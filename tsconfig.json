@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "strict": true,
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "target": "es6",
+        "outDir": "build",
+        "module": "node18"
+    }
+}

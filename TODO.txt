@@ -1,0 +1,29 @@
+    # register
+    ?? sinkron_user = sinkron.createUser()
+    const id = users.insert({ name })
+
+    # auth middleware (TODO list of sessions, terminate)
+    ctx.user = users.findOne(ctx.session.user)
+
+    # create space
+    spaces.insert()
+    sinkron.createGroup('spaces/:id/members')
+    sinkron.createGroup('spaces/:id/editors')
+    sinkron.createGroup('spaces/:id/admin')
+    sinkron.createCollection(
+        id: 'spaces/:id',
+        permissions: {
+            'group(space/:id/members)': read,
+            'group(space/:id/editors)': update
+        })
+    )
+
+    # invite to space
+    members.insert({ space, user ... })
+    sinkron.addUserToGroup('spaces/:id/members')
+
+    # ws upgrade (in app)
+    sinkronServer.upgrade(..., userid) ?
+
+    # MESSAGE change col, doc
+    sinkron.checkPermission( user, doc )
