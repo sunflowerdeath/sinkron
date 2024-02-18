@@ -23,6 +23,7 @@ type AuthTokenProps = {
 
 type Profile = {
     id: string
+    name: string
     spaces: { id: string; role: string }[]
 }
 
@@ -208,7 +209,7 @@ class UsersController {
     ): Promise<ResultType<Profile, RequestError>> {
         const user = await this.users.findOne({
             where: { id, isDisabled: false },
-            select: { id: true }
+            select: { id: true, name: true }
         })
 
         if (user === null) {

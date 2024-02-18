@@ -6,17 +6,28 @@ const spacesRouter = (controller: Controller) => {
     const router = new Router()
 
     // create space
-    router.post('/spaces/new', (ctx) => {
+    router.post('/spaces/new', async (ctx) => {
         const { name } = ctx.request.body
-        controller.spaces.create({
+        const res = await controller.spaces.create({
             name,
             ownerId: ctx.token.userId
         })
+        if (res.isOk) {
+            ctx.body = res.value
+        } else {
+            ctx.status = 500
+            ctx.body = res.error
+        }
     })
 
-    // get list of members
-    router.get('/spaces/:id/members', () => {
-        // TODO
+    router.get('/spaces/:id/members', async (ctx) => {
+        const res = await controller.spaces.getMembers(ctx.params.id)
+        if (res.isOk) {
+            ctx.body = res.value
+        } else {
+            ctx.status = 500
+            ctx.body = res.error
+        }
     })
 
     // update member of a space (change role)

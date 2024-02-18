@@ -14,6 +14,9 @@ dependencies:
   '@koa/router':
     specifier: ^12.0.1
     version: 12.0.1
+  '@material-design-icons/svg':
+    specifier: ^0.14.13
+    version: 0.14.13
   ajv:
     specifier: ^8.12.0
     version: 8.12.0
@@ -111,8 +114,8 @@ dependencies:
     specifier: ^9.0.0
     version: 9.0.1
   wouter:
-    specifier: ^2.11.0
-    version: 2.12.1(react@18.2.0)
+    specifier: ^3.0.0
+    version: 3.0.0(react@18.2.0)
   ws:
     specifier: ^8.11.0
     version: 8.16.0
@@ -187,6 +190,9 @@ devDependencies:
   prettier:
     specifier: ^2.7.1
     version: 2.8.8
+  raw-loader:
+    specifier: ^4.0.2
+    version: 4.0.2(webpack@5.90.1)
   typescript:
     specifier: ^5.3.3
     version: 5.3.3
@@ -2085,6 +2091,10 @@ packages:
     transitivePeerDependencies:
       - encoding
       - supports-color
+    dev: false
+
+  /@material-design-icons/svg@0.14.13:
+    resolution: {integrity: sha512-nCExGZOtoLoFeeqShEOM4XA9DkkLzLlQdk/ZxHxps0//dz6e1Lw3fvQbZ2X/+0Dz2O+udiEukfZ4Nd4KpHg8aA==}
     dev: false
 
   /@nodelib/fs.scandir@2.1.5:
@@ -7009,6 +7019,10 @@ packages:
       yallist: 4.0.0
     dev: false
 
+  /mitt@3.0.1:
+    resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
+    dev: false
+
   /mkdirp-classic@0.5.3:
     resolution: {integrity: sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==}
     dev: false
@@ -7824,6 +7838,17 @@ packages:
       unpipe: 1.0.0
     dev: false
 
+  /raw-loader@4.0.2(webpack@5.90.1):
+    resolution: {integrity: sha512-ZnScIV3ag9A4wPX/ZayxL/jZH+euYb6FcUinPcgiQW0+UBtEv0O6Q3lGd3cqJ+GHH+rksEv3Pj99oxJ3u3VIKA==}
+    engines: {node: '>= 10.13.0'}
+    peerDependencies:
+      webpack: ^4.0.0 || ^5.0.0
+    dependencies:
+      loader-utils: 2.0.4
+      schema-utils: 3.3.0
+      webpack: 5.90.1(esbuild@0.15.18)(webpack-cli@4.10.0)
+    dev: true
+
   /rc@1.2.8:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
     hasBin: true
@@ -8237,6 +8262,11 @@ packages:
       es-errors: 1.3.0
       set-function-name: 2.0.1
     dev: true
+
+  /regexparam@3.0.0:
+    resolution: {integrity: sha512-RSYAtP31mvYLkAHrOlh25pCNQ5hWnT106VukGaaFfuJrZFkGRX5GhUAdPqpSDXxOhA2c4akmRuplv1mRqnBn6Q==}
+    engines: {node: '>=8'}
+    dev: false
 
   /regexpu-core@5.3.2:
     resolution: {integrity: sha512-RAM5FlZz+Lhmo7db9L298p2vHP5ZywrVXmVXpmAD9GuL5MPH6t9ROw1iA/wfHkQ76Qe7AaPF0nGuim96/IrQMQ==}
@@ -9690,12 +9720,14 @@ packages:
     resolution: {integrity: sha512-ILEIE97kDZvF9Wb9f6h5aXK4swSlKGUcOEGiIYb2OOu/IrDU9iwj0fD//SsA6E5ibwJxpEvhullJY4Sl4GcpAw==}
     dev: true
 
-  /wouter@2.12.1(react@18.2.0):
-    resolution: {integrity: sha512-G7a6JMSLSNcu6o8gdOfIzqxuo8Qx1qs+9rpVnlurH69angsSFPZP5gESNuVNeJct/MGpQg191pDo4HUjTx7IIQ==}
+  /wouter@3.0.0(react@18.2.0):
+    resolution: {integrity: sha512-mI7KL45peK6D15f5fdE9xpzn/ShbCTnBO5BPUX/XpZm+lwxs7h2t2Nh++Kcr7nozdCzKnomrFxDIObuIEZB1sg==}
     peerDependencies:
       react: '>=16.8.0'
     dependencies:
+      mitt: 3.0.1
       react: 18.2.0
+      regexparam: 3.0.0
       use-sync-external-store: 1.2.0(react@18.2.0)
     dev: false
 

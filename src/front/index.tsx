@@ -7,7 +7,7 @@ import {
     observable,
     ObservableMap
 } from 'mobx'
-import { observer } from 'mobx-react-lite'
+import { observer, Observer } from 'mobx-react-lite'
 import { fromPromise, IPromiseBasedObservable } from 'mobx-utils'
 import * as Automerge from '@automerge/automerge'
 import {
@@ -31,8 +31,7 @@ import {
     useRoute,
     Link
 } from 'wouter'
-import { compareAsc, compareDesc } from 'date-fns'
-import Cookies from 'js-cookie'
+import { defaults } from 'lodash'
 
 import {
     Collection,
@@ -48,9 +47,8 @@ import {
     applySlateOps,
     AutomergeNode
 } from '../slate'
-import { Result, ResultType } from '../result'
+import { Result, ResultType } from '../utils/result'
 
-import { forwardRef } from 'react'
 import {
     OrienteProvider,
     Col,
@@ -60,75 +58,33 @@ import {
     useStyles,
     StyleProps,
     StyleMap,
+    omitStyleProps,
     mergeRefs,
-    Menu,
-    MenuItem
+    Modal,
+    useModal
 } from 'oriente'
 
+import notificationsSvg from '@material-design-icons/svg/outlined/notifications.svg'
+import addSvg from '@material-design-icons/svg/outlined/add.svg'
+import moreHorizSvg from '@material-design-icons/svg/outlined/more_horiz.svg'
+
 import { fetchJson, FetchError } from './fetchJson'
-import { TransformedMap } from './transformedMap'
 
-interface ButtonStyleProps {
-    isFocused: boolean
-}
+import { Store, useStore, StoreContext } from './store'
 
-interface ButtonProps extends StyleProps<[ButtonProps, TapState]> {
-    as?: React.ElementType
-    children: React.ReactNode
-    onClick: () => void
-    isDisabled?: boolean
-    onChangeTapState?: (tapState: TapState) => void
-}
+import { Avatar } from './ui/avatar'
+import { Button } from './ui/button'
+import { Heading } from './ui/heading'
+import { Input } from './ui/input'
+import { Menu, MenuItem } from './ui/menu'
+import ButtonsGrid from './ui/ButtonsGrid'
+import { Icon } from './ui/icon'
+import Container from './ui/Container'
 
-const buttonStyles = (
-    props: ButtonProps,
-    { isFocused, isHovered, isPressed }: TapState
-): StyleMap => {
-    return {
-        root: {
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            height: 60,
-            minWidth: 60,
-            boxSizing: 'border-box',
-            justifyContent: 'center',
-            padding: '0 8px',
-            display: 'flex',
-            alignItems: 'center',
-            cursor: props.isDisabled ? 'not-allowed' : 'pointer',
-            outline: 'none',
-            userSelect: 'none',
-            background: isHovered ? '#666' : '#555',
-            opacity: props.isDisabled ? 0.5 : 1,
-            boxShadow: isFocused ? 'inset 0 0 0 2px #ccc' : 'none',
-            WebkitTapHighlightColor: 'transparent'
-        }
-    }
-}
-
-const Button = forwardRef((props: ButtonProps, ref) => {
-    const { as, children, onClick, isDisabled, onChangeTapState, ...rest } =
-        props
-    const Component = as || 'div'
-    const { tapState, render } = useTaply({
-        onClick,
-        isDisabled,
-        onChangeTapState
-    })
-    const styles = useStyles(buttonStyles, [props, tapState])
-    return render((attrs, taplyRef) => {
-        return createElement(
-            Component,
-            {
-                ...rest,
-                style: styles.root,
-                ...attrs,
-                ref: mergeRefs(ref, taplyRef)
-            },
-            children
-        )
-    })
-})
+import CategoriesView from './views/CategoriesView'
+import CreateSpaceView from './views/CreateSpaceView'
+import SpaceMembersView from './views/SpaceMembersView'
+import SwitchSpaceView from './views/SwitchSpaceView'
 
 const useForceUpdate = () => {
     const [state, setState] = useState({})
@@ -158,100 +114,6 @@ const renderElement = (props) => {
     return <span {...props.attributes}>{props.children}</span>
 }
 
-interface Space {
-    id: string
-    name: string
-    owner: User
-    collectionId: string
-}
-
-interface User {
-    id: string
-    name: string
-    spaces: Space[]
-}
-
-type Credentials = { name: string; password: string }
-
-const authLocalStorageKey = 'auth'
-
-type AuthToken = { token: string; user: { id: string; name: string } }
-
-class AppStore {
-    isInited: boolean = false
-
-    user?: User = undefined
-    space?: Space = undefined
-
-    constructor() {
-        this.init()
-        makeAutoObservable(this)
-    }
-
-    setUser(user: User) {
-        this.user = user
-        this.space = this.user.spaces?.[0]
-        localStorage.setItem('user', JSON.stringify(this.user))
-    }
-
-    async init() {
-        const user = localStorage.getItem('user')
-        if (user !== null) {
-            this.setUser(JSON.parse(user))
-            await this.fetchProfile()
-        }
-        this.isInited = true
-    }
-
-    async fetchProfile() {
-        console.log('Fetching user...')
-        const res = await fetchJson<User>({ url: '/api/profile' })
-        if (res.isOk) {
-            this.setUser(res.value)
-            console.log('Fetch user success')
-        } else {
-            if (res.error.kind === 'http') {
-                // TODO if session expired / terminated
-                console.log('Fetch user error')
-                this.logout()
-            }
-        }
-    }
-
-    async authenticate(credentials: Credentials) {
-        const res = await fetchJson<User>({
-            method: 'POST',
-            url: '/api/login',
-            data: credentials
-        })
-        if (res.isOk) {
-            this.setUser(res.value)
-            console.log('Logged in')
-        } else {
-            return res.error
-        }
-    }
-
-    logout() {
-        console.log('Logout')
-        this.user = undefined
-        this.space = undefined
-        localStorage.removeItem('user')
-        history.pushState({}, '', '/')
-    }
-
-    async createSpace(name: string) {
-        const state = fromPromise(
-            fetchJson({
-                method: 'POST',
-                url: '/api/spaces/new',
-                data: { name }
-            })
-        )
-        return state
-    }
-}
-
 interface Document {
     content: AutomergeNode
 }
@@ -261,64 +123,6 @@ interface DocumentListItemData {
     item: Item<Document>
     title: string
     subtitle: string | null
-}
-
-const getUpdatedAt = <T,>(item: Item<T>) =>
-    item.state === ItemState.Synchronized
-        ? item.updatedAt!
-        : item.localUpdatedAt!
-
-class SpaceStore {
-    space: Space
-    collection: Collection<Document>
-    list: TransformedMap<Item<Document>, DocumentListItemData>
-
-    constructor(space: Space) {
-        this.space = space
-
-        const col = `spaces/${space.id}`
-        const store = new IndexedDbCollectionStore(col)
-        const token = Cookies.get('token')
-        const transport = new WebsocketTransport(`ws://127.0.0.1:8080/${token}`)
-        this.collection = new Collection<Document>({
-            transport,
-            col,
-            store
-        })
-
-        // @ts-ignore
-        window.col = this.collection
-
-        this.list = new TransformedMap({
-            source: this.collection.items,
-            filter: (item) => item.local !== null,
-            transform: (item) => this.makeItemData(item)
-        })
-    }
-
-    makeItemData(item) {
-        const doc = item.local!.content
-        const firstNode = doc.children[0]
-        const firstNodeText = firstNode
-            ? firstNode.children.map((c) => c.text).join('')
-            : ''
-        const title = firstNodeText.length > 0 ? firstNodeText : null
-        let subtitle
-        if (title !== null && title.length > 0) {
-            const secondNode = doc.children[1]
-            const secondNodeText = secondNode
-                ? secondNode.children.map((c) => c.text).join('')
-                : ''
-            subtitle = secondNodeText.slice(0, 100)
-        }
-        return { id: item.id, item, title, subtitle }
-    }
-
-    get sortedList() {
-        return Array.from(this.list.map.values()).sort((a, b) =>
-            compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
-        )
-    }
 }
 
 interface DocumentViewProps {
@@ -355,16 +159,10 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     <div>Created: 1 sep 10:27</div>
                     <div>Last modified: 1 sep 10:27</div>
                 </Col>
-                <div>
-                    <MenuItem style={{ height: 45, padding: '0 8px' }}>
-                        Share
-                    </MenuItem>
-                    <MenuItem
-                        style={{ height: 45, padding: '0 8px' }}
-                        onSelect={onDelete}
-                    >
-                        Delete
-                    </MenuItem>
+                <div style={{ alignSelf: 'stretch' }}>
+                    <MenuItem>Pin to top</MenuItem>
+                    <MenuItem>Share</MenuItem>
+                    <MenuItem onSelect={onDelete}>Delete</MenuItem>
                 </div>
             </Col>
         )
@@ -372,23 +170,13 @@ const DocumentView = observer((props: DocumentViewProps) => {
 
     return (
         <div
-            style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+            style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%'
+            }}
         >
-            <div
-                style={{
-                    height: 60,
-                    display: 'flex',
-                    justifyContent: 'flex-end'
-                }}
-            >
-                <Menu menu={menu} styles={{ list: { background: '#555' } }}>
-                    {(ref, { open }) => (
-                        <Button onClick={open} ref={ref}>
-                            ...
-                        </Button>
-                    )}
-                </Menu>
-            </div>
             <Slate
                 initialValue={value}
                 editor={editor}
@@ -399,21 +187,36 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     style={{ padding: '16px 40px', outline: 'none' }}
                 />
             </Slate>
+            <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                <Menu
+                    menu={menu}
+                    styles={{ list: { background: '#555' } }}
+                    placement={{ padding: 0, offset: 8 }}
+                    autoSelectFirstItem={false}
+                >
+                    {(ref, { open }) => (
+                        <Button onClick={open} ref={ref}>
+                            <Icon svg={moreHorizSvg} />
+                        </Button>
+                    )}
+                </Menu>
+            </div>
         </div>
     )
 })
 
 interface DocumentRouteProps {
-    store: DocumentStore
     id: string
 }
 
 const DocumentRoute = observer((props: DocumentRouteProps) => {
-    const { store, id } = props
+    const { id } = props
+    const store = useStore()
+    const space = store.spaceStore!
 
     const [location, navigate] = useLocation()
 
-    const item = store.collection.items.get(id)
+    const item = space.collection.items.get(id)
     if (item === undefined || item.local === null) {
         return <Redirect to="/" />
     }
@@ -423,14 +226,14 @@ const DocumentRoute = observer((props: DocumentRouteProps) => {
             (op) => op.type !== 'set_selection'
         )
         if (ops.length > 0) {
-            store.collection.change(id, (doc) =>
+            space.collection.change(id, (doc) =>
                 applySlateOps(doc.content, ops)
             )
         }
     }
 
     const onDelete = () => {
-        store.collection.delete(id)
+        space.collection.delete(id)
         navigate('/')
     }
 
@@ -492,20 +295,17 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
     )
 })
 
-interface DocumentListProps {
-    store: DocumentStore
-}
-
-const DocumentList = observer((props: DocumentListProps) => {
-    const { store } = props
+const DocumentList = observer(() => {
+    const store = useStore()
+    const space = store.spaceStore!
 
     const [location, navigate] = useLocation()
     const [match, params] = useRoute('/documents/:id')
     const selectedId = match ? params.id : undefined
 
     let content
-    if (store.list.map.size > 0) {
-        content = store.sortedList.map((item) => (
+    if (space.list.map.size > 0) {
+        content = space.sortedList.map((item) => (
             <DocumentListItem
                 key={item.id}
                 data={item}
@@ -535,135 +335,150 @@ const SettingsView = observer(() => {
     return <div></div>
 })
 
-const Heading = (props) => {
-    return (
-        <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>
-            {props.children}
-        </h1>
-    )
+const modalStyles: StyleMap = {
+    window: {
+        background: 'var(--color-background)',
+        padding: 20
+    },
+    container: {
+        paddingTop: 40
+    }
 }
 
-type AccountViewProps = {
-    store: AppStore
+const StyledModal = (props: React.ComponentProps<typeof Modal>) => {
+    return <Modal styles={[modalStyles, props.styles]} {...props} />
 }
 
-const AccountView = observer((props: AccountViewProps) => {
-    const { store } = props
+const AccountView = observer(() => {
+    const store = useStore()
+
+    const leaveModal = useModal({
+        Component: StyledModal,
+        width: 440,
+        isCentered: true,
+        children: (close) => {
+            return (
+                <Col gap={20}>
+                    Are you sure you want to leave space "name"?
+                    <ButtonsGrid>
+                        <Button onClick={close}>Cancel</Button>
+                        <Button>Leave</Button>
+                    </ButtonsGrid>
+                </Col>
+            )
+        }
+    })
+
+    const deleteModal = useModal({
+        Component: StyledModal,
+        width: 440,
+        isCentered: true,
+        children: (close) => {
+            return (
+                <Col gap={20}>
+                    Are you sure you want to delete space "name"?
+                    <ButtonsGrid>
+                        <Button onClick={close}>Cancel</Button>
+                        <Button>DELETE</Button>
+                    </ButtonsGrid>
+                </Col>
+            )
+        }
+    })
+
+    const isOwner = store.user!.id === store.spaceE!.owner.id
+
+    const roleText = isOwner ? 'Owner' : store.spaceE!.role
 
     return (
-        <Col gap={40} style={{ padding: '18px 40px' }}>
-            <Heading>Account and spaces</Heading>
+        <Container title="Account and spaces">
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
-                    <div
-                        style={{
-                            height: 45,
-                            width: 45,
-                            background: '#53804C',
-                            borderRadius: 10
-                        }}
-                    />
-                    <div>@sunflowerdeath</div>
+                    <Avatar name={store.user!.name} />
+                    <div>{store.user!.name}</div>
                 </Row>
-                <Row gap={8}>
+                <ButtonsGrid>
                     <Button>Account settings</Button>
                     <Button onClick={() => store.logout()}>Logout</Button>
-                </Row>
+                </ButtonsGrid>
             </Col>
             <Col gap={16}>
                 <Heading>Space</Heading>
                 <Row gap={8}>
-                    <div
-                        style={{
-                            height: 45,
-                            width: 45,
-                            background: '#53804C',
-                            borderRadius: 10
-                        }}
-                    />
+                    <Avatar name={store.spaceE!.name} />
                     <Col>
-                        <div>@sunflowerdeath</div>
-                        <div style={{ opacity: '.6' }}>1 member - Admin</div>
+                        <div>{store.spaceE!.name}</div>
+                        <div style={{ opacity: '.6' }}>
+                            {store.spaceE!.membersCount} member &ndash;{' '}
+                            {roleText}
+                        </div>
                     </Col>
                 </Row>
-                <Row gap={8}>
+                <ButtonsGrid>
                     <Button>Invite member</Button>
-                    <Button>Members list</Button>
+                    <Button as={Link} to="/space/members">
+                        Members list
+                    </Button>
                     <Button>Space settings</Button>
-                    <Button>Leave space</Button>
-                </Row>
+                    {isOwner ? (
+                        <Button onClick={() => deleteModal.open()}>
+                            Delete space
+                        </Button>
+                    ) : (
+                        <Button onClick={() => leaveModal.open()}>
+                            Leave space
+                        </Button>
+                    )}
+                </ButtonsGrid>
             </Col>
-            <Row gap={8}>
-                <Button>Switch space</Button>
-                <Button as={Link} to="/new-space">
+            <ButtonsGrid>
+                <Button as={Link} to="/switch-space">
+                    Switch space
+                </Button>
+                <Button as={Link} to="/create-space">
                     Create new space
                 </Button>
-            </Row>
-        </Col>
+            </ButtonsGrid>
+            {leaveModal.render()}
+            {deleteModal.render()}
+        </Container>
     )
 })
 
-type CreateSpaceViewProps = {
-    store: AppStore
-}
 
-const CreateSpaceView = observer((props: CreateSpaceViewProps) => {
-    const { store } = props
-
-    const [location, navigate] = useLocation()
-
-    const [name, setName] = useState('')
-
-    const [createState, setCreateState] = useState<IPromiseBasedObservable<
-        ResultType<object, FetchError>
-    > | null>(null)
-    const create = async () => {
-        const state = store.createSpace(name)
-        setCreateState(state)
-        const res = await state
-        if (res.isOk) {
-            store.user!.spaces.push(res.value as Space)
-            store.space = res.value as Space
-            navigate('/')
-        } else {
-            alert(res.error)
-        }
-    }
-
-    return (
-        <Col gap={20} style={{ padding: '0 40px', paddingTop: 18 }}>
-            <Heading>Create new space</Heading>
-            Name:
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-            <Button
-                onClick={create}
-                isDisabled={createState?.state === 'pending'}
-            >
-                Create
-            </Button>
-        </Col>
-    )
+const NotificationsView = observer(() => {
+    const store = useStore()
+    return <Container title="Notifications">No notifications</Container>
 })
 
-interface SpaceViewProps {
-    store: AppStore
-}
-
-const SpaceView = observer((props: SpaceViewProps) => {
-    const store = useMemo(() => new SpaceStore(props.store.space!), [])
+const SpaceView = observer(() => {
+    const store = useStore()
+    const space = store.spaceStore!
 
     const [location, navigate] = useLocation()
 
     const createDocument = () => {
-        const id = store.collection.create(makeInitial())
+        const id = space.collection.create(makeInitial())
         navigate(`/documents/${id}`)
     }
 
     const spaceBar = (
-        <Button style={{ justifyContent: 'start' }} as={Link} to="/account">
-            Sunflowerdeath
-        </Button>
+        <Row gap={8}>
+            <Button
+                style={{ justifyContent: 'start', flexGrow: 1 }}
+                as={Link}
+                to="/account"
+            >
+                <Row gap={8} align="center">
+                    <Avatar name={space.space.name} />
+                    <div style={{ flexGrow: 1 }}>{space.space.name}</div>
+                </Row>
+            </Button>
+            <Button as={Link} to="/notifications">
+                <Icon svg={notificationsSvg} />
+            </Button>
+        </Row>
     )
 
     const notesBar = (
@@ -673,10 +488,12 @@ const SpaceView = observer((props: SpaceViewProps) => {
                     flexGrow: 1,
                     justifyContent: 'start'
                 }}
+                as={Link}
+                to="/categories"
             >
-                Documents
+                All documents
                 <span style={{ color: '#999', marginLeft: 8 }}>
-                    {store.collection.items.size}
+                    {space.collection.items.size}
                 </span>
             </Button>
             <Button
@@ -686,7 +503,7 @@ const SpaceView = observer((props: SpaceViewProps) => {
                 }}
                 onClick={createDocument}
             >
-                +
+                <Icon svg={addSvg} />
             </Button>
         </Row>
     )
@@ -700,7 +517,7 @@ const SpaceView = observer((props: SpaceViewProps) => {
 
     const status = (
         <div style={{ padding: '0 8px', paddingBottom: 8, color: '#999' }}>
-            {statusMap[store.collection.status]}
+            {statusMap[space.collection.status]}
         </div>
     )
 
@@ -714,10 +531,10 @@ const SpaceView = observer((props: SpaceViewProps) => {
             gap={8}
             align="stretch"
         >
-            {spaceBar}
             {notesBar}
             <DocumentList store={store} />
-            {status}
+            {spaceBar}
+            {/*status*/}
         </Col>
     )
 
@@ -729,24 +546,32 @@ const SpaceView = observer((props: SpaceViewProps) => {
                     <Route
                         path={`/documents/:id`}
                         children={(params) => (
-                            <DocumentRoute
-                                key={params.id}
-                                store={store}
-                                id={params.id}
-                            />
+                            <DocumentRoute key={params.id} id={params.id} />
                         )}
                     />
                     <Route
-                        path={`/account`}
-                        children={(params) => (
-                            <AccountView store={props.store} />
-                        )}
+                        path={'/account'}
+                        children={(params) => <AccountView />}
                     />
                     <Route
-                        path={`/new-space`}
-                        children={(params) => (
-                            <CreateSpaceView store={props.store} />
-                        )}
+                        path={'/notifications'}
+                        children={(params) => <NotificationsView />}
+                    />
+                    <Route
+                        path={'/create-space'}
+                        children={(params) => <CreateSpaceView />}
+                    />
+                    <Route
+                        path={'/switch-space'}
+                        children={(params) => <SwitchSpaceView />}
+                    />
+                    <Route
+                        path={'/space/members'}
+                        children={(params) => <SpaceMembersView />}
+                    />
+                    <Route
+                        path={'/categories'}
+                        children={(params) => <CategoriesView />}
                     />
                     <Redirect to="/" />
                 </Switch>
@@ -755,12 +580,8 @@ const SpaceView = observer((props: SpaceViewProps) => {
     )
 })
 
-interface LoginViewProps {
-    store: AppStore
-}
-
-const LoginView = (props: LoginViewProps) => {
-    const { store } = props
+const LoginView = () => {
+    const store = useStore()
     return (
         <Col align="center" justify="center" style={{ height: '100%' }}>
             <Button
@@ -779,7 +600,7 @@ const LoginView = (props: LoginViewProps) => {
 
 const Root = observer(() => {
     const store = useMemo(() => {
-        const s = new AppStore()
+        const s = new Store()
         window.store = s
         return s
     }, [])
@@ -787,15 +608,11 @@ const Root = observer(() => {
     if (!store.isInited) return null
 
     return (
-        <OrienteProvider>
-            <Router>
-                {store.user ? (
-                    <SpaceView store={store} />
-                ) : (
-                    <LoginView store={store} />
-                )}
-            </Router>
-        </OrienteProvider>
+        <StoreContext.Provider value={store}>
+            <OrienteProvider>
+                <Router>{store.user ? <SpaceView /> : <LoginView />}</Router>
+            </OrienteProvider>
+        </StoreContext.Provider>
     )
 })
 

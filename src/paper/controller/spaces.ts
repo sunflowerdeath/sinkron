@@ -1,5 +1,5 @@
 import { EntitySchema, DataSource, Repository } from 'typeorm'
-import { Raw } from 'typeorm'
+import { Raw, In } from 'typeorm'
 
 import { AuthToken, User, Space, SpaceRole, SpaceMember } from '../entities'
 import { Controller } from './index'
@@ -85,7 +85,11 @@ class SpacesController {
         })
         await this.sinkron.addMemberToGroup(ownerId, `spaces/${space.id}/admin`)
 
-        return Result.ok(space)
+        return Result.ok({
+            ...space,
+            role: 'admin',
+            membersCount: 1
+        })
     }
 
     async delete(id: string): Promise<ResultType<true, RequestError>> {
@@ -145,14 +149,53 @@ class SpacesController {
 
         const res = await this.members.find({
             where: { userId },
-            relations: ['space']
+            relations: ['space'],
+            select: {
+                spaceId: true,
+                role: true,
+                space: { id: true, ownerId: true, name: true }
+            }
         })
         const spaces = res.map((m) => ({
             id: m.spaceId,
             name: m.space.name,
-            role: m.role
+            role: m.role,
+            membersCount: 0,
+            owner: { id: m.space.ownerId }
         }))
+
+        const membersCount = await this.members
+            .createQueryBuilder()
+            .select('COUNT(1)', 'count')
+            .addSelect('spaceId', 'id')
+            .where({ spaceId: In(spaces.map((s) => s.id)) })
+            .groupBy('id')
+            .getRawMany()
+
+        membersCount.forEach((item) => {
+            spaces.find((s) => s.id === item.id)!.membersCount = item.count
+        })
+
         return Result.ok(spaces)
+    }
+
+    async getMembers(id: string) {
+        const cnt = await this.spaces.countBy({ id })
+        if (cnt === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: 'Space not found',
+                details: { id }
+            })
+        }
+
+        const res = await this.members.find({
+            where: { spaceId: id },
+            relations: { user: true },
+            select: { user: { id: true, name: true }, role: true }
+        })
+
+        return Result.ok(res.map((m) => ({ role: m.role, ...m.user })))
     }
 
     // update space member

@@ -24,6 +24,11 @@ const rules = [
                 options: { loader: 'tsx', jsx: 'automatic' }
             }
         ]
+    },
+    {
+        test: /\.svg$/i,
+        issuer: /\.(js|jsx|ts|tsx)$/,
+        use: ['raw-loader']
     }
 ]
 

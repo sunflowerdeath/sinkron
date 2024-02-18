@@ -44,6 +44,7 @@ const run = async () => {
     if (createUserResult.isOk) user = createUserResult.value
     console.log('Created user', user)
 
+    /*
     let space
     let createSpaceResult = await app.controller.spaces.create({
         ownerId: user!.id,
@@ -57,7 +58,7 @@ const run = async () => {
         spaceId: space!.id,
         role: "admin"
     })
-
+    */
 
     app.start()
 

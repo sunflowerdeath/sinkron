@@ -69,7 +69,11 @@ const SpaceEntity = new EntitySchema<Space>({
     columns: {
         id: { type: String, primary: true, generated: 'uuid' },
         name: { type: String },
+        ownerId: { type: String },
         createdAt: { type: Date, createDate: true }
+    },
+    relations: {
+        owner: { type: 'many-to-one', target: 'user' }
     }
 })
 

@@ -14,7 +14,7 @@ import {
 
 import Koa from 'koa'
 import koaBodyParser from 'koa-bodyparser'
-import Router from 'koa-tree-router'
+import Router from '@koa/router'
 
 import { Sinkron, SinkronServer } from '../sinkron/server'
 
