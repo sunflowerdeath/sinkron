@@ -149,9 +149,13 @@ class Sinkron {
                 details: 'Duplicate id'
             })
         }
+
         await models.collections.insert({ id, colrev: 1 })
         // TODO generated fields
         const col = { id, colrev: 1 }
+
+        // create meta document
+
         return Result.ok(col as Collection)
     }
 

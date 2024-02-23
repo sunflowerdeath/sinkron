@@ -1,7 +1,18 @@
 import { createContext, useContext } from 'react'
-import { makeAutoObservable, reaction, observe } from 'mobx'
+import {
+    makeAutoObservable,
+    reaction,
+    observe,
+    makeObservable,
+    computed,
+    observable
+} from 'mobx'
 import { fromPromise } from 'mobx-utils'
 import Cookies from 'js-cookie'
+import { v4 as uuidv4 } from 'uuid'
+import { without } from 'lodash-es'
+
+import { AutomergeNode, toAutomerge } from '../slate'
 
 import {
     Collection,
@@ -16,7 +27,7 @@ import { TransformedMap } from './transformedMap'
 import { fetchJson, FetchError } from './fetchJson'
 import { compareAsc, compareDesc } from 'date-fns'
 
-interface Space {
+export interface Space {
     id: string
     name: string
     owner: User
@@ -24,43 +35,77 @@ interface Space {
     role: SpaceRole
 }
 
-type SpaceRole = 'readonly' | 'editor' | 'admin'
+export type SpaceRole = 'readonly' | 'editor' | 'admin'
 
-interface User {
+export interface User {
     id: string
     name: string
     spaces: Space[]
 }
 
-type Credentials = { name: string; password: string }
+export type Credentials = { name: string; password: string }
+
+export type Category = {
+    id: string
+    name: string
+    parent: string | null
+}
+
+export type Metadata = {
+    meta: true
+    categories: Category[]
+}
+
+export interface Document {
+    content: AutomergeNode
+    categories: string[]
+}
+
+export interface DocumentListItemData {
+    id: string
+    item: Item<Document>
+    title: string
+    subtitle: string | null
+}
+
+const getDocumentListItemData = (
+    item: Item<Document>
+): DocumentListItemData => {
+    const doc = item.local!.content
+    const firstNode = doc.children[0]
+    const firstNodeText = firstNode
+        ? firstNode.children.map((c) => c.text).join('')
+        : ''
+    const title = firstNodeText.length > 0 ? firstNodeText : null
+    // let subtitle
+    // if (title !== null && title.length > 0) {
+    const secondNode = doc.children[1]
+    const secondNodeText = secondNode
+        ? secondNode.children.map((c) => c.text).join('')
+        : ''
+    const subtitle = secondNodeText.slice(0, 100)
+    // }
+    return { id: item.id, item, title, subtitle }
+}
 
 class Store {
     isInited: boolean = false
-
-    user?: User = undefined
-    space?: string = undefined
-
-    get spaceE() {
-        return this.space === undefined
-            ? undefined
-            : this.user!.spaces.find((s) => s.id === this.space)
-    }
-
-    get spaceStore() {
-        if (this.space === undefined) return
-        const space = this.user!.spaces.find((s) => s.id === this.space)
-        return new SpaceStore(space!)
-    }
+    user?: User
+    currentSpace?: string
 
     constructor() {
         this.init()
         makeAutoObservable(this)
     }
 
-    setUser(user: User) {
-        this.user = user
-        this.space = this.user.spaces?.[0].id
-        localStorage.setItem('user', JSON.stringify(this.user))
+    get space() {
+        return this.user!.spaces.find((s) => s.id === this.currentSpace)!
+    }
+
+    get spaceStore() {
+        if (this.space === undefined) return
+        const space = this.user!.spaces.find((s) => s.id === this.currentSpace)
+        return new SpaceStore(space!)
     }
 
     async init() {
@@ -70,6 +115,12 @@ class Store {
             await this.fetchProfile()
         }
         this.isInited = true
+    }
+
+    setUser(user: User) {
+        this.user = user
+        this.currentSpace = this.user.spaces?.[0].id
+        localStorage.setItem('user', JSON.stringify(this.user))
     }
 
     async fetchProfile() {
@@ -104,7 +155,7 @@ class Store {
     logout() {
         console.log('Logout')
         this.user = undefined
-        this.space = undefined
+        this.currentSpace = undefined
         localStorage.removeItem('user')
         history.pushState({}, '', '/')
     }
@@ -121,14 +172,50 @@ class Store {
     }
 }
 
+const makeInitialDocument = () => ({
+    content: toAutomerge({
+        children: [
+            {
+                type: 'title',
+                children: [{ text: '' }]
+            }
+        ]
+    }),
+    categories: []
+})
+
 const getUpdatedAt = <T>(item: Item<T>) =>
     item.state === ItemState.Synchronized
         ? item.updatedAt!
         : item.localUpdatedAt!
 
+type ListItem = { id: string; parent: string | null }
+
+export type TreeNode<T extends {}> = T & { children: TreeNode<T>[] }
+
+const listToTree = <T extends ListItem>(list: T[]): TreeNode<T>[] => {
+    const index: { [id: string]: TreeNode<T> } = {}
+    list.forEach((c) => {
+        index[c.id] = { ...c, children: [] }
+    })
+    const tree: TreeNode<T>[] = []
+    list.forEach((item) => {
+        const node = index[item.id]
+        if (item.parent) {
+            const parentNode = index[item.parent]
+            parentNode.children.push(node)
+        } else {
+            tree.push(node)
+        }
+    })
+    return tree
+}
+
 class SpaceStore {
     space: Space
     collection: Collection<Document>
+
+    currentCategoryId: string | null = null
     list: TransformedMap<Item<Document>, DocumentListItemData>
 
     constructor(space: Space) {
@@ -149,33 +236,114 @@ class SpaceStore {
 
         this.list = new TransformedMap({
             source: this.collection.items,
-            filter: (item) => item.local !== null,
-            transform: (item) => this.makeItemData(item)
+            filter: (item) => {
+                if (item.local === null) return false
+                if (item.local.meta) return false
+
+                if (this.currentCategoryId !== null) {
+                    return item.local.categories.includes(
+                        this.currentCategoryId
+                    )
+                } else {
+                    return true
+                }
+            },
+            transform: getDocumentListItemData
+        })
+
+        makeObservable(this, {
+            metaItem: computed,
+            meta: computed,
+            currentCategoryId: observable,
+            currentCategory: computed,
+            categories: computed
         })
     }
 
-    makeItemData(item) {
-        const doc = item.local!.content
-        const firstNode = doc.children[0]
-        const firstNodeText = firstNode
-            ? firstNode.children.map((c) => c.text).join('')
-            : ''
-        const title = firstNodeText.length > 0 ? firstNodeText : null
-        let subtitle
-        if (title !== null && title.length > 0) {
-            const secondNode = doc.children[1]
-            const secondNodeText = secondNode
-                ? secondNode.children.map((c) => c.text).join('')
-                : ''
-            subtitle = secondNodeText.slice(0, 100)
+    get metaItem() {
+        for (let [key, item] of this.collection.items.entries()) {
+            if (item.local?.meta === true) return item
         }
-        return { id: item.id, item, title, subtitle }
+    }
+
+    get meta() {
+        if (!this.metaItem || this.metaItem.local === null) {
+            throw new Error('Metadata document not found!')
+        }
+        return this.metaItem.local as any as Metadata
+    }
+
+    changeMeta(cb: (m: Metadata) => void) {
+        if (!this.metaItem || this.metaItem.local === null) {
+            throw new Error('Metadata document not found!')
+        }
+        this.collection.change(this.metaItem.id, cb)
+    }
+
+    get currentCategory() {
+        return this.currentCategoryId === null
+            ? null
+            : this.meta.categories.find((c) => c.id === this.currentCategoryId)
     }
 
     get sortedList() {
         return Array.from(this.list.map.values()).sort((a, b) =>
             compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
         )
+    }
+
+    createDocument() {
+        const doc = makeInitialDocument()
+        if (this.currentCategoryId !== null) {
+            doc.categories.push(this.currentCategoryId)
+        }
+        const id = this.collection.create(doc)
+        return id
+    }
+
+    get categories() {
+        return listToTree(this.meta.categories)
+    }
+
+    selectCategory(id: string | null) {
+        this.currentCategoryId = id
+    }
+
+    createCategory(name: string, parent: string | null = null) {
+        const id = uuidv4()
+        this.changeMeta((meta) => {
+            meta.categories.push({ id, name, parent })
+        })
+        return id
+    }
+
+    updateCategory(id: string, data: { name: string; parent: string | null }) {
+        this.changeMeta((meta) => {
+            const cat = meta.categories.find((c) => c.id === id)
+            if (cat === undefined) return
+            cat.name = name
+            cat.parent = parent
+        })
+    }
+
+    deleteCategory(id: string) {
+        this.changeMeta((meta) => {
+            const idx = meta.categories.findIndex((c) => c.id === id)
+            if (idx !== -1) meta.categories.deleteAt(idx)
+        })
+
+        this.collection.items.forEach((item) => {
+            if (item.local === null) return
+            const data = item.local
+            if (data.meta) return
+            if (data.categories.includes(id)) {
+                this.collection.change(item.id, (d) => {
+                    d.categories = without(d.categories, id)
+                })
+            }
+        })
+
+        if (this.currentCategoryId === id) this.currentCategoryId = null
     }
 }
 

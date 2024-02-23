@@ -1,5 +1,7 @@
 import { EntitySchema, DataSource, Repository } from 'typeorm'
 import { Raw, In } from 'typeorm'
+import { v4 as uuidv4 } from 'uuid'
+import * as Automerge from '@automerge/automerge'
 
 import { AuthToken, User, Space, SpaceRole, SpaceMember } from '../entities'
 import { Controller } from './index'
@@ -77,6 +79,9 @@ class SpacesController {
         */
 
         await this.sinkron.createCollection(col)
+
+        const meta = Automerge.from({ meta: true, categories: [] })
+        await this.sinkron.createDocument(uuidv4(), col, Automerge.save(meta))
 
         await this.members.insert({
             userId: ownerId,

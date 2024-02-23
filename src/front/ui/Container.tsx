@@ -28,7 +28,7 @@ const Container = (props: ContainerProps) => {
         >
             <Row style={{ height: 60, alignSelf: 'stretch' }} align="center">
                 <Heading style={{ flexGrow: 1 }}>{props.title}</Heading>
-                <Button onClick={() => navigate('/')}>
+                <Button onClick={onClose}>
                     <Icon svg={closeSvg} />
                 </Button>
             </Row>

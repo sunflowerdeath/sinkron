@@ -3,6 +3,7 @@ interface IconProps {
     height?: number
     fill?: string
     svg: string
+    style?: React.CSSProperties
 }
 
 const defaultIconProps = {
@@ -12,10 +13,10 @@ const defaultIconProps = {
 
 const Icon = (inProps: IconProps) => {
     const props = { ...defaultIconProps, ...inProps }
-    const { svg, size, fill } = props
+    const { svg, size, fill, style } = props
     return (
         <div
-            style={{ width: size, height: size, fill }}
+            style={{ width: size, height: size, fill, ...style }}
             dangerouslySetInnerHTML={{ __html: svg }}
             className="icon"
         />

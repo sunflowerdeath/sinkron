@@ -339,6 +339,7 @@ class Collection<T extends object> {
 
     isLoaded = false
     status = ConnectionStatus.Disconnected
+    initialSyncCompleted = false
 
     async init() {
         if (this.store) await this.loadFromStore()
@@ -421,6 +422,7 @@ class Collection<T extends object> {
         this.colrev = msg.colrev
         this.flush()
         this.status = ConnectionStatus.Ready
+        this.initialSyncCompleted = true
     }
 
     handleChangeMessage(msg: ChangeMessage) {

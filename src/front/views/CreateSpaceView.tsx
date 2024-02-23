@@ -1,14 +1,14 @@
-import { useState } from "react"
+import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { useLocation } from "wouter"
+import { useLocation } from 'wouter'
 
-import { Col } from "oriente"
+import { Col } from 'oriente'
 
 import { fetchJson, FetchError } from '../fetchJson'
-import { useStore } from "../store"
+import { useStore } from '../store'
 import { Result, ResultType } from '../../utils/result'
 
-import Container from '../ui/Container'
+import { Heading } from '../ui/heading'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import ButtonsGrid from '../ui/ButtonsGrid'
@@ -37,7 +37,8 @@ const CreateSpaceView = observer(() => {
     }
 
     return (
-        <Container title="Create new space">
+        <Col gap={20}>
+            <Heading>Create new space</Heading>
             <Col gap={8} style={{ alignSelf: 'stretch' }}>
                 Name:
                 <Input
@@ -46,16 +47,14 @@ const CreateSpaceView = observer(() => {
                     onChange={(value) => setName(value)}
                 />
             </Col>
-            <ButtonsGrid>
-                <Button>Cancel</Button>
-                <Button
-                    onClick={create}
-                    isDisabled={createState?.state === 'pending'}
-                >
-                    Create
-                </Button>
-            </ButtonsGrid>
-        </Container>
+            <Button
+                onClick={create}
+                isDisabled={createState?.state === 'pending'}
+                style={{ alignSelf: 'stretch' }}
+            >
+                Create
+            </Button>
+        </Col>
     )
 })
 
