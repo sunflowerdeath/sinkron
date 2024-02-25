@@ -53,7 +53,7 @@ export type Category = {
 
 export type Metadata = {
     meta: true
-    categories: Category[]
+    categories: { [key:string]: Category }
 }
 
 export interface Document {
@@ -88,39 +88,31 @@ const getDocumentListItemData = (
     return { id: item.id, item, title, subtitle }
 }
 
-class Store {
-    isInited: boolean = false
+class AuthStore {
+    isInited?: boolean = false
     user?: User
-    currentSpace?: string
+    store?: Store
 
     constructor() {
         this.init()
         makeAutoObservable(this)
     }
 
-    get space() {
-        return this.user!.spaces.find((s) => s.id === this.currentSpace)!
-    }
-
-    get spaceStore() {
-        if (this.space === undefined) return
-        const space = this.user!.spaces.find((s) => s.id === this.currentSpace)
-        return new SpaceStore(space!)
-    }
-
     async init() {
         const user = localStorage.getItem('user')
         if (user !== null) {
             this.setUser(JSON.parse(user))
+            this.isInited = true
             await this.fetchProfile()
+        } else {
+            this.isInited = true
         }
-        this.isInited = true
     }
 
     setUser(user: User) {
         this.user = user
-        this.currentSpace = this.user.spaces?.[0].id
         localStorage.setItem('user', JSON.stringify(this.user))
+        this.store = new Store(this, user, undefined)
     }
 
     async fetchProfile() {
@@ -155,9 +147,37 @@ class Store {
     logout() {
         console.log('Logout')
         this.user = undefined
-        this.currentSpace = undefined
         localStorage.removeItem('user')
         history.pushState({}, '', '/')
+    }
+}
+
+class Store {
+    authStore: AuthStore
+    user: User
+    spaceId: string
+    space!: SpaceStore
+
+    constructor(authStore: AuthStore, user: User, spaceId: string | undefined) {
+        this.authStore = authStore
+        this.user = user
+        this.spaceId = spaceId || user.spaces[0].id
+        makeAutoObservable(this)
+
+        reaction(
+            () => this.spaceId,
+            () => {
+                const space = this.user.spaces.find(
+                    (s) => s.id === this.spaceId
+                )!
+                this.space = new SpaceStore(space)
+            },
+            { fireImmediately: true }
+        )
+    }
+
+    logout() {
+        this.authStore.logout()
     }
 
     async createSpace(name: string) {
@@ -184,7 +204,7 @@ const makeInitialDocument = () => ({
     categories: []
 })
 
-const getUpdatedAt = <T>(item: Item<T>) =>
+const getUpdatedAt = <T,>(item: Item<T>) =>
     item.state === ItemState.Synchronized
         ? item.updatedAt!
         : item.localUpdatedAt!
@@ -214,9 +234,8 @@ const listToTree = <T extends ListItem>(list: T[]): TreeNode<T>[] => {
 class SpaceStore {
     space: Space
     collection: Collection<Document>
-
-    currentCategoryId: string | null = null
-    list: TransformedMap<Item<Document>, DocumentListItemData>
+    categoryId: string | null = null
+    documentList: TransformedMap<Item<Document>, DocumentListItemData>
 
     constructor(space: Space) {
         this.space = space
@@ -230,20 +249,16 @@ class SpaceStore {
             col,
             store
         })
-
         // @ts-ignore
         window.col = this.collection
 
-        this.list = new TransformedMap({
+        this.documentList = new TransformedMap({
             source: this.collection.items,
             filter: (item) => {
                 if (item.local === null) return false
                 if (item.local.meta) return false
-
-                if (this.currentCategoryId !== null) {
-                    return item.local.categories.includes(
-                        this.currentCategoryId
-                    )
+                if (this.categoryId !== null) {
+                    return item.local.categories.includes(this.categoryId)
                 } else {
                     return true
                 }
@@ -252,12 +267,19 @@ class SpaceStore {
         })
 
         makeObservable(this, {
+            sortedDocumentList: computed,
             metaItem: computed,
             meta: computed,
-            currentCategoryId: observable,
-            currentCategory: computed,
-            categories: computed
+            categoryId: observable,
+            category: computed,
+            categoriesTree: computed
         })
+    }
+
+    get sortedDocumentList() {
+        return Array.from(this.documentList.map.values()).sort((a, b) =>
+            compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
+        )
     }
 
     get metaItem() {
@@ -280,56 +302,49 @@ class SpaceStore {
         this.collection.change(this.metaItem.id, cb)
     }
 
-    get currentCategory() {
-        return this.currentCategoryId === null
+    get category() {
+        return this.categoryId === null
             ? null
-            : this.meta.categories.find((c) => c.id === this.currentCategoryId)
-    }
-
-    get sortedList() {
-        return Array.from(this.list.map.values()).sort((a, b) =>
-            compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
-        )
+            : this.meta.categories[this.categoryId]
     }
 
     createDocument() {
         const doc = makeInitialDocument()
-        if (this.currentCategoryId !== null) {
-            doc.categories.push(this.currentCategoryId)
+        if (this.categoryId !== null) {
+            doc.categories.push(this.categoryId)
         }
         const id = this.collection.create(doc)
         return id
     }
 
-    get categories() {
-        return listToTree(this.meta.categories)
+    get categoriesTree() {
+        return listToTree(Object.values(this.meta.categories))
     }
 
     selectCategory(id: string | null) {
-        this.currentCategoryId = id
+        this.categoryId = id
     }
 
     createCategory(name: string, parent: string | null = null) {
         const id = uuidv4()
         this.changeMeta((meta) => {
-            meta.categories.push({ id, name, parent })
+            meta.categories[id] = { id, name, parent }
         })
         return id
     }
 
     updateCategory(id: string, data: { name: string; parent: string | null }) {
         this.changeMeta((meta) => {
-            const cat = meta.categories.find((c) => c.id === id)
+            const cat = meta.categories[id]
             if (cat === undefined) return
-            cat.name = name
-            cat.parent = parent
+            cat.name = data.name
+            cat.parent = data.parent
         })
     }
 
     deleteCategory(id: string) {
         this.changeMeta((meta) => {
-            const idx = meta.categories.findIndex((c) => c.id === id)
-            if (idx !== -1) meta.categories.deleteAt(idx)
+            delete meta.categories[id]
         })
 
         this.collection.items.forEach((item) => {
@@ -343,7 +358,7 @@ class SpaceStore {
             }
         })
 
-        if (this.currentCategoryId === id) this.currentCategoryId = null
+        if (this.categoryId === id) this.categoryId = null
     }
 }
 
@@ -351,4 +366,4 @@ const StoreContext = createContext<Store>(null)
 
 const useStore = () => useContext(StoreContext)
 
-export { Store, useStore, StoreContext }
+export { AuthStore, Store, useStore, StoreContext }

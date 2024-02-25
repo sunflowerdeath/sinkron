@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react-lite'
-import {  useLocation, useRoute, Link } from 'wouter'
+import { useLocation, useRoute, Link } from 'wouter'
 import { Col, Row } from 'oriente'
 
 import notificationsSvg from '@material-design-icons/svg/outlined/notifications.svg'
@@ -11,7 +11,7 @@ import { Avatar } from '../ui/avatar'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/icon'
 import { Store, useStore, DocumentListItemData } from '../store'
-import { ItemState, } from '../../sinkron/client'
+import { ItemState } from '../../sinkron/client'
 
 interface DocumentListItemProps {
     data: DocumentListItemData
@@ -66,15 +66,15 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
 
 const DocumentList = observer(() => {
     const store = useStore()
-    const space = store.spaceStore!
+    const space = store.space
 
     const [location, navigate] = useLocation()
     const [match, params] = useRoute('/documents/:id')
     const selectedId = match ? params.id : undefined
 
     let content
-    if (space.list.map.size > 0) {
-        content = space.sortedList.map((item) => (
+    if (space.documentList.map.size > 0) {
+        content = space.sortedDocumentList.map((item) => (
             <DocumentListItem
                 key={item.id}
                 data={item}
@@ -100,10 +100,9 @@ const DocumentList = observer(() => {
     return <div style={{ flexGrow: 1, overflow: 'auto' }}>{content}</div>
 })
 
-
 const DocumentListView = observer(() => {
     const store = useStore()
-    const space = store.spaceStore!
+    const space = store.space
 
     const [location, navigate] = useLocation()
 
@@ -114,10 +113,13 @@ const DocumentListView = observer(() => {
 
     const topBar = (
         <Row gap={8}>
-            {space.currentCategoryId !== null && (
+            {space.category !== null && (
                 <Button
                     onClick={() => {
-                        space.currentCategoryId = null
+                        const parent = space.category
+                            ? space.category.parent
+                            : null
+                        space.selectCategory(parent)
                     }}
                 >
                     <Icon
@@ -131,7 +133,7 @@ const DocumentListView = observer(() => {
                 as={Link}
                 to="/categories"
             >
-                {space.currentCategory?.name || 'All documents'}
+                {space.category?.name || 'All documents'}
             </Button>
             <Button onClick={createDocument}>
                 <Icon svg={addSvg} />

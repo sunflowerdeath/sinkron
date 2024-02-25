@@ -28,8 +28,9 @@ const CreateSpaceView = observer(() => {
         setCreateState(state)
         const res = await state
         if (res.isOk) {
-            store.user!.spaces.push(res.value as Space)
-            store.space = res.value as Space
+            const space = res.value as Space
+            store.user.spaces.push(space)
+            store.spaceId = res.value.id
             navigate('/')
         } else {
             alert(res.error)

@@ -12,7 +12,7 @@ import CreateSpaceView from './CreateSpaceView'
 import SpaceMembersView from './SpaceMembersView'
 import SwitchSpaceView from './SwitchSpaceView'
 import AccountAndSpaceView from './AccountAndSpaceView'
-import CreateCategoryView from './CreateCategoryView'
+import { CreateCategoryView, EditCategoryView } from './CreateCategoryView'
 
 const SettingsView = observer(() => {
     return <div></div>
@@ -26,45 +26,55 @@ const NotificationsView = observer(() => {
 const SpaceView = observer(() => {
     const isMobile = useMedia('(max-width: 1023px)')
 
+    const routes = (
+        <>
+            <Route
+                path={`/documents/:id`}
+                children={(params) => (
+                    <DocumentView key={params.id} id={params.id} />
+                )}
+            />
+            <Route
+                path={'/account'}
+                children={(params) => <AccountAndSpaceView />}
+            />
+            <Route
+                path={'/notifications'}
+                children={(params) => <NotificationsView />}
+            />
+            <Route
+                path={'/create-space'}
+                children={(params) => <CreateSpaceView />}
+            />
+            <Route
+                path={'/switch-space'}
+                children={(params) => <SwitchSpaceView />}
+            />
+            <Route
+                path={'/space/members'}
+                children={(params) => <SpaceMembersView />}
+            />
+            <Route
+                path={'/categories'}
+                children={(params) => <CategoriesView />}
+            />
+            <Route
+                path={'/categories/new'}
+                children={(params) => <CreateCategoryView />}
+            />
+            <Route
+                path={'/categories/:id/edit'}
+                children={(params) => <EditCategoryView id={params.id} />}
+            />
+            <Redirect to="/" />
+        </>
+    )
+
     if (isMobile) {
         return (
             <Switch>
                 <Route path="/" children={() => <DocumentListView />} />
-                <Route
-                    path={`/documents/:id`}
-                    children={(params) => (
-                        <DocumentView key={params.id} id={params.id} />
-                    )}
-                />
-                <Route
-                    path={'/account'}
-                    children={(params) => <AccountAndSpaceView />}
-                />
-                <Route
-                    path={'/notifications'}
-                    children={(params) => <NotificationsView />}
-                />
-                <Route
-                    path={'/create-space'}
-                    children={(params) => <CreateSpaceView />}
-                />
-                <Route
-                    path={'/switch-space'}
-                    children={(params) => <SwitchSpaceView />}
-                />
-                <Route
-                    path={'/space/members'}
-                    children={(params) => <SpaceMembersView />}
-                />
-                <Route
-                    path={'/categories'}
-                    children={(params) => <CategoriesView />}
-                />
-                <Route
-                    path={'/create-category'}
-                    children={(params) => <CreateCategoryView />}
-                />
-                <Redirect to="/" />
+                {routes}
             </Switch>
         )
     } else {
@@ -80,43 +90,7 @@ const SpaceView = observer(() => {
                     <DocumentListView />
                 </div>
                 <div style={{ flexGrow: 1 }}>
-                    <Switch>
-                        <Route
-                            path={`/documents/:id`}
-                            children={(params) => (
-                                <DocumentView key={params.id} id={params.id} />
-                            )}
-                        />
-                        <Route
-                            path={'/account'}
-                            children={(params) => <AccountAndSpaceView />}
-                        />
-                        <Route
-                            path={'/notifications'}
-                            children={(params) => <NotificationsView />}
-                        />
-                        <Route
-                            path={'/create-space'}
-                            children={(params) => <CreateSpaceView />}
-                        />
-                        <Route
-                            path={'/switch-space'}
-                            children={(params) => <SwitchSpaceView />}
-                        />
-                        <Route
-                            path={'/space/members'}
-                            children={(params) => <SpaceMembersView />}
-                        />
-                        <Route
-                            path={'/categories'}
-                            children={(params) => <CategoriesView />}
-                        />
-                        <Route
-                            path={'/create-category'}
-                            children={(params) => <CreateCategoryView />}
-                        />
-                        <Redirect to="/" />
-                    </Switch>
+                    <Switch>{routes}</Switch>
                 </div>
             </div>
         )

@@ -4,11 +4,14 @@ import { Link, useLocation } from 'wouter'
 
 import moreHorizSvg from '@material-design-icons/svg/outlined/more_horiz.svg'
 import arrowDownSvg from '@material-design-icons/svg/outlined/expand_more.svg'
+import arrowBackSvg from '@material-design-icons/svg/outlined/arrow_back.svg'
+import closeSvg from '@material-design-icons/svg/outlined/close.svg'
 
 import { Menu, MenuItem } from '../ui/menu'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/icon'
 import { Heading } from '../ui/heading'
+import Container from '../ui/Container'
 
 import { useStore, Category, TreeNode } from '../store'
 
@@ -20,11 +23,24 @@ type CategoriesListItemProps = {
 
 const CategoryListItem = (props: CategoriesListItemProps) => {
     const { category, onSelect, onDelete } = props
+
+    const [location, navigate] = useLocation()
+
     const hasChildren = category.children !== undefined
     const menu = () => (
         <>
-            <MenuItem>Create subcategory</MenuItem>
-            <MenuItem>Rename</MenuItem>
+            <MenuItem
+                onSelect={() =>
+                    navigate(`/categories/new?parent=${category.id}`)
+                }
+            >
+                Create subcategory
+            </MenuItem>
+            <MenuItem
+                onSelect={() => navigate(`/categories/${category.id}/edit`)}
+            >
+                Rename
+            </MenuItem>
             <MenuItem>Move to another category</MenuItem>
             <MenuItem
                 onSelect={() => {
@@ -61,12 +77,14 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                     )}
                 </Menu>
             </Row>
-            {category.children && (
-                <CategoryList
-                    categories={category.children}
-                    onSelect={onSelect}
-                    onDelete={onDelete}
-                />
+            {category.children.length > 0 && (
+                <Col style={{ marginLeft: 32, alignSelf: 'normal' }}>
+                    <CategoryList
+                        categories={category.children}
+                        onSelect={onSelect}
+                        onDelete={onDelete}
+                    />
+                </Col>
             )}
         </>
     )
@@ -95,27 +113,26 @@ const CategoryList = (props: CategoryListProps) => {
 
 const CategoriesView = observer(() => {
     const store = useStore()
-    const spaceStore = store.spaceStore!
 
     const [location, navigate] = useLocation()
 
     const onDelete = (id: string) => {
-        store.spaceStore!.deleteCategory(id)
+        store.space.deleteCategory(id)
     }
 
     const selectCategory = (id: string | null) => {
-        spaceStore.currentCategoryId = id
+        store.space.selectCategory(id)
         navigate('/')
     }
 
     let list
-    if (store.spaceStore!.collection.initialSyncCompleted) {
+    if (store.space.collection.initialSyncCompleted) {
         list = (
-            <>
+            <Col gap={8}>
                 <Button
                     style={{ alignSelf: 'normal' }}
                     as={Link}
-                    to="/create-category"
+                    to="/categories/new"
                 >
                     Create category
                 </Button>
@@ -131,31 +148,21 @@ const CategoriesView = observer(() => {
                         </Row>
                     </Button>
                     <CategoryList
-                        categories={store.spaceStore!.categories}
+                        categories={store.space.categoriesTree}
                         onDelete={onDelete}
                         onSelect={(id) => selectCategory(id)}
                     />
                 </Col>
-            </>
+            </Col>
         )
     } else {
         list = 'Loading...'
     }
 
     return (
-        <Col
-            gap={20}
-            style={{
-                padding: '0 40px',
-                maxWidth: 480,
-                boxSizing: 'border-box'
-            }}
-        >
-            <div style={{ height: 60, alignItems: 'center', display: 'flex' }}>
-                <Heading>Categories</Heading>
-            </div>
+        <Container title="Categories" onClose={() => navigate('/')}>
             {list}
-        </Col>
+        </Container>
     )
 })
 

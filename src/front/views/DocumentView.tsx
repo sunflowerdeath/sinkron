@@ -97,7 +97,6 @@ interface EditorViewProps {
 }
 
 const EditorView = observer((props: EditorViewProps) => {
-    const spaceStore = useStore().spaceStore!
     const { doc, onChange } = props
 
     const isMobile = useMedia('(max-width: 1023px)')
@@ -124,8 +123,8 @@ const EditorView = observer((props: EditorViewProps) => {
             <Editable
                 renderElement={renderElement}
                 style={{
-                    padding: 10,
-                    paddingTop: 30,
+                    padding: isMobile ? 10 : 40,
+                    paddingTop: 20,
                     outline: 'none',
                     flexGrow: 1,
                     overflow: 'auto'
@@ -139,8 +138,8 @@ const EditorView = observer((props: EditorViewProps) => {
                             style={{
                                 opacity: 0.4,
                                 position: 'absolute',
-                                top: 18,
-                                left: 40,
+                                top: 20,
+                                left: isMobile ? 10 : 40,
                                 pointerEvents: 'none',
                                 userSelect: 'none'
                             }}
@@ -160,8 +159,9 @@ interface DocumentViewProps {
 
 const DocumentView = observer((props: DocumentViewProps) => {
     const { id } = props
+
     const store = useStore()
-    const space = store.spaceStore!
+    const space = store.space
 
     const [location, navigate] = useLocation()
     const isMobile = useMedia('(max-width: 1023px)')
@@ -198,8 +198,9 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     <div>Last modified: 1 sep 10:27</div>
                 </Col>
                 <div style={{ alignSelf: 'stretch' }}>
-                    <MenuItem>Pin to top</MenuItem>
                     <MenuItem>Share</MenuItem>
+                    <MenuItem>Copy to another space</MenuItem>
+                    <MenuItem>Publish</MenuItem>
                     <MenuItem onSelect={onDelete}>Delete</MenuItem>
                 </div>
             </Col>
@@ -211,11 +212,9 @@ const DocumentView = observer((props: DocumentViewProps) => {
         categoriesList = (
             <Row gap={8} align="center">
                 <CategoriesList
-                    items={doc.categories.map((id) => ({
-                        id,
-                        name: space.meta.categories.find((c) => c.id === id)!
-                            .name
-                    }))}
+                    items={doc.categories.map(
+                        (id) => space.meta.categories[id]!
+                    )}
                     onRemove={(c) => {
                         space.collection.change(id, (doc) => {
                             doc.categories = without(doc.categories, c)
@@ -246,8 +245,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     left: 0,
                     height: '100vh',
                     width: isMobile ? '100%' : 480,
-                    background: '#333',
-                    borderRight: '2px solid #555'
+                    background: '#333'
                 }}
             >
                 <SelectCategoriesView
@@ -257,17 +255,42 @@ const DocumentView = observer((props: DocumentViewProps) => {
                             doc.categories = value
                         })
                     }}
-                    categories={space.categories}
+                    tree={space.categoriesTree}
+                    categories={space.meta.categories}
+                    onClose={() => setShowSelect(false)}
                 />
-                <Button
-                    onClick={() => setShowSelect(false)}
-                    style={{ position: 'absolute', top: 0, right: 0 }}
-                >
-                    <Icon svg={closeSvg} />
-                </Button>
             </div>
         )
     }
+
+    const menuButton = (
+        <Menu
+            menu={menu}
+            styles={{ list: { background: '#555' } }}
+            placement={{ padding: 0, offset: 8 }}
+            autoSelectFirstItem={false}
+        >
+            {(ref, { open }) => (
+                <Button onClick={open} ref={ref}>
+                    <Icon svg={moreHorizSvg} />
+                </Button>
+            )}
+        </Menu>
+    )
+    const top = isMobile ? (
+        <Row justify="space-between">
+            {isMobile && (
+                <Button as={Link} to="/">
+                    <Icon svg={arrowBackSvg} />
+                </Button>
+            )}
+            {menuButton}
+        </Row>
+    ) : (
+        <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 1 }}>
+            {menuButton}
+        </div>
+    )
 
     return (
         <div
@@ -278,28 +301,13 @@ const DocumentView = observer((props: DocumentViewProps) => {
                 height: '100vh'
             }}
         >
-            <Row justify="space-between">
-                {isMobile && (
-                    <Button as={Link} to="/">
-                        <Icon svg={arrowBackSvg} />
-                    </Button>
-                )}
-                <Menu
-                    menu={menu}
-                    styles={{ list: { background: '#555' } }}
-                    placement={{ padding: 0, offset: 8 }}
-                    autoSelectFirstItem={false}
-                >
-                    {(ref, { open }) => (
-                        <Button onClick={open} ref={ref}>
-                            <Icon svg={moreHorizSvg} />
-                        </Button>
-                    )}
-                </Menu>
-            </Row>
+            {top}
             <EditorView doc={item.local} onChange={onChange} />
             {selectCategories}
-            <Row style={{ height: 60, paddingLeft: 40 }} align="center">
+            <Row
+                style={{ height: 60, padding: isMobile ? '0 10px' : '0 40px' }}
+                align="center"
+            >
                 {categoriesList}
             </Row>
         </div>

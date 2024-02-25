@@ -1,6 +1,6 @@
 import { observer } from 'mobx-react-lite'
 import { Observer } from 'mobx-react-lite'
-import { Link } from 'wouter'
+import { useLocation, Link } from 'wouter'
 
 import { Col, Row, useModal } from 'oriente'
 import { Modal } from '../ui/modal'
@@ -8,10 +8,14 @@ import { Heading } from '../ui/heading'
 import ButtonsGrid from '../ui/ButtonsGrid'
 import { Avatar } from '../ui/avatar'
 import { Button } from '../ui/button'
+import Container from '../ui/Container'
+
 import { useStore } from '../store'
 
 const AccountAndSpaceView = observer(() => {
     const store = useStore()
+
+    const [location, navigate] = useLocation()
 
     const leaveModal = useModal({
         Component: Modal,
@@ -47,13 +51,12 @@ const AccountAndSpaceView = observer(() => {
         }
     })
 
-    const isOwner = store.user!.id === store.space!.owner.id
+    const isOwner = store.user.id === store.space.space.owner.id
 
-    const roleText = isOwner ? 'Owner' : store.space!.role
+    const roleText = isOwner ? 'Owner' : store.space.space.role
 
     return (
-        <Col gap={20} style={{ padding: "18px 40px" }}>
-            <Heading>Account and spaces</Heading>
+        <Container title="Account and spaces" onClose={() => navigate('/')}>
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
@@ -68,11 +71,11 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Space</Heading>
                 <Row gap={8}>
-                    <Avatar name={store.space!.name} />
+                    <Avatar name={store.space.space.name} />
                     <Col>
-                        <div>{store.space!.name}</div>
+                        <div>{store.space.space.name}</div>
                         <div style={{ opacity: '.6' }}>
-                            {store.space!.membersCount} member &ndash;{' '}
+                            {store.space.space.membersCount} member &ndash;{' '}
                             {roleText}
                         </div>
                     </Col>
@@ -104,7 +107,7 @@ const AccountAndSpaceView = observer(() => {
             </ButtonsGrid>
             {leaveModal.render()}
             {deleteModal.render()}
-        </Col>
+        </Container>
     )
 })
 

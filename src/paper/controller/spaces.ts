@@ -80,7 +80,7 @@ class SpacesController {
 
         await this.sinkron.createCollection(col)
 
-        const meta = Automerge.from({ meta: true, categories: [] })
+        const meta = Automerge.from({ meta: true, categories: {} })
         await this.sinkron.createDocument(uuidv4(), col, Automerge.save(meta))
 
         await this.members.insert({

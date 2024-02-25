@@ -6,7 +6,7 @@ import { Router } from 'wouter'
 import { OrienteProvider, Col } from 'oriente'
 
 import { ConnectionStatus } from '../sinkron/client'
-import { Store, useStore, StoreContext } from './store'
+import { AuthStore, Store, useStore, StoreContext } from './store'
 
 import SpaceView from './views/SpaceView'
 
@@ -27,13 +27,16 @@ const status = (
 )
 */
 
-const LoginView = () => {
-    const store = useStore()
+interface LoginViewProps {
+    store: AuthStore
+}
+
+const LoginView = (props: LoginViewProps) => {
     return (
         <Col align="center" justify="center" style={{ height: '100%' }}>
             <Button
                 onClick={() => {
-                    store.authenticate({
+                    props.store.authenticate({
                         name: 'test',
                         password: 'password'
                     })
@@ -46,22 +49,28 @@ const LoginView = () => {
 }
 
 const Root = observer(() => {
-    const store = useMemo(() => {
-        const s = new Store()
+    const authStore = useMemo(() => {
+        const s = new AuthStore()
         window.store = s
         return s
     }, [])
 
     useTitle('Box')
 
-    if (!store.isInited) return null
+    if (!authStore.isInited) return null
 
     return (
-        <StoreContext.Provider value={store}>
-            <OrienteProvider>
-                <Router>{store.user ? <SpaceView /> : <LoginView />}</Router>
-            </OrienteProvider>
-        </StoreContext.Provider>
+        <OrienteProvider>
+            <Router>
+                {authStore.user ? (
+                    <StoreContext.Provider value={authStore.store!}>
+                        <SpaceView />
+                    </StoreContext.Provider>
+                ) : (
+                    <LoginView store={authStore} />
+                )}
+            </Router>
+        </OrienteProvider>
     )
 })
 

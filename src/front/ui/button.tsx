@@ -34,6 +34,7 @@ const buttonStyles = (
                 : 'var(--color-text)',
             textDecoration: 'none',
             height: size,
+            flexShrink: 0,
             minWidth: size,
             boxSizing: 'border-box',
             justifyContent: 'center',

@@ -14,7 +14,7 @@ const CategoriesList = (props: CategoriesListProps) => {
     const { items, onRemove } = props
 
     return (
-        <Row gap={8} style={{ height: 60 }} align="center">
+        <Row gap={8} style={{ height: 60, flexShrink: 0 }} align="center">
             {items.map((item) => (
                 <Row
                     align="center"

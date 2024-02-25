@@ -5,7 +5,7 @@ import { without } from 'lodash-es'
 
 import { Button } from '../ui/button'
 import { Icon } from '../ui/icon'
-import { Heading } from '../ui/heading'
+import Container from '../ui/Container'
 import ButtonsGrid from '../ui/ButtonsGrid'
 
 import CategoriesList from '../components/CategoriesList'
@@ -17,12 +17,12 @@ import checkBoxOutlineSvg from '@material-design-icons/svg/outlined/check_box_ou
 import expandMoreSvg from '@material-design-icons/svg/outlined/expand_more.svg'
 import closeSvg from '@material-design-icons/svg/outlined/close.svg'
 
-import { Category, Node } from '../store'
+import { Category, TreeNode } from '../store'
 
 interface CategoriesTreeItemProps {
     value: string[]
     onChange: (value: string[]) => void
-    category: Node<Category>
+    category: TreeNode<Category>
 }
 
 const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
@@ -63,7 +63,7 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
 interface CategoriesTreeProps {
     value: string[]
     onChange: (value: string[]) => void
-    categories: Node<Category>[]
+    categories: TreeNode<Category>[]
 }
 
 const CategoriesTree = (props: CategoriesTreeProps) => {
@@ -85,34 +85,39 @@ const CategoriesTree = (props: CategoriesTreeProps) => {
 interface SelectCategoriesViewProps {
     value: string[]
     onChange: (value: string[]) => void
-    categories: Node<Category>[]
+    tree: TreeNode<Category>[]
+    categories: { [key: string]: Category }
+    onClose: () => void
 }
 
 const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
-    const { categories, onChange, value } = props
+    const { categories, onChange, onClose, value, tree } = props
     return (
-        <Col gap={20} style={{ padding: '0 40px', height: "100%" }} align="normal">
-            <Row style={{ height: 60, alignSelf: 'stretch' }} align="center">
-                <Heading style={{ flexGrow: 1 }}>Select categories</Heading>
-            </Row>
+        <Container title="Select categories" onClose={onClose}>
             <Button as={Link} to="/categories">
                 Manage categories
             </Button>
-            <div style={{ flexGrow: 1 }}>
-            <CategoriesTree
-                categories={categories}
-                value={value}
-                onChange={onChange}
-            />
+            <div style={{ flexGrow: 1, paddingBottom: 60 }}>
+                <CategoriesTree
+                    categories={tree}
+                    value={value}
+                    onChange={onChange}
+                />
             </div>
-            <CategoriesList
-                items={value.map((id) => ({
-                    id,
-                    name: categories.find((c) => c.id === id).name
-                }))}
-                onRemove={(id) => onChange(without(value, id))}
-            />
-        </Col>
+            <div
+                style={{
+                    position: 'fixed',
+                    bottom: 0,
+                    width: '100%',
+                    background: 'var(--color-background)'
+                }}
+            >
+                <CategoriesList
+                    items={value.map((id) => categories[id]!)}
+                    onRemove={(id) => onChange(without(value, id))}
+                />
+            </div>
+        </Container>
     )
 }
 
