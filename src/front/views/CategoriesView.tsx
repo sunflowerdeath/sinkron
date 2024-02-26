@@ -39,9 +39,8 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
             <MenuItem
                 onSelect={() => navigate(`/categories/${category.id}/edit`)}
             >
-                Rename
+                Edit
             </MenuItem>
-            <MenuItem>Move to another category</MenuItem>
             <MenuItem
                 onSelect={() => {
                     onDelete(category.id)

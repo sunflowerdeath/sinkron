@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { useLocation } from 'wouter'
+import { useLocation, useSearch } from 'wouter'
+import queryString from 'query-string'
 import { Col, Row } from 'oriente'
 
 import closeSvg from '@material-design-icons/svg/outlined/close.svg'
@@ -16,18 +17,19 @@ import { Icon } from '../ui/icon'
 import Container from '../ui/Container'
 import { Menu, MenuItem } from '../ui/menu'
 
-const render = (
-    categories: TreeNode<Category>[],
-    onSelect: (c: Category) => void
+const renderItems = (
+    tree: TreeNode<Category>[],
+    map: { [key: string]: Category },
+    onSelect: (c: string) => void
 ) => {
-    return categories.map((c) => (
+    return tree.map((c) => (
         <>
-            <MenuItem value={c.id} key={c.id} onSelect={() => onSelect(c)}>
+            <MenuItem value={c.id} key={c.id} onSelect={() => onSelect(c.id)}>
                 {c.name}
             </MenuItem>
             {c.children && (
                 <div style={{ paddingLeft: 30 }}>
-                    {render(c.children, onSelect)}
+                    {renderItems(c.children, map, onSelect)}
                 </div>
             )}
         </>
@@ -35,18 +37,21 @@ const render = (
 }
 
 interface CategorySelectProps {
-    categories: TreeNode<Category>[]
-    value: Category | undefined
-    onChange: (value: Category | undefined) => void
+    categoryMap: { [key: string]: Category }
+    categoryTree: TreeNode<Category>[]
+    value: string | null
+    onChange: (value: string | null) => void
 }
 
 const CategorySelect = (props: CategorySelectProps) => {
-    const { categories, value, onChange } = props
+    const { categoryTree, categoryMap, value, onChange } = props
     const menu = () => {
-        return (
-            <div style={{ background: '#555', padding: 8 }}>
-                {render(categories, onChange)}
-            </div>
+        return categoryTree.length === 0 ? (
+            <Row style={{ color: '#999', height: 45 }} align="center">
+                No categories
+            </Row>
+        ) : (
+            renderItems(categoryTree, categoryMap, onChange)
         )
     }
     return (
@@ -71,13 +76,13 @@ const CategorySelect = (props: CategorySelectProps) => {
                 >
                     <div style={{ flexGrow: 1 }}>
                         {value ? (
-                            value.name
+                            categoryMap[value].name
                         ) : (
                             <div style={{ color: '#999' }}>No parent</div>
                         )}
                     </div>
                     {value ? (
-                        <Button size="s" onClick={() => onChange(undefined)}>
+                        <Button size="s" onClick={() => onChange(null)}>
                             <Icon svg={closeSvg} />
                         </Button>
                     ) : (
@@ -90,16 +95,28 @@ const CategorySelect = (props: CategorySelectProps) => {
 }
 
 interface EditCategoryFormProps {
-    category?: Category
-    categoriesTree: TreeNode<Category>[]
+    initialValues?: { name: string; parent: string | null }
+    categoryMap: { [key: string]: Category }
+    categoryTree: TreeNode<Category>[]
     submitButtonText: React.ReactNode
     onSubmit: (values: { name: string; parent: string | null }) => void
 }
 
 const EditCategoryForm = (props: EditCategoryFormProps) => {
-    const { category, categoriesTree, onSubmit, submitButtonText } = props
-    const [name, setName] = useState(category?.name || '')
-    const [parentCategory, setParentCategory] = useState<Category>()
+    const {
+        initialValues,
+        categoryMap,
+        categoryTree,
+        onSubmit,
+        submitButtonText
+    } = props
+
+    const [name, setName] = useState(initialValues?.name || '')
+    const [parent, setParent] = useState<string | null>(
+        initialValues?.parent || null
+    )
+
+    const isValid = name.length > 0
 
     return (
         <>
@@ -114,15 +131,15 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
             <Col gap={8}>
                 Parent category:
                 <CategorySelect
-                    categories={categoriesTree}
-                    value={parentCategory}
-                    onChange={setParentCategory}
+                    categoryMap={categoryMap}
+                    categoryTree={categoryTree}
+                    value={parent}
+                    onChange={setParent}
                 />
             </Col>
             <Button
-                onClick={() =>
-                    onSubmit({ name, parent: parentCategory?.id || null })
-                }
+                onClick={() => onSubmit({ name, parent })}
+                isDisabled={!isValid}
             >
                 {submitButtonText}
             </Button>
@@ -131,13 +148,19 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
 }
 
 const CreateCategoryView = observer(() => {
+    const search = queryString.parse(useSearch())
+    const initialParent =
+        'parent' in search
+            ? Array.isArray(search.parent)
+                ? search.parent[0]
+                : search.parent
+            : null
+
     const store = useStore()
     const [location, navigate] = useLocation()
 
-    const [name, setName] = useState('')
-    const [parentCategory, setParentCategory] = useState<Category>()
-    const create = () => {
-        const id = store.space.createCategory(name, parentCategory?.id)
+    const create = (values: { name: string; parent: string | null }) => {
+        const id = store.space.createCategory(values)
         store.space.selectCategory(id)
         navigate('/')
     }
@@ -147,24 +170,14 @@ const CreateCategoryView = observer(() => {
     }
 
     return (
-        <Container title="New category" onClose={() => navigate('/')}>
-            <Col gap={8} style={{ alignSelf: 'stretch' }} align="normal">
-                Name:
-                <Input
-                    style={{ maxWidth: 400 }}
-                    value={name}
-                    onChange={(value) => setName(value)}
-                />
-            </Col>
-            <Col gap={8}>
-                Parent category:
-                <CategorySelect
-                    categories={store.space.categoriesTree}
-                    value={parentCategory}
-                    onChange={setParentCategory}
-                />
-            </Col>
-            <Button onClick={create}>Create</Button>
+        <Container title="Create category" onClose={() => navigate('/')}>
+            <EditCategoryForm
+                initialValues={{ name: '', parent: initialParent }}
+                onSubmit={create}
+                submitButtonText="Create"
+                categoryMap={store.space.categoriesMap}
+                categoryTree={store.space.categoriesTree}
+            />
         </Container>
     )
 })
@@ -192,10 +205,11 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
     return (
         <Container title="Edit category" onClose={() => navigate('/')}>
             <EditCategoryForm
-                category={category}
+                initialValues={category}
                 onSubmit={update}
                 submitButtonText="Save"
-                categoriesTree={store.space.categoriesTree}
+                categoryMap={store.space.categoriesMap}
+                categoryTree={store.space.categoriesTree}
             />
         </Container>
     )

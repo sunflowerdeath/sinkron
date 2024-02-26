@@ -2,15 +2,14 @@ import { useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useTitle, useMedia } from 'react-use'
 import { observer } from 'mobx-react-lite'
-import { Router } from 'wouter'
+import { Router, Switch, Route, Redirect } from 'wouter'
 import { OrienteProvider, Col } from 'oriente'
 
 import { ConnectionStatus } from '../sinkron/client'
 import { AuthStore, Store, useStore, StoreContext } from './store'
 
 import SpaceView from './views/SpaceView'
-
-import { Button } from './ui/button'
+import { LoginView, SignupView } from './views/LoginView'
 
 /*
 const statusMap = {
@@ -26,27 +25,6 @@ const status = (
     </div>
 )
 */
-
-interface LoginViewProps {
-    store: AuthStore
-}
-
-const LoginView = (props: LoginViewProps) => {
-    return (
-        <Col align="center" justify="center" style={{ height: '100%' }}>
-            <Button
-                onClick={() => {
-                    props.store.authenticate({
-                        name: 'test',
-                        password: 'password'
-                    })
-                }}
-            >
-                Login
-            </Button>
-        </Col>
-    )
-}
 
 const Root = observer(() => {
     const authStore = useMemo(() => {
@@ -67,7 +45,17 @@ const Root = observer(() => {
                         <SpaceView />
                     </StoreContext.Provider>
                 ) : (
-                    <LoginView store={authStore} />
+                    <Switch>
+                        <Route
+                            path="/"
+                            children={() => <LoginView store={authStore} />}
+                        />
+                        <Route
+                            path="/signup"
+                            children={() => <SignupView store={authStore} />}
+                        />
+                        <Redirect to="/" />
+                    </Switch>
                 )}
             </Router>
         </OrienteProvider>

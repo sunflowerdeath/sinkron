@@ -1,4 +1,4 @@
-import { Menu, MenuItem } from "oriente"
+import { Menu, MenuItem, StyleMap } from 'oriente'
 
 const menuItemStyles = (
     props: React.ComponentProps<typeof MenuItem>,
@@ -16,4 +16,20 @@ const StyledMenuItem = (props: React.ComponentProps<typeof MenuItem>) => {
     return <MenuItem styles={[menuItemStyles, styles]} {...rest} />
 }
 
-export { Menu, StyledMenuItem as MenuItem }
+const menuStyles: StyleMap = {
+    list: {
+        background: '#555',
+        padding: 8,
+        boxSizing: 'border-box',
+        boxShadow:
+            'rgb(51 51 51 / 40%) 0px 0px 12px 0px,' +
+            'rgb(51 51 51 / 40%) 0px 0px 2px 0px'
+    }
+}
+
+const StyledMenu = (props: React.ComponentProps<typeof Menu>) => {
+    const { styles, ...rest } = props
+    return <Menu styles={[menuStyles, styles]} {...rest} />
+}
+
+export { StyledMenu as Menu, StyledMenuItem as MenuItem }

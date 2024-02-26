@@ -1,7 +1,10 @@
 import { observer } from 'mobx-react-lite'
 import { useMedia } from 'react-use'
-import { Route, Switch, Redirect } from 'wouter'
+import { Route, Switch, Redirect, useLocation, useSearch } from 'wouter'
 import { Col, Row } from 'oriente'
+
+import Container from '../ui/Container'
+import { Button } from '../ui/button'
 
 import { Store, useStore, DocumentListItemData } from '../store'
 
@@ -19,8 +22,39 @@ const SettingsView = observer(() => {
 })
 
 const NotificationsView = observer(() => {
+    const [location, navigate] = useLocation()
     const store = useStore()
-    return <div title="Notifications">No notifications</div>
+    // No notifications
+    return (
+        <Container title="Notifications" onClose={() => navigate('/')}>
+            <Col gap={32}>
+                <Col gap={8}>
+                    <div style={{ color: '#999' }}>Today, 18:57</div>
+                    User @sunflowerdeath invites you to join space "Food" with a
+                    role "Admin".
+                    <Row gap={8}>
+                        <Button>Decline</Button>
+                        <Button>Accept</Button>
+                    </Row>
+                </Col>
+                <Col gap={8}>
+                    <div style={{ color: '#999' }}>Today, 18:57</div>
+                    You invited user @sunflowerdeath to space "Food" with a role
+                    "Admin"
+                    <Row gap={8}>
+                        <Button>Cancel invite</Button>
+                        <Button>Edit invite</Button>
+                    </Row>
+                </Col>
+                <Col gap={8}>
+                    <div style={{ color: '#999' }}>Today, 18:57</div>
+                    User @sunflowerdeath accepted your invite to join space
+                    "Food".
+                    <Button>Hide</Button>
+                </Col>
+            </Col>
+        </Container>
+    )
 })
 
 const SpaceView = observer(() => {
@@ -60,7 +94,11 @@ const SpaceView = observer(() => {
             />
             <Route
                 path={'/categories/new'}
-                children={(params) => <CreateCategoryView />}
+                children={(params) => (
+                        <CreateCategoryView
+                        />
+                    )
+                }
             />
             <Route
                 path={'/categories/:id/edit'}

@@ -7,6 +7,7 @@
         "lint": "eslint src",
         "server": "webpack --config webpack.server.config.js && node build/server.js",
         "front": "webpack serve --config webpack.front.config.js",
+        "build-front": "NODE_ENV=production webpack --config webpack.front.config.js",
         "test": "webpack --config webpack.server.config.js && mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
@@ -72,6 +73,7 @@
         "oriente": "^0.1.1",
         "pino": "^8.11.0",
         "pino-pretty": "^10.0.0",
+        "query-string": "^8.2.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-use": "^17.4.0",

@@ -53,7 +53,7 @@ export type Category = {
 
 export type Metadata = {
     meta: true
-    categories: { [key:string]: Category }
+    categories: { [key: string]: Category }
 }
 
 export interface Document {
@@ -90,8 +90,8 @@ const getDocumentListItemData = (
 
 class AuthStore {
     isInited?: boolean = false
-    user?: User
-    store?: Store
+    user?: User = undefined
+    store?: Store = undefined
 
     constructor() {
         this.init()
@@ -317,18 +317,21 @@ class SpaceStore {
         return id
     }
 
+    get categoriesMap() {
+        return this.meta.categories
+    }
     get categoriesTree() {
-        return listToTree(Object.values(this.meta.categories))
+        return listToTree(Object.values(this.categoriesMap))
     }
 
     selectCategory(id: string | null) {
         this.categoryId = id
     }
 
-    createCategory(name: string, parent: string | null = null) {
+    createCategory(values: { name: string; parent: string | null }) {
         const id = uuidv4()
         this.changeMeta((meta) => {
-            meta.categories[id] = { id, name, parent }
+            meta.categories[id] = { id, ...values }
         })
         return id
     }
