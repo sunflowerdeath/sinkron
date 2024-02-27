@@ -1,0 +1,35 @@
+{
+    "name": "sinkron-client",
+    "version": "0.0.1",
+    "description": "",
+    "main": "build/main.js",
+    "types": "types/index.d.ts",
+    "scripts": {
+        "lint": "eslint src",
+        "build": "NODE_ENV=production webpack"
+    },
+    "author": "sunflowerdeath",
+    "license": "Unlicense",
+    "devDependencies": {
+        "@types/lodash-es": "^4.17.6",
+        "@types/uuid": "^9.0.0",
+        "esbuild": "^0.15.12",
+        "esbuild-loader": "^2.20.0",
+        "ts-loader": "^9.5.1",
+        "typescript": "^5.3.3",
+        "webpack": "^5.74.0",
+        "webpack-bundle-analyzer": "^4.10.1",
+        "webpack-cli": "^4.10.0"
+    },
+    "dependencies": {
+        "@automerge/automerge": "^2.1.10",
+        "date-fns": "^3.0.0",
+        "js-base64": "^3.7.7",
+        "lodash-es": "^4.17.21",
+        "mobx": "^6.6.2",
+        "nanoevents": "^7.0.1",
+        "nanoid": "^4.0.0",
+        "sinkron": "0.0.1",
+        "uuid": "^9.0.0"
+    }
+}
