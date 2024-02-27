@@ -26,7 +26,7 @@ import { AutomergeNode, toAutomerge } from "./slate"
 import { TransformedMap } from "./transformedMap"
 import { fetchJson, FetchError } from "./fetchJson"
 
-import { fetchJson as fetchJson2 } from "./fetchJson2"
+import { fetchApi } from "./fetchJson2"
 
 export interface Space {
     id: string
@@ -134,7 +134,7 @@ class AuthStore {
     async authenticate(credentials: Credentials) {
         let profile
         try {
-            profile = await fetchJson2<User>({
+            profile = await fetchApi<User>({
                 method: "POST",
                 url: "/api/login",
                 data: credentials

@@ -28,7 +28,6 @@ module.exports = {
     target: 'node',
     externals: [nodeExternals({ additionalModuleDirs: ['../node_modules'] })],
     resolve: {
-        mainFields: ['main', 'module'],
         extensions: ['.js', '.ts']
     },
     module: { rules },

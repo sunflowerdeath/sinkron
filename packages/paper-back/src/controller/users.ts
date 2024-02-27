@@ -1,10 +1,28 @@
 import { EntitySchema, DataSource, Repository } from "typeorm"
 import { Raw } from "typeorm"
-import type { ErrorCode } from "sinkron"
 
 import { AuthToken, User, Space, SpaceRole, SpaceMember } from "../entities"
 import { Result, ResultType } from "../utils/result"
 import { Controller } from "./index"
+
+export enum ErrorCode {
+    // Invalid request format
+    InvalidRequest = "invalid_request",
+
+    // User could not be authenticated, connection will be closed
+    AuthenticationFailed = "auth_failed",
+
+    // User doesn't have permission to perform the operation
+    AccessDenied = "access_denied",
+
+    // Operation cannot be performed
+    UnprocessableRequest = "unprocessable_request",
+
+    // Requested entity not found
+    NotFound = "not_found",
+
+    InternalServerError = "internal_server_error"
+}
 
 type RequestError = {
     code: ErrorCode
@@ -49,7 +67,7 @@ class UsersController {
         if (!validateUsername(name) || !validatePassword(password)) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                message: "Invalid name or password",
+                message: "Incorrect name or password",
                 details: {}
             })
         }
@@ -58,7 +76,7 @@ class UsersController {
         if (count > 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                message: "Username is taken",
+                message: "Username is already taken",
                 details: { name }
             })
         }
@@ -214,7 +232,7 @@ class UsersController {
         if (user === null || user.password !== password) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                message: "Couldn't authorize",
+                message: "Incorrect name or password",
                 details: { user }
             })
         }

@@ -28,14 +28,13 @@ module.exports = {
         path: path.resolve(__dirname, "./build"),
         filename: "[name].js",
         library: {
-            type: "commonjs",
-        },
+            type: "commonjs"
+        }
     },
     mode: isProduction ? "production" : "development",
     target: "node",
     externals: [nodeExternals({ additionalModuleDirs: ["../node_modules"] })],
     resolve: {
-        mainFields: ["main", "module"],
         extensions: [".js", ".ts"]
     },
     module: { rules },

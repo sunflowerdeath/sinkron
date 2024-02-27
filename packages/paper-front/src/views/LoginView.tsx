@@ -1,22 +1,22 @@
-import { useState } from 'react'
-import { observer } from 'mobx-react-lite'
-import { fromPromise, IPromiseBasedObservable } from 'mobx-utils'
-import { Col } from 'oriente'
-import { Link } from 'wouter'
+import { useState } from "react"
+import { observer } from "mobx-react-lite"
+import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
+import { Col } from "oriente"
+import { Link } from "wouter"
 
-import { AuthStore } from '../store'
+import { AuthStore } from "../store"
 
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Heading } from '../ui/heading'
+import { Button } from "../ui/button"
+import { Input } from "../ui/input"
+import { Heading } from "../ui/heading"
 
 interface LoginViewProps {
     store: AuthStore
 }
 
 const LoginView = observer((props: LoginViewProps) => {
-    const [login, setLogin] = useState('')
-    const [password, setPassword] = useState('')
+    const [login, setLogin] = useState("")
+    const [password, setPassword] = useState("")
 
     const isValid = login.length > 0 && password.length > 0
 
@@ -33,24 +33,26 @@ const LoginView = observer((props: LoginViewProps) => {
             align="normal"
             justify="center"
             style={{
-                height: '100%',
+                height: "100%",
                 width: 320,
-                margin: 'auto',
+                margin: "auto",
                 paddingTop: 40
             }}
             gap={16}
         >
             <Heading style={{ alignSelf: "center" }}>Log In</Heading>
 
-            {authState.state === "rejected" &&
-                <div style={{ color: "var(--color-error)" }}>{authState.value.data.error.message}</div>
-            }
+            {authState.state === "rejected" && (
+                <div style={{ color: "var(--color-error)" }}>
+                    {authState.value.message}
+                </div>
+            )}
             <Col gap={4}>
                 Username
                 <Input
                     value={login}
                     onChange={setLogin}
-                    style={{ width: '100%' }}
+                    style={{ width: "100%" }}
                 />
             </Col>
             <Col gap={4}>
@@ -58,13 +60,13 @@ const LoginView = observer((props: LoginViewProps) => {
                 <Input
                     value={password}
                     onChange={setPassword}
-                    style={{ width: '100%' }}
+                    style={{ width: "100%" }}
                 />
             </Col>
             <Button
-                style={{ alignSelf: 'stretch' }}
+                style={{ alignSelf: "stretch" }}
                 onClick={auth}
-                isDisabled={!isValid || authState.state === 'pending'}
+                isDisabled={!isValid || authState.state === "pending"}
             >
                 Log In
             </Button>
@@ -76,14 +78,14 @@ const LoginView = observer((props: LoginViewProps) => {
 })
 
 const SignupView = observer((props: LoginViewProps) => {
-    const [login, setLogin] = useState('')
-    const [password, setPassword] = useState('')
+    const [login, setLogin] = useState("")
+    const [password, setPassword] = useState("")
 
     const isValid = login.length > 0 && password.length > 0
 
-    const [signupState, setSignupState] = useState<IPromiseBasedObservable<any>>(
-        fromPromise.resolve()
-    )
+    const [signupState, setSignupState] = useState<
+        IPromiseBasedObservable<any>
+    >(fromPromise.resolve())
     const signup = () => {
         const state = props.store.signup({ name: login, password })
         setSignupState(fromPromise(state))
@@ -94,9 +96,9 @@ const SignupView = observer((props: LoginViewProps) => {
             align="normal"
             justify="center"
             style={{
-                height: '100%',
+                height: "100%",
                 width: 320,
-                margin: 'auto',
+                margin: "auto",
                 paddingTop: 40
             }}
             gap={16}
@@ -107,7 +109,7 @@ const SignupView = observer((props: LoginViewProps) => {
                 <Input
                     value={login}
                     onChange={setLogin}
-                    style={{ width: '100%' }}
+                    style={{ width: "100%" }}
                 />
                 <div style={{ color: "var(--color-secondary)" }}>
                     Can contain latin letters and numbers
@@ -118,13 +120,13 @@ const SignupView = observer((props: LoginViewProps) => {
                 <Input
                     value={password}
                     onChange={setPassword}
-                    style={{ width: '100%' }}
+                    style={{ width: "100%" }}
                 />
             </Col>
             <Button
-                style={{ alignSelf: 'stretch' }}
+                style={{ alignSelf: "stretch" }}
                 onClick={signup}
-                isDisabled={!isValid || signupState.state === 'pending'}
+                isDisabled={!isValid || signupState.state === "pending"}
             >
                 Create account
             </Button>

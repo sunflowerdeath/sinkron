@@ -9,7 +9,7 @@ export interface FetchParams {
 }
 
 const defaultFetchParams = {
-    method: "GET",
+    method: "GET"
 }
 
 export type FetchErrorKind =
@@ -17,12 +17,45 @@ export type FetchErrorKind =
     | "abort"
     | "http"
     | "invalid_json"
-    | "application_error"
+    | "application"
 
-export type FetchError = {
-    kind: FetchErrorKind
+const fetchErrorMessages: { [key: string]: string } = {
+    fetch: "Check your internet connection and try again.",
+    abort: "Request was aborted.",
+    http: "Server error.",
+    json: "Server error."
+}
+
+class FetchError extends Error {
     originalError?: any
+    kind: FetchErrorKind
+    data?: object
     response?: Response
+
+    constructor({
+        kind,
+        originalError,
+        data,
+        response,
+        message
+    }: {
+        kind: FetchErrorKind
+        originalError?: any
+        data?: object
+        response?: Response
+        message?: string
+    }) {
+        super(message || fetchErrorMessages[kind])
+        this.name = "FetchError"
+        this.kind = kind
+        this.originalError = originalError
+        this.data = data
+        this.response = response
+    }
+
+    toString() {
+        return this.message
+    }
 }
 
 const fetchJson = async <T extends object = object>(
@@ -39,7 +72,7 @@ const fetchJson = async <T extends object = object>(
         method,
         body: data ? JSON.stringify(data) : undefined,
         credentials: "include",
-        headers,
+        headers
     })
 
     let response: Response | undefined = undefined
@@ -47,7 +80,7 @@ const fetchJson = async <T extends object = object>(
         response = await request
     } catch (e) {
         if (isAbortError(e as Error)) {
-            throw { kind: "abort", originalError: e }
+            throw new FetchError({ kind: "abort", originalError: e })
         }
         throw { kind: "fetch_error", originalError: e, response }
     }
@@ -58,17 +91,39 @@ const fetchJson = async <T extends object = object>(
         try {
             json = await response.json()
         } catch (e) {
-            throw {
+            throw new FetchError({
                 kind: "invalid_json",
                 originalError: e,
-                response,
-            }
+                response
+            })
         }
     }
     if (!response.ok) {
-        throw { kind: "http", data: json, response }
+        throw new FetchError({ kind: "http", data: json, response })
     }
     return json as T
 }
 
-export { fetchJson }
+interface ApiError {
+    error: { message: string } & object
+}
+
+const isApiError = (data: object | undefined): data is ApiError =>
+    data !== undefined && "error" in data && typeof data.error === "object"
+
+const fetchApi = async <T extends object = object>(
+    params: FetchParams
+): Promise<T> => {
+    return fetchJson<T>(params).catch((error: FetchError) => {
+        if (error.kind === "http" && isApiError(error.data)) {
+            throw new FetchError({
+                kind: "application",
+                message: error.data.error.message,
+                data: error.data.error
+            })
+        }
+        throw error
+    })
+}
+
+export { fetchJson, fetchApi }

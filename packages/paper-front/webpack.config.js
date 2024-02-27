@@ -42,11 +42,7 @@ module.exports = {
     mode: isProduction ? "production" : "development",
     target: "web",
     resolve: {
-        mainFields: ["module", "main"],
-        extensions: [".js", ".jsx", ".ts", ".tsx"],
-        alias: {
-            "@automerge/automerge": path.resolve(__dirname, "node_modules/@automerge/automerge/dist/mjs/index.js")
-        }
+        extensions: [".js", ".jsx", ".ts", ".tsx"]
     },
     module: { rules },
     devtool: "cheap-module-source-map",
