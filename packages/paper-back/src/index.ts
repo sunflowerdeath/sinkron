@@ -33,7 +33,7 @@ const run = async () => {
     const sinkron = new Sinkron({ dbPath })
     await sinkron.init()
 
-    const app = new App({ sinkron, port: 8080 })
+    const app = new App({ sinkron, port: 80 })
     await app.init()
 
     let user

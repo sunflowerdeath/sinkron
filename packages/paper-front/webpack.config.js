@@ -37,7 +37,8 @@ module.exports = {
         main: "./src/index.tsx"
     },
     output: {
-        path: path.resolve(__dirname, "./build")
+        path: path.resolve(__dirname, "./build"),
+        publicPath: "/"
     },
     mode: isProduction ? "production" : "development",
     target: "web",

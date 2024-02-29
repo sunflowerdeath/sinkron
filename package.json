@@ -4,7 +4,8 @@
     "description": "",
     "scripts": {
         "build-backend": "pnpm --filter sinkron --filter paper-back build",
-        "start-backend": "cd packages/paper-back && pnpm start"
+        "start-backend": "cd packages/paper-back && pnpm start",
+        "build-front": "pnpm --filter sinkron-client --filter paper-front build"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
