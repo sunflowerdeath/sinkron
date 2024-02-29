@@ -3,8 +3,9 @@
     "version": "0.0.1",
     "description": "",
     "scripts": {
+        "start": "node ./build/main.js",
         "build": "NODE_ENV=production webpack",
-        "start": "webpack && node ./build/main.js"
+        "dev": "webpack && node ./build/main.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
@@ -34,7 +35,7 @@
         "@koa/router": "^12.0.1",
         "ajv": "^8.12.0",
         "bcrypt": "^5.1.1",
-        "better-sqlite3": "^7.6.2",
+        "better-sqlite3": "^9.4.3",
         "cookie": "^0.6.0",
         "koa": "^2.13.4",
         "koa-bodyparser": "^4.4.1",

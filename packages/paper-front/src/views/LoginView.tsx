@@ -104,6 +104,12 @@ const SignupView = observer((props: LoginViewProps) => {
             gap={16}
         >
             <Heading style={{ alignSelf: "center" }}>Create Account</Heading>
+
+            {signupState.state === "rejected" && (
+                <div style={{ color: "var(--color-error)" }}>
+                    {signupState.value.message}
+                </div>
+            )}
             <Col gap={4}>
                 Username
                 <Input

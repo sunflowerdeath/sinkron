@@ -1,7 +1,7 @@
-import { createServer } from 'http'
-import type { Server, ClientRequest, IncomingMessage } from 'http'
-import cookie from 'cookie'
-import Ajv, { JSONSchemaType } from 'ajv'
+import { createServer } from "http"
+import type { Server, ClientRequest, IncomingMessage } from "http"
+import cookie from "cookie"
+import Ajv, { JSONSchemaType } from "ajv"
 import {
     EntitySchema,
     DataSource,
@@ -9,27 +9,27 @@ import {
     MoreThan,
     MoreThanOrEqual,
     EntityManager
-} from 'typeorm'
-import Koa from 'koa'
-import koaBodyParser from 'koa-bodyparser'
-import Router from '@koa/router'
+} from "typeorm"
+import Koa from "koa"
+import koaBodyParser from "koa-bodyparser"
+import Router from "@koa/router"
 
-import { Sinkron, SinkronServer } from 'sinkron'
+import { Sinkron, SinkronServer } from "sinkron"
 
-import { Controller } from './controller'
-import type { User, Space, SpaceMember } from './entities'
-import { entities } from './entities'
+import { Controller } from "./controller"
+import type { User, Space, SpaceMember } from "./entities"
+import { entities } from "./entities"
 import loginRouter from "./routes/login"
 import spacesRouter from "./routes/spaces"
 import invitesRouter from "./routes/invites"
 
 const credentialsSchema = {
-    type: 'object',
+    type: "object",
     properties: {
-        name: { type: 'string' },
-        password: { type: 'string' }
+        name: { type: "string" },
+        password: { type: "string" }
     },
-    required: ['name', 'password'],
+    required: ["name", "password"],
     additionalProperties: false
 }
 
@@ -54,11 +54,11 @@ class App {
         this.port = port
 
         this.db = new DataSource({
-            type: 'better-sqlite3',
-            database: ':memory:',
+            type: "better-sqlite3",
+            database: ":memory:",
             entities,
             synchronize: true,
-            logging: ['query', 'error']
+            logging: ["query", "error"]
         })
 
         this.sinkron = sinkron
@@ -81,10 +81,10 @@ class App {
         }
 
         this.http = createServer(koa.callback())
-        this.http.on('upgrade', (request, socket, head) => {
+        this.http.on("upgrade", (request, socket, head) => {
             authenticate(request).then((userId) => {
                 if (userId === undefined) {
-                    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+                    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
                     socket.destroy()
                     return
                 }
@@ -93,7 +93,7 @@ class App {
                     socket,
                     head,
                     (ws) => {
-                        this.sinkronServer.ws.emit('connection', ws, request)
+                        this.sinkronServer.ws.emit("connection", ws, request)
                     }
                 )
             })
@@ -107,13 +107,13 @@ class App {
     createApp() {
         const app = new Koa()
 
-        app.keys = ['VERY SECRET KEY']
+        app.keys = ["VERY SECRET KEY"]
         app.use(koaBodyParser())
 
         app.use(loginRouter(this.controller).routes())
 
         const requireAuth = async (ctx, next) => {
-            const token = ctx.cookies.get('token')
+            const token = ctx.cookies.get("token")
             if (token) {
                 const res = await this.controller.users.verifyAuthToken(token)
                 if (res.isOk && res !== null) {
@@ -123,15 +123,15 @@ class App {
                 }
             }
             ctx.status = 401
-            ctx.end('Unauthorized')
+            ctx.end("Unauthorized")
         }
 
         const router = new Router()
         router.use(requireAuth)
-        router.get('/profile', async (ctx) => {
+        router.get("/profile", async (ctx) => {
             const token = ctx.token
             const res = await this.controller.users.getUserProfile(token.userId)
-            if (!res.isOk) throw 'hz'
+            if (!res.isOk) throw "hz"
             ctx.body = res.value
         })
         router.use(spacesRouter(this.controller).routes())

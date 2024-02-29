@@ -3,10 +3,13 @@
     "version": "0.0.1",
     "description": "",
     "scripts": {
+        "build-backend": "pnpm --filter sinkron --filter paper-back build",
+        "start-backend": "cd packages/paper-back && pnpm start"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "dependencies": {
         "prettier": "^2.7.1"
-    }
+    },
+    "packageManager": "pnpm@8.15.4+sha256.cea6d0bdf2de3a0549582da3983c70c92ffc577ff4410cbf190817ddc35137c2"
 }

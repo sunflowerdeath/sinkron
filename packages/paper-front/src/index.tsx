@@ -13,9 +13,6 @@ import { AuthStore, Store, useStore, StoreContext } from './store'
 import SpaceView from './views/SpaceView'
 import { LoginView, SignupView } from './views/LoginView'
 
-let doc = Automerge.init()
-console.log("DOCUMENT", doc)
-
 /*
 const statusMap = {
     [ConnectionStatus.Disconnected]: 'Waiting for connection...',

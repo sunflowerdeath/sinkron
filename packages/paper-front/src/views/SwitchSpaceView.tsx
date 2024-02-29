@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite"
 import { useLocation, Link } from "wouter"
 import { Col, Row } from "oriente"
 
-import { useStore } from "../store"
+import { useStore, Space } from "../store"
 import { Button } from "../ui/button"
 import { Avatar } from "../ui/avatar"
 import Container from "../ui/Container"
@@ -13,22 +13,22 @@ const SwitchSpaceView = observer(() => {
     const [location, navigate] = useLocation()
 
     const select = (s: Space) => {
-        store.space = s
-        navigate('/')
+        store.spaceId = s.id
+        navigate("/")
     }
 
     return (
-        <Container title="Switch space">
+        <Container title="Switch space" onClose={() => navigate("/")}>
             <Col gap={10}>
-                {store.user!.spaces.map((s) => (
+                {store.user.spaces.map((s) => (
                     <Button
                         onClick={() => select(s)}
-                        style={{ width: 400, justifyContent: 'start' }}
+                        style={{ width: 400, justifyContent: "start" }}
                     >
                         <Row gap={8} align="center">
                             <Avatar name={s.name} />
                             <Col>
-                                <div>{s.name || '.'}</div>
+                                <div>{s.name || "."}</div>
                                 <div style={{ opacity: 0.6 }}>
                                     {s.membersCount} members &ndash; {s.role}
                                 </div>

@@ -147,17 +147,18 @@ class AuthStore {
     }
 
     async signup(credentials: Credentials) {
-        const res = await fetchJson<User>({
-            method: "POST",
-            url: "/api/signup",
-            data: credentials
-        })
-        if (res.isOk) {
-            this.setUser(res.value)
-            console.log("Signed up")
-        } else {
-            return res.error
+        let profile
+        try {
+            profile = await fetchApi<User>({
+                method: "POST",
+                url: "/api/signup",
+                data: credentials
+            })
+        } catch (e) {
+            throw e
         }
+        this.setUser(profile)
+        console.log("Signed up")
     }
 
     logout() {
