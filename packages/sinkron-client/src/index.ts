@@ -14,10 +14,6 @@ import {
 import { debounce } from "lodash-es"
 import { parseISO } from "date-fns"
 
-console.log("CLIENT")
-let doc = Automerge.init()
-console.log("CLIENT", doc)
-
 enum Op {
     Create = "+",
     Modify = "M",

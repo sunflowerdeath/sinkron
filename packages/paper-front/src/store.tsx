@@ -248,6 +248,12 @@ const listToTree = <T extends ListItem>(list: T[]): TreeNode<T>[] => {
     return tree
 }
 
+const isProductionEnv = window.location.hostname.includes("onrender.com")
+
+const BACKEND_URL = isProductionEnv
+    ? "ws://sinkron.onrender.com"
+    : "ws://127.0.0.1:80"
+
 class SpaceStore {
     space: Space
     collection: Collection<Document>
@@ -260,7 +266,8 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const store = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
-        const transport = new WebsocketTransport(`ws://127.0.0.1:8080/${token}`)
+        console.log(BACKEND_URL)
+        const transport = new WebsocketTransport(`${BACKEND_URL}/${token}`)
         this.collection = new Collection<Document>({
             transport,
             col,
