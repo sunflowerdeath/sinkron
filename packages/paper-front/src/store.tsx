@@ -251,7 +251,7 @@ const listToTree = <T extends ListItem>(list: T[]): TreeNode<T>[] => {
 const isProductionEnv = window.location.hostname.includes("onrender.com")
 
 const BACKEND_URL = isProductionEnv
-    ? "ws://sinkron.onrender.com"
+    ? "wss://sinkron.onrender.com"
     : "ws://127.0.0.1:80"
 
 class SpaceStore {
