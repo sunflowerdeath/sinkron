@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import { Sinkron } from 'sinkron'
 import { App } from '../app'
 
-describe('UsersController', () => {
+describe.only('UsersController', () => {
     let app
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ':memory: ' })
@@ -18,13 +18,13 @@ describe('UsersController', () => {
         assert(res.isOk)
         const user = res.value
 
-        const res2 = await c.users.getUserProfile(user.id)
+        const res2 = await c.users.getUserProfile(user.id, "get profile")
         assert(res2.isOk)
 
-        const res3 = await c.users.deleteUser(user.id)
+        const res3 = await c.users.deleteUser(user.id, "delete")
         assert(res3.isOk)
 
-        const res4 = await c.users.getUserProfile(user.id)
+        const res4 = await c.users.getUserProfile(user.id, "get profile err")
         assert(!res4.isOk)
     })
 

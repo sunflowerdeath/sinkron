@@ -99,17 +99,34 @@ class UsersController {
     }
 
     async deleteUser(id: string): Promise<ResultType<true, RequestError>> {
-        const res = await this.users.delete(id)
-        if (res.affected === 0) {
+        const count = await this.users.countBy({ id })
+        if (count === 0) {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "User not found",
                 details: { id }
             })
-        } else {
-            // TODO delete tokens
-            return Result.ok(true)
         }
+
+        // delete spaces
+        const spaces = await this.db
+            .getRepository<Space>("space")
+            .findBy({ ownerId: id })
+        for (let i in spaces) {
+            await this.controller.spaces.delete(spaces[i].id)
+        }
+
+        // delete memebers
+        await this.db
+            .getRepository<SpaceMember>("space_member")
+            .delete({ userId: id })
+
+        // delete auth tokens
+        await this.tokens.delete({ userId: id })
+
+        await this.users.delete(id)
+
+        return Result.ok(true)
     }
 
     async getUser(id: string): Promise<ResultType<User | null, RequestError>> {

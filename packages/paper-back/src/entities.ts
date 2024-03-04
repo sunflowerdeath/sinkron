@@ -1,4 +1,4 @@
-import { EntitySchema } from 'typeorm'
+import { EntitySchema } from "typeorm"
 
 export type User = {
     id: string
@@ -26,7 +26,7 @@ export type Space = {
     createdAt: Date
 }
 
-export type SpaceRole = 'readonly' | 'editor' | 'admin'
+export type SpaceRole = "readonly" | "editor" | "admin"
 
 export type SpaceMember = {
     id: string
@@ -38,10 +38,27 @@ export type SpaceMember = {
     createdAt: Date
 }
 
+export type InviteStatus = "sent" | "accepted" | "declined" | "cancelled"
+
+export type Invite = {
+    id: string
+    space: Space
+    spaceId: string
+    role: SpaceRole
+    from: User
+    fromId: string
+    to: User
+    toId: string
+    createdAt: Date
+    updatedAt: Date
+    status: InviteStatus
+    notificationHidden: boolean
+}
+
 const UserEntity = new EntitySchema<User>({
-    name: 'user',
+    name: "user",
     columns: {
-        id: { type: String, primary: true, generated: 'uuid' },
+        id: { type: String, primary: true, generated: "uuid" },
         createdAt: { type: Date, createDate: true },
         isDisabled: { type: Boolean },
         name: { type: String, unique: true },
@@ -50,48 +67,85 @@ const UserEntity = new EntitySchema<User>({
 })
 
 const AuthTokenEntity = new EntitySchema<AuthToken>({
-    name: 'token',
+    name: "token",
     columns: {
-        token: { type: String, primary: true, generated: 'uuid' },
-        userId: { type: String },
+        token: { type: String, primary: true, generated: "uuid" },
+        userId: { type: String }, // index?
         createdAt: { type: Date, createDate: true },
         expiresAt: { type: Date, nullable: true },
         lastAccess: { type: Date, createDate: true },
         client: { type: String, nullable: true }
     },
     relations: {
-        user: { type: 'many-to-one', target: 'user' }
-    }
+        user: { type: "many-to-one", target: "user" }
+    },
+    indices: [
+        { columns: ["userId"] },
+    ]
 })
 
 const SpaceEntity = new EntitySchema<Space>({
-    name: 'space',
+    name: "space",
     columns: {
-        id: { type: String, primary: true, generated: 'uuid' },
+        id: { type: String, primary: true, generated: "uuid" },
         name: { type: String },
         ownerId: { type: String },
         createdAt: { type: Date, createDate: true }
     },
     relations: {
-        owner: { type: 'many-to-one', target: 'user' }
+        owner: { type: "many-to-one", target: "user" }
     }
 })
 
 const SpaceMemberEntity = new EntitySchema<SpaceMember>({
-    name: 'space_member',
+    name: "space_member",
     columns: {
-        id: { type: String, primary: true, generated: 'uuid' },
+        id: { type: String, primary: true, generated: "uuid" },
         userId: { type: String },
         spaceId: { type: String },
         role: { type: String },
         createdAt: { type: Date, createDate: true }
     },
     relations: {
-        space: { type: 'many-to-one', target: 'space' },
-        user: { type: 'many-to-one', target: 'user' }
-    }
+        space: { type: "many-to-one", target: "space" },
+        user: { type: "many-to-one", target: "user" }
+    },
+    indices: [
+        { columns: ["userId"] },
+        { columns: ["spaceId"] },
+    ]
 })
 
-const entities = [UserEntity, AuthTokenEntity, SpaceEntity, SpaceMemberEntity]
+const InviteEntity = new EntitySchema<Invite>({
+    name: "invite",
+    columns: {
+        id: { type: String, primary: true, generated: "uuid" },
+        spaceId: { type: String },
+        role: { type: String },
+        fromId: { type: String },
+        toId: { type: String },
+        createdAt: { type: Date, createDate: true },
+        updatedAt: { type: Date, updateDate: true },
+        status: { type: String },
+        notificationHidden: { type: Boolean }
+    },
+    relations: {
+        space: { type: "many-to-one", target: "space" },
+        from: { type: "many-to-one", target: "user" },
+        to: { type: "many-to-one", target: "user" }
+    },
+    indices: [
+        { columns: ["fromId"] },
+        { columns: ["toId"] },
+    ]
+})
+
+const entities = [
+    UserEntity,
+    AuthTokenEntity,
+    SpaceEntity,
+    SpaceMemberEntity,
+    InviteEntity
+]
 
 export { entities }

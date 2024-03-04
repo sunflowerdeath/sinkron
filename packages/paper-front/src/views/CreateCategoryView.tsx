@@ -1,35 +1,37 @@
-import { useState } from 'react'
-import { observer } from 'mobx-react-lite'
-import { useLocation, useSearch } from 'wouter'
-import queryString from 'query-string'
-import { Col, Row } from 'oriente'
+import { useState } from "react"
+import { observer } from "mobx-react-lite"
+import { useLocation, useSearch } from "wouter"
+import queryString from "query-string"
+import { Col, Row } from "oriente"
 
-import closeSvg from '@material-design-icons/svg/outlined/close.svg'
-import expandMoreSvg from '@material-design-icons/svg/outlined/expand_more.svg'
+import closeSvg from "@material-design-icons/svg/outlined/close.svg"
+import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore } from '../store'
-import { TreeNode, Category } from '../store'
+import { useStore } from "../store"
+import { Tree, Category } from "../store"
 
-import { Input } from '../ui/input'
-import { Heading } from '../ui/heading'
-import { Button } from '../ui/button'
-import { Icon } from '../ui/icon'
-import Container from '../ui/Container'
-import { Menu, MenuItem } from '../ui/menu'
+import { Input } from "../ui/input"
+import { Heading } from "../ui/heading"
+import { Button } from "../ui/button"
+import { Icon } from "../ui/icon"
+import Container from "../ui/Container"
+import { Menu, MenuItem } from "../ui/menu"
 
-const renderItems = (
-    tree: TreeNode<Category>[],
-    map: { [key: string]: Category },
-    onSelect: (c: string) => void
-) => {
-    return tree.map((c) => (
+const renderItems = (props: CategorySelectProps) => {
+    const { categoryTree, disabledItems, onChange } = props
+    return props.categoryTree.map((c) => (
         <>
-            <MenuItem value={c.id} key={c.id} onSelect={() => onSelect(c.id)}>
+            <MenuItem
+                value={c.id}
+                key={c.id}
+                onSelect={() => props.onChange(c.id)}
+                isDisabled={disabledItems.includes(c.id)}
+            >
                 {c.name}
             </MenuItem>
             {c.children && (
                 <div style={{ paddingLeft: 30 }}>
-                    {renderItems(c.children, map, onSelect)}
+                    {renderItems({ ...props, categoryTree: c.children })}
                 </div>
             )}
         </>
@@ -37,21 +39,22 @@ const renderItems = (
 }
 
 interface CategorySelectProps {
-    categoryMap: { [key: string]: Category }
-    categoryTree: TreeNode<Category>[]
     value: string | null
     onChange: (value: string | null) => void
+    categoryMap: { [key: string]: Category }
+    categoryTree: Tree<Category>
+    disabledItems: string[]
 }
 
 const CategorySelect = (props: CategorySelectProps) => {
     const { categoryTree, categoryMap, value, onChange } = props
     const menu = () => {
         return categoryTree.length === 0 ? (
-            <Row style={{ color: '#999', height: 45 }} align="center">
+            <Row style={{ color: "#999", height: 45 }} align="center">
                 No categories
             </Row>
         ) : (
-            renderItems(categoryTree, categoryMap, onChange)
+            renderItems(props)
         )
     }
     return (
@@ -65,9 +68,9 @@ const CategorySelect = (props: CategorySelectProps) => {
                 <Row
                     style={{
                         height: 60,
-                        border: '2px solid #999',
-                        padding: '0 8px',
-                        alignSelf: 'normal'
+                        border: "2px solid #999",
+                        padding: "0 8px",
+                        alignSelf: "normal"
                     }}
                     align="center"
                     ref={ref}
@@ -78,7 +81,7 @@ const CategorySelect = (props: CategorySelectProps) => {
                         {value ? (
                             categoryMap[value].name
                         ) : (
-                            <div style={{ color: '#999' }}>No parent</div>
+                            <div style={{ color: "#999" }}>No parent</div>
                         )}
                     </div>
                     {value ? (
@@ -96,8 +99,9 @@ const CategorySelect = (props: CategorySelectProps) => {
 
 interface EditCategoryFormProps {
     initialValues?: { name: string; parent: string | null }
+    disabledItems: string[]
     categoryMap: { [key: string]: Category }
-    categoryTree: TreeNode<Category>[]
+    categoryTree: Tree<Category>
     submitButtonText: React.ReactNode
     onSubmit: (values: { name: string; parent: string | null }) => void
 }
@@ -107,11 +111,12 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
         initialValues,
         categoryMap,
         categoryTree,
+        disabledItems,
         onSubmit,
         submitButtonText
     } = props
 
-    const [name, setName] = useState(initialValues?.name || '')
+    const [name, setName] = useState(initialValues?.name || "")
     const [parent, setParent] = useState<string | null>(
         initialValues?.parent || null
     )
@@ -120,7 +125,7 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
 
     return (
         <>
-            <Col gap={8} style={{ alignSelf: 'stretch' }} align="normal">
+            <Col gap={8} style={{ alignSelf: "stretch" }} align="normal">
                 Name:
                 <Input
                     style={{ maxWidth: 400 }}
@@ -131,6 +136,7 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
             <Col gap={8}>
                 Parent category:
                 <CategorySelect
+                    disabledItems={disabledItems}
                     categoryMap={categoryMap}
                     categoryTree={categoryTree}
                     value={parent}
@@ -150,7 +156,7 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
 const CreateCategoryView = observer(() => {
     const search = queryString.parse(useSearch())
     const initialParent =
-        'parent' in search
+        "parent" in search
             ? Array.isArray(search.parent)
                 ? search.parent[0]
                 : search.parent
@@ -162,21 +168,22 @@ const CreateCategoryView = observer(() => {
     const create = (values: { name: string; parent: string | null }) => {
         const id = store.space.createCategory(values)
         store.space.selectCategory(id)
-        navigate('/')
+        navigate("/")
     }
 
     if (!store.space.collection.initialSyncCompleted) {
-        return 'Loading...'
+        return "Loading..."
     }
 
     return (
-        <Container title="Create category" onClose={() => navigate('/')}>
+        <Container title="Create category" onClose={() => navigate("/")}>
             <EditCategoryForm
-                initialValues={{ name: '', parent: initialParent }}
+                initialValues={{ name: "", parent: initialParent }}
                 onSubmit={create}
                 submitButtonText="Create"
-                categoryMap={store.space.categoriesMap}
-                categoryTree={store.space.categoriesTree}
+                categoryMap={store.space.categoryMap}
+                categoryTree={store.space.categoryTree}
+                disabledItems={[]}
             />
         </Container>
     )
@@ -193,23 +200,24 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
     const [location, navigate] = useLocation()
 
     if (!store.space.collection.initialSyncCompleted) {
-        return 'Loading...'
+        return "Loading..."
     }
 
     const category = store.space.meta.categories[id]
     const update = async (values: { name: string; parent: string | null }) => {
         await store.space.updateCategory(id, values)
-        navigate('/categories')
+        navigate("/categories")
     }
 
     return (
-        <Container title="Edit category" onClose={() => navigate('/')}>
+        <Container title="Edit category" onClose={() => navigate("/")}>
             <EditCategoryForm
                 initialValues={category}
                 onSubmit={update}
                 submitButtonText="Save"
-                categoryMap={store.space.categoriesMap}
-                categoryTree={store.space.categoriesTree}
+                categoryMap={store.space.categoryMap}
+                categoryTree={store.space.categoryTree}
+                disabledItems={[id]}
             />
         </Container>
     )

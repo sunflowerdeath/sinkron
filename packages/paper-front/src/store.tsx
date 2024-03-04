@@ -230,7 +230,9 @@ type ListItem = { id: string; parent: string | null }
 
 export type TreeNode<T extends {}> = T & { children: TreeNode<T>[] }
 
-const listToTree = <T extends ListItem>(list: T[]): TreeNode<T>[] => {
+export type Tree<T extends {}> = TreeNode<T>[]
+
+const listToTree = <T extends ListItem>(list: T[]): Tree<T> => {
     const index: { [id: string]: TreeNode<T> } = {}
     list.forEach((c) => {
         index[c.id] = { ...c, children: [] }
@@ -252,7 +254,7 @@ const isProductionEnv = window.location.hostname.includes("onrender.com")
 
 const BACKEND_URL = isProductionEnv
     ? "wss://sinkron.onrender.com"
-    : "ws://127.0.0.1:80"
+    : `ws://${window.location.hostname}:80`
 
 class SpaceStore {
     space: Space
@@ -266,7 +268,6 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const store = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
-        console.log(BACKEND_URL)
         const transport = new WebsocketTransport(`${BACKEND_URL}/${token}`)
         this.collection = new Collection<Document>({
             transport,
@@ -296,7 +297,8 @@ class SpaceStore {
             meta: computed,
             categoryId: observable,
             category: computed,
-            categoriesTree: computed
+            categoryMap: computed,
+            categoryTree: computed
         })
     }
 
@@ -341,11 +343,12 @@ class SpaceStore {
         return id
     }
 
-    get categoriesMap() {
+    get categoryMap() {
         return this.meta.categories
     }
-    get categoriesTree() {
-        return listToTree(Object.values(this.categoriesMap))
+
+    get categoryTree() : Tree<Category> {
+        return listToTree(Object.values(this.categoryMap))
     }
 
     selectCategory(id: string | null) {

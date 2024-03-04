@@ -8,14 +8,17 @@
         "allowSyntheticDefaultImports": true,
         "isolatedModules": true,
 
+        "target": "es2015",
+        "lib": ["es6", "es7", "dom", "esnext"],
+        "jsx": "react-jsx",
+
+        "outDir": "build",
         "declaration": true,
         "declarationDir": "./types",
-        "target": "es2015",
-        "outDir": "build",
 
         "noImplicitAny": true,
         "noImplicitReturns": true,
         "noImplicitThis": true
-    }
+    },
+    "include": ["src/**/*.ts*"]
 }
-

@@ -1,4 +1,4 @@
-import { Menu, MenuItem, StyleMap } from 'oriente'
+import { Menu, MenuItem, StyleMap } from "oriente"
 
 const menuItemStyles = (
     props: React.ComponentProps<typeof MenuItem>,
@@ -6,8 +6,9 @@ const menuItemStyles = (
 ) => ({
     root: {
         padding: 10,
-        cursor: 'default',
-        background: state.isSelected ? '#666' : 'none'
+        cursor: "default",
+        background: state.isSelected ? "#666" : "none",
+        color: props.isDisabled ? "var(--color-secondary)" : "var(--color-text)"
     }
 })
 
@@ -18,12 +19,12 @@ const StyledMenuItem = (props: React.ComponentProps<typeof MenuItem>) => {
 
 const menuStyles: StyleMap = {
     list: {
-        background: '#555',
+        background: "#555",
         padding: 8,
-        boxSizing: 'border-box',
+        boxSizing: "border-box",
         boxShadow:
-            'rgb(51 51 51 / 40%) 0px 0px 12px 0px,' +
-            'rgb(51 51 51 / 40%) 0px 0px 2px 0px'
+            "rgb(51 51 51 / 40%) 0px 0px 12px 0px," +
+            "rgb(51 51 51 / 40%) 0px 0px 2px 0px"
     }
 }
 

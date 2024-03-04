@@ -160,7 +160,7 @@ const DocumentListView = observer(() => {
     )
 
     return (
-        <Col style={{ alignItems: 'stretch', height: '100vh' }} gap={8}>
+        <Col style={{ alignItems: 'stretch', height: '100dvh' }} gap={8}>
             {topBar}
             <DocumentList />
             {bottomBar}

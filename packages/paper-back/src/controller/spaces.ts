@@ -1,16 +1,35 @@
-import { EntitySchema, DataSource, Repository } from "typeorm"
+import { DataSource, Repository } from "typeorm"
 import { Raw, In } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 
 import { Sinkron, Permissions } from "sinkron"
-import type {Permission} from "sinkron"
-import type { ErrorCode } from "sinkron"
+import type { Permission } from "sinkron"
+// import type { ErrorCode } from "sinkron"
 
 import { Result, ResultType } from "../utils/result"
 
 import { AuthToken, User, Space, SpaceRole, SpaceMember } from "../entities"
 import { Controller } from "./index"
+
+export enum ErrorCode {
+    // Invalid request format
+    InvalidRequest = "invalid_request",
+
+    // User could not be authenticated, connection will be closed
+    AuthenticationFailed = "auth_failed",
+
+    // User doesn't have permission to perform the operation
+    AccessDenied = "access_denied",
+
+    // Operation cannot be performed
+    UnprocessableRequest = "unprocessable_request",
+
+    // Requested entity not found
+    NotFound = "not_found",
+
+    InternalServerError = "internal_server_error"
+}
 
 type RequestError = {
     code: ErrorCode
@@ -99,8 +118,8 @@ class SpacesController {
     }
 
     async delete(id: string): Promise<ResultType<true, RequestError>> {
-        const res = await this.spaces.delete(id)
-        if (res.affected === 0) {
+        const count = await this.spaces.countBy({ id })
+        if (count === 0) {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "Space not found",
@@ -108,13 +127,23 @@ class SpacesController {
             })
         }
 
+        // TODO members
+        await this.members.delete({ spaceId: id })
+
+        // delete collection
         const col = `spaces/${id}`
         await this.sinkron.deleteCollection(col)
+
+        // TODO delete groups
+
+        await this.spaces.delete({ id })
 
         return Result.ok(true)
     }
 
-    async addMember(props: AddMemberProps) {
+    async addMember(
+        props: AddMemberProps
+    ): Promise<ResultType<true, RequestError>> {
         const { userId, spaceId, role } = props
 
         const cnt1 = await this.spaces.countBy({ id: spaceId })
@@ -139,6 +168,7 @@ class SpacesController {
 
         await this.members.insert({ userId, spaceId, role })
         await this.sinkron.addMemberToGroup(userId, `spaces/${spaceId}/${role}`)
+        return Result.ok(true)
     }
 
     async getUserSpaces(
@@ -208,22 +238,6 @@ class SpacesController {
 
     // remove member from space
 
-    /*
-    async sendInvite(userId: string, role: SpaceRole) {
-        this.invites.insert({
-            to: userId,
-            role: SpaceRole
-        })
-    }
-
-    async acceptInvite(inviteId: string) {
-        // this.addMemberToSpace(...)
-    }
-
-    async declineInvite(inviteId: string) {}
-
-    async cancelInvite(inviteId: string) {}
-    */
 }
 
 export { SpacesController }

@@ -6,6 +6,7 @@ import { createEditor, Node, Transforms } from 'slate'
 import { withReact, ReactEditor, Slate, Editable } from 'slate-react'
 import { Col, Row } from 'oriente'
 import { without } from 'lodash-es'
+import * as Automerge from "@automerge/automerge"
 
 import expandLessSvg from '@material-design-icons/svg/outlined/expand_less.svg'
 import arrowBackSvg from '@material-design-icons/svg/outlined/arrow_back.svg'
@@ -19,7 +20,7 @@ import CategoriesList from '../components/CategoriesList'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/icon'
 import { Menu, MenuItem } from '../ui/menu'
-import { useStore } from '../store'
+import { useStore, Document } from '../store'
 
 const useForceUpdate = () => {
     const [state, setState] = useState({})
@@ -46,9 +47,10 @@ const renderElement = (props) => {
     return <span {...props.attributes}>{props.children}</span>
 }
 
-const createDocumentEditor = (): ReactEditor => {
+const createDocumentEditor = (onChange: any): ReactEditor => {
     const editor = withReact(createEditor())
     const { normalizeNode } = editor
+    // editor.onChange = onChange
     editor.normalizeNode = (entry) => {
         const [node, path] = entry
         if (path.length === 0) {
@@ -104,7 +106,12 @@ const EditorView = observer((props: EditorViewProps) => {
     const [location, navigate] = useLocation()
     const forceUpdate = useForceUpdate()
 
-    const editor = useMemo(() => createDocumentEditor(), [])
+    const editor = useMemo(() => createDocumentEditor(
+            (hz) => {
+                // console.log("onchange", operation)
+                // onChange?.(editor)
+            }
+    ), [])
     const value = useMemo(
         () => (fromAutomerge(doc.content) as any).children,
         [doc]
@@ -118,7 +125,14 @@ const EditorView = observer((props: EditorViewProps) => {
         <Slate
             initialValue={value}
             editor={editor}
-            onChange={() => onChange?.(editor)}
+            onChange={(a) => {
+                // Prevent bug firing twice on Android
+                if (!editor.operations.fired) {
+                    onChange?.(editor)
+                    editor.operations.fired = true
+                }
+                
+            }}
         >
             <Editable
                 renderElement={renderElement}
@@ -178,6 +192,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
             (op) => op.type !== 'set_selection'
         )
         if (ops.length > 0) {
+            console.log(ops)
             space.collection.change(id, (doc) =>
                 applySlateOps(doc.content, ops)
             )
@@ -243,7 +258,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     position: 'absolute',
                     top: 0,
                     left: 0,
-                    height: '100vh',
+                    height: '100dvh',
                     width: isMobile ? '100%' : 480,
                     background: '#333'
                 }}
@@ -255,8 +270,8 @@ const DocumentView = observer((props: DocumentViewProps) => {
                             doc.categories = value
                         })
                     }}
-                    tree={space.categoriesTree}
-                    categories={space.meta.categories}
+                    tree={space.categoryTree}
+                    categories={space.categoryMap}
                     onClose={() => setShowSelect(false)}
                 />
             </div>
@@ -267,7 +282,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
         <Menu
             menu={menu}
             styles={{ list: { background: '#555' } }}
-            placement={{ padding: 0, offset: 8 }}
+            placement={{ padding: 0, offset: 8, align: "end" }}
             autoSelectFirstItem={false}
         >
             {(ref, { open }) => (
@@ -298,7 +313,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100vh'
+                height: '100dvh'
             }}
         >
             {top}

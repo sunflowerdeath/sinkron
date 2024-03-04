@@ -102,6 +102,7 @@ class App {
 
     async init() {
         await this.db.initialize()
+        await this.sinkron.init()
     }
 
     createApp() {

@@ -147,7 +147,7 @@ const CategoriesView = observer(() => {
                         </Row>
                     </Button>
                     <CategoryList
-                        categories={store.space.categoriesTree}
+                        categories={store.space.categoryTree}
                         onDelete={onDelete}
                         onSelect={(id) => selectCategory(id)}
                     />
