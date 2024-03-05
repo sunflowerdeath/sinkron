@@ -20,6 +20,7 @@ module.exports = {
     entry: {
         test: [
             "./src/controller/users.test.ts",
+            "./src/controller/spaces.test.ts",
             "./src/controller/invites.test.ts"
         ]
     },

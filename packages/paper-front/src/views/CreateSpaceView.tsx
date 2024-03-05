@@ -99,7 +99,7 @@ const CreateSpaceView = observer(() => {
         if (res.isOk) {
             const space = res.value as Space
             store.user.spaces.push(space)
-            store.spaceId = res.value.id
+            store.changeSpace(space.id)
             navigate("/")
         } else {
             alert(res.error)

@@ -207,6 +207,13 @@ class Store {
         )
         return state
     }
+
+    changeSpace(spaceId: string) {
+        if (this.spaceId !== spaceId) {
+            this.space?.collection.stopAutoReconnect?.()
+            this.spaceId = spaceId
+        }
+    }
 }
 
 const makeInitialDocument = () => ({
@@ -274,8 +281,6 @@ class SpaceStore {
             col,
             store
         })
-        // @ts-ignore
-        window.col = this.collection
 
         this.documentList = new TransformedMap({
             source: this.collection.items,

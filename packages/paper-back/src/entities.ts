@@ -26,7 +26,7 @@ export type Space = {
     createdAt: Date
 }
 
-export type SpaceRole = "readonly" | "editor" | "admin"
+export type SpaceRole = "readonly" | "editor" | "admin" | "owner"
 
 export type SpaceMember = {
     id: string

@@ -45,7 +45,7 @@ type CreateSpaceProps = {
 type AddMemberProps = {
     userId: string
     spaceId: string
-    role: SpaceRole
+    role: "readonly" | "editor" | "admin" // without owner
 }
 
 type UserSpaces = { id: string; name: string; role: SpaceRole }[]
@@ -74,12 +74,25 @@ class SpacesController {
     ): Promise<ResultType<Space, RequestError>> {
         const { ownerId, name } = props
 
-        const data = { name, ownerId }
-        const res = await this.spaces.insert(data)
-        const space = {
-            ...data,
-            ...res.generatedMaps[0]
-        } as Space
+        const count = await this.users.countBy({ id: ownerId })
+        if (count === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "User not found",
+                details: props
+            })
+        }
+
+        const createRes = await this.spaces.insert({ name, ownerId })
+
+        const space : Space = {
+            ...createRes.generatedMaps[0],
+            name,
+            owner: { id: ownerId } as User,
+            // @ts-ignore
+            role: "owner",
+            membersCount: 1
+        }
 
         const col = `spaces/${space.id}`
 
@@ -106,15 +119,11 @@ class SpacesController {
         await this.members.insert({
             userId: ownerId,
             spaceId: space.id,
-            role: "admin"
+            role: "owner"
         })
         await this.sinkron.addMemberToGroup(ownerId, `spaces/${space.id}/admin`)
 
-        return Result.ok({
-            ...space,
-            role: "admin",
-            membersCount: 1
-        })
+        return Result.ok(space)
     }
 
     async delete(id: string): Promise<ResultType<true, RequestError>> {
@@ -151,7 +160,7 @@ class SpacesController {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "Space not found",
-                details: { id: spaceId }
+                details: props
             })
         }
 
@@ -160,14 +169,51 @@ class SpacesController {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "User not found",
-                details: { id: userId }
+                details: props
             })
         }
 
-        // TODO check if already added
+        const cnt3 = await this.members.countBy({ spaceId, userId })
+        if (cnt3 !== 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "User is already a member",
+                details: props
+            })
+        }
 
         await this.members.insert({ userId, spaceId, role })
         await this.sinkron.addMemberToGroup(userId, `spaces/${spaceId}/${role}`)
+        return Result.ok(true)
+    }
+
+    async removeMember(props: {
+        spaceId: string
+        userId: string
+    }): Promise<ResultType<true, RequestError>> {
+        const { userId, spaceId } = props
+
+        const space = await this.spaces.findOne({
+            where: { id: spaceId },
+            select: { ownerId: true }
+        })
+        if (space !== null && userId === space.ownerId) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Can't remove owner",
+                details: props
+            })
+        }
+
+        const res = await this.members.delete({ userId, spaceId })
+        if (res.affected === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "Member not found",
+                details: props
+            })
+        }
+
         return Result.ok(true)
     }
 
@@ -237,7 +283,6 @@ class SpacesController {
     // update space member
 
     // remove member from space
-
 }
 
 export { SpacesController }

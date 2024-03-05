@@ -13,7 +13,7 @@ const SwitchSpaceView = observer(() => {
     const [location, navigate] = useLocation()
 
     const select = (s: Space) => {
-        store.spaceId = s.id
+        store.changeSpace(s.id)
         navigate("/")
     }
 
@@ -24,6 +24,7 @@ const SwitchSpaceView = observer(() => {
                     <Button
                         onClick={() => select(s)}
                         style={{ width: 400, justifyContent: "start" }}
+                        key={s.id}
                     >
                         <Row gap={8} align="center">
                             <Avatar name={s.name} />

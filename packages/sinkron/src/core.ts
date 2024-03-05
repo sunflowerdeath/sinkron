@@ -5,18 +5,18 @@ import {
     MoreThan,
     MoreThanOrEqual,
     EntityManager
-} from 'typeorm'
-import { without, remove, isEqual, uniq } from 'lodash'
-import { v4 as uuidv4 } from 'uuid'
-import * as Automerge from '@automerge/automerge'
-import pino from 'pino'
+} from "typeorm"
+import { without, remove, isEqual, uniq } from "lodash"
+import { v4 as uuidv4 } from "uuid"
+import * as Automerge from "@automerge/automerge"
+import pino from "pino"
 
-import { entities } from './entities'
-import type { Document, Collection, Group, GroupMember } from './entities'
+import { entities } from "./entities"
+import type { Document, Collection, Group, GroupMember } from "./entities"
 
 // import { generatePasswordHash, validatePasswordHash } from './passwordHash'
-import { Result, ResultType } from './result'
-import { emptyPermissionsTable } from './permissions'
+import { Result, ResultType } from "./result"
+import { emptyPermissionsTable } from "./permissions"
 import {
     ErrorCode,
     SyncMessage,
@@ -30,7 +30,7 @@ import {
     ErrorMessage,
     DocMessage,
     ClientMessage
-} from './protocol'
+} from "./protocol"
 
 type ChangeHandler = (msg: ChangeMessage) => void
 
@@ -72,17 +72,18 @@ class Sinkron {
     constructor(props: SinkronProps) {
         const { dbPath } = props
         this.db = new DataSource({
-            type: 'better-sqlite3',
+            type: "better-sqlite3",
             database: dbPath,
             entities,
             synchronize: true,
-            logging: ['query', 'error']
+            // logging: ['query', 'error']
+            logging: ["error"]
         })
         this.models = {
-            documents: this.db.getRepository('document'),
-            collections: this.db.getRepository('collection'),
-            groups: this.db.getRepository('group'),
-            members: this.db.getRepository('group_member')
+            documents: this.db.getRepository("document"),
+            collections: this.db.getRepository("collection"),
+            groups: this.db.getRepository("group"),
+            members: this.db.getRepository("group_member")
         }
     }
 
@@ -101,10 +102,10 @@ class Sinkron {
 
     getModels(m: EntityManager) {
         return {
-            documents: m.getRepository('document'),
-            collections: m.getRepository('collection'),
-            groups: m.getRepository('group'),
-            members: m.getRepository('group_member')
+            documents: m.getRepository("document"),
+            collections: m.getRepository("collection"),
+            groups: m.getRepository("group"),
+            members: m.getRepository("group_member")
         }
     }
 
@@ -146,7 +147,7 @@ class Sinkron {
         if (count > 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Duplicate id'
+                details: "Duplicate id"
             })
         }
 
@@ -191,7 +192,7 @@ class Sinkron {
         if (colrev < 0 || colrev > colEntity.colrev) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Invalid colrev'
+                details: "Invalid colrev"
             })
         }
 
@@ -222,7 +223,7 @@ class Sinkron {
         if (docCnt > 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Duplicate id'
+                details: "Duplicate id"
             })
         }
 
@@ -230,7 +231,7 @@ class Sinkron {
         if (colEntity === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Collection not found'
+                details: "Collection not found"
             })
         }
 
@@ -268,7 +269,7 @@ class Sinkron {
         if (col === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Collection not found'
+                details: "Collection not found"
             })
         }
         const nextColrev = col.colrev + 1
@@ -308,7 +309,7 @@ class Sinkron {
         if (doc.data === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Unable to update deleted document'
+                details: "Unable to update deleted document"
             })
         }
 
@@ -328,7 +329,7 @@ class Sinkron {
         } catch (e) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Unable to apply changes'
+                details: "Unable to apply changes"
             })
         }
         const nextData = Automerge.save(automerge)
@@ -350,7 +351,7 @@ class Sinkron {
         if (doc.data === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: 'Unable to update deleted document'
+                details: "Unable to update deleted document"
             })
         }
 
@@ -360,7 +361,7 @@ class Sinkron {
         } catch (e) {
             return Result.err({
                 code: ErrorCode.InternalServerError,
-                details: 'Unable to apply changes'
+                details: "Unable to apply changes"
             })
         }
         const nextData = Automerge.save(automerge)
@@ -479,7 +480,7 @@ class Sinkron {
             if (count > 0) {
                 return Result.err({
                     code: ErrorCode.InvalidRequest,
-                    details: 'Duplicate id'
+                    details: "Duplicate id"
                 })
             }
 
@@ -496,7 +497,7 @@ class Sinkron {
             if (count === 0) {
                 return Result.err({
                     code: ErrorCode.InvalidRequest,
-                    details: 'Group not exist'
+                    details: "Group not exist"
                 })
             }
 
@@ -518,7 +519,7 @@ class Sinkron {
             if (count === 0) {
                 return Result.err({
                     code: ErrorCode.InvalidRequest,
-                    details: 'Group not exist'
+                    details: "Group not exist"
                 })
             }
 

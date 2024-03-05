@@ -3,10 +3,11 @@ import assert from 'node:assert'
 import { Sinkron } from 'sinkron'
 import { App } from '../app'
 
-describe.only('UsersController', () => {
+describe('UsersController', () => {
     let app
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ':memory: ' })
+        await sinkron.init()
         app = new App({ sinkron })
         await app.init()
     })

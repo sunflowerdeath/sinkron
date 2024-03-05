@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { observer } from "mobx-react-lite"
 import { fromPromise } from "mobx-utils"
-import { useLocation } from "wouter"
+import { useLocation, Link } from "wouter"
 import { Col, Row } from "oriente"
 
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
@@ -76,7 +76,7 @@ const SpaceMembersView = observer(() => {
 
     return (
         <Container title="Space members" onClose={() => navigate("/")}>
-            <Button>Invite user</Button>
+            <Button as={Link} to="/space/invite">Invite</Button>
             <ActionStateView state={fetchMembersState}>
                 {(result) => (
                     <Col gap={8} style={{ alignSelf: "stretch" }}>
@@ -133,7 +133,7 @@ const SpaceMembersView = observer(() => {
                                         <MenuItem>Remove from space</MenuItem>
                                     </>
                                 )}
-                                placement={{ align: "end" }}
+                                placement={{ align: "end", offset: 8 }}
                             >
                                 {(ref, { open }) => (
                                     <Button ref={ref} onClick={open}>

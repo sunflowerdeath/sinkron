@@ -5,7 +5,6 @@ import { Controller } from "../controller"
 const spacesRouter = (controller: Controller) => {
     const router = new Router()
 
-    // create space
     router.post('/spaces/new', async (ctx) => {
         const { name } = ctx.request.body
         const res = await controller.spaces.create({
@@ -31,12 +30,12 @@ const spacesRouter = (controller: Controller) => {
     })
 
     // update member of a space (change role)
-    router.post('/spaces/:idd/members/:member/update', () => {
+    router.post('/spaces/:id/members/:member/update', () => {
         // TODO
     })
 
     // remove member from a space
-    router.post('/spaces/:idd/members/:member/remove', () => {
+    router.post('/spaces/:id/members/:member/remove', () => {
         // TODO
     })
 

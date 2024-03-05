@@ -86,7 +86,9 @@ const AccountAndSpaceView = observer(() => {
                     <Button as={Link} to="/space/members">
                         Members
                     </Button>
-                    <Button>Invite</Button>
+                    <Button as={Link} to="/space/invite">
+                        Invite
+                    </Button>
                     <Button>Space settings</Button>
                     {isOwner ? (
                         <Button onClick={() => deleteModal.open()}>
@@ -104,7 +106,7 @@ const AccountAndSpaceView = observer(() => {
                     Switch space
                 </Button>
                 <Button as={Link} to="/create-space">
-                    Create new space
+                    Create space
                 </Button>
             </ButtonsGrid>
             {leaveModal.render()}

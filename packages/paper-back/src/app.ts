@@ -58,7 +58,8 @@ class App {
             database: ":memory:",
             entities,
             synchronize: true,
-            logging: ["query", "error"]
+            // logging: ["query", "error"],
+            logging: ["error"]
         })
 
         this.sinkron = sinkron
@@ -102,7 +103,6 @@ class App {
 
     async init() {
         await this.db.initialize()
-        await this.sinkron.init()
     }
 
     createApp() {
