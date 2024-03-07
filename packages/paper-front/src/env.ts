@@ -1,7 +1,7 @@
 const isProductionEnv = window.location.hostname.includes("sinkron.xyz")
 
 const wsUrl = isProductionEnv
-    ? "wss://sinkron.xyz"
+    ? "wss://api.sinkron.xyz"
     : `ws://${window.location.hostname}:80`
 
 const apiUrl = "/api"
