@@ -38,7 +38,7 @@ module.exports = {
     },
     output: {
         path: path.resolve(__dirname, "./build"),
-        publicPath: "/"
+        publicPath: "/static/"
     },
     mode: isProduction ? "production" : "development",
     target: "web",

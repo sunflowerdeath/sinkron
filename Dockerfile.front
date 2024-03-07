@@ -1,14 +1,17 @@
 FROM node:20-alpine AS build
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 COPY . /app
 WORKDIR /app
 # RUN rm -rf packages/sinkron
 RUN rm -rf packages/paper-back
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 RUN pnpm run build-front
 
-FROM socialengine/nginx-spa:latest
+FROM nginx:alpine
+ENV STATIC_FILES_URL="/static"
+ENV API_REWRITE_URL="https://api.sinkon.xyz/"
+# ENV NGINX_ENVSUBST_OUTPUT_DIR="/etc/nginx/"
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/packages/paper-front/build /app
 RUN chmod -R 777 /app
+

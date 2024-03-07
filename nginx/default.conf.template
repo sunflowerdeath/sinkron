@@ -1,0 +1,20 @@
+server {
+    listen 80;
+
+    root /app;
+
+    location /api {
+        rewrite /api(.*) $1 break;
+        proxy_pass ${API_REWRITE_URL};
+    }
+
+    location ${STATIC_FILES_URL} {
+        rewrite ${STATIC_FILES_URL}(.*) $1 break;
+        try_files $uri =404;
+    }
+
+    location / {
+        add_header Cache-Control "no-store";
+        try_files /index.html last;
+    }
+}

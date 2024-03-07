@@ -24,9 +24,10 @@ import { compareAsc, compareDesc } from "date-fns"
 import { AutomergeNode, toAutomerge } from "./slate"
 
 import { TransformedMap } from "./transformedMap"
-import { fetchJson, FetchError } from "./fetchJson"
 
+import { fetchJson, FetchError } from "./fetchJson"
 import { fetchApi } from "./fetchJson2"
+import env from "./env"
 
 export interface Space {
     id: string
@@ -118,7 +119,7 @@ class AuthStore {
 
     async fetchProfile() {
         console.log("Fetching user...")
-        const res = await fetchJson<User>({ url: "/api/profile" })
+        const res = await fetchJson<User>({ url: `${env.apiUrl}/profile` })
         if (res.isOk) {
             this.setUser(res.value)
             console.log("Fetch user success")
@@ -136,7 +137,7 @@ class AuthStore {
         try {
             profile = await fetchApi<User>({
                 method: "POST",
-                url: "/api/login",
+                url: `${env.apiUrl}/login`,
                 data: credentials
             })
         } catch (e) {
@@ -151,7 +152,7 @@ class AuthStore {
         try {
             profile = await fetchApi<User>({
                 method: "POST",
-                url: "/api/signup",
+                url: `${env.apiUrl}/signup`,
                 data: credentials
             })
         } catch (e) {
@@ -201,7 +202,7 @@ class Store {
         const state = fromPromise(
             fetchJson({
                 method: "POST",
-                url: "/api/spaces/new",
+                url: `${env.apiUrl}/spaces/new`,
                 data: { name }
             })
         )
@@ -257,12 +258,6 @@ const listToTree = <T extends ListItem>(list: T[]): Tree<T> => {
     return tree
 }
 
-const isProductionEnv = window.location.hostname.includes("sinkron.xyz")
-
-const BACKEND_URL = isProductionEnv
-    ? "wss://sinkron.xyz"
-    : `ws://${window.location.hostname}:80`
-
 class SpaceStore {
     space: Space
     collection: Collection<Document>
@@ -275,7 +270,7 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const store = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
-        const transport = new WebsocketTransport(`${BACKEND_URL}/${token}`)
+        const transport = new WebsocketTransport(`${env.wsUrl}/${token}`)
         this.collection = new Collection<Document>({
             transport,
             col,
@@ -394,6 +389,15 @@ class SpaceStore {
         })
 
         if (this.categoryId === id) this.categoryId = null
+    }
+
+    fetchMembers() {
+        return fromPromise(
+            fetchJson({
+                method: "GET",
+                url: `${env.apiUrl}/spaces/${this.space.id}/members`
+            })
+        )
     }
 }
 

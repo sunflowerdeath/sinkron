@@ -33,7 +33,6 @@ member
     remove
 */
 
-
 type SpaceMember = {
     role: string
     name: string
@@ -63,20 +62,13 @@ const SpaceMembersView = observer(() => {
     const [location, navigate] = useLocation()
     const store = useStore()
 
-    const fetchMembersState = useMemo(
-        () =>
-            fromPromise(
-                fetchJson({
-                    method: "GET",
-                    url: `/api/spaces/${store.spaceId}/members`
-                })
-            ),
-        []
-    )
+    const fetchMembersState = useMemo(() => store.space.fetchMembers(), [])
 
     return (
         <Container title="Space members" onClose={() => navigate("/")}>
-            <Button as={Link} to="/space/invite">Invite</Button>
+            <Button as={Link} to="/space/invite">
+                Invite
+            </Button>
             <ActionStateView state={fetchMembersState}>
                 {(result) => (
                     <Col gap={8} style={{ alignSelf: "stretch" }}>
