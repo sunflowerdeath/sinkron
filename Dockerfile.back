@@ -9,7 +9,7 @@ WORKDIR /app
 RUN rm -rf packages/sinkron-client
 RUN rm -rf packages/paper-front
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm run -r build
+RUN pnpm run build-backend
 
 FROM base
 COPY . /app

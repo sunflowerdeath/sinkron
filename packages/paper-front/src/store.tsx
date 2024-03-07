@@ -257,10 +257,10 @@ const listToTree = <T extends ListItem>(list: T[]): Tree<T> => {
     return tree
 }
 
-const isProductionEnv = window.location.hostname.includes("onrender.com")
+const isProductionEnv = window.location.hostname.includes("sinkron.xyz")
 
 const BACKEND_URL = isProductionEnv
-    ? "wss://sinkron.onrender.com"
+    ? "wss://sinkron.xyz"
     : `ws://${window.location.hostname}:80`
 
 class SpaceStore {
@@ -352,7 +352,7 @@ class SpaceStore {
         return this.meta.categories
     }
 
-    get categoryTree() : Tree<Category> {
+    get categoryTree(): Tree<Category> {
         return listToTree(Object.values(this.categoryMap))
     }
 

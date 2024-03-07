@@ -4,9 +4,9 @@
     "private": true,
     "description": "",
     "scripts": {
-        "build-backend": "pnpm --filter sinkron --filter paper-back build",
+        "build-backend": "pnpm --F=paper-back... build",
         "start-backend": "cd packages/paper-back && pnpm start",
-        "build-front": "pnpm --filter sinkron-client --filter paper-front build"
+        "build-front": "pnpm --F=paper-front... build"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
