@@ -1,4 +1,6 @@
 Dockerfile
+.git
 .dockerignore
 node_modules
-.git
+packages/*/node_modules
+packages/*/build
