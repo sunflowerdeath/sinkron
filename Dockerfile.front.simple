@@ -1,0 +1,12 @@
+FROM node:20-alpine AS build
+RUN corepack enable
+COPY . /app
+WORKDIR /app
+# RUN rm -rf packages/sinkron
+RUN rm -rf packages/paper-back
+RUN pnpm install --frozen-lockfile
+RUN pnpm run build-front
+
+FROM socialengine/nginx-spa:latest
+COPY --from=build /app/packages/paper-front/build /app
+RUN chmod -R 777 /app
