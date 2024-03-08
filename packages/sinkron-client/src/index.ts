@@ -465,7 +465,6 @@ class Collection<T extends object> {
             this.items.delete(id)
             return
         }
-        console.log("pidor", Automerge)
         const doc = Automerge.load<T>(Base64.toUint8Array(data))
 
         if (!this.items.has(id)) {

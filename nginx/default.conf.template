@@ -9,6 +9,7 @@ server {
     }
 
     location ${STATIC_FILES_URL} {
+        gzip on;
         rewrite ${STATIC_FILES_URL}(.*) $1 break;
         try_files $uri =404;
     }

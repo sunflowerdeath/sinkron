@@ -213,22 +213,7 @@ class SinkronServer {
     async handleSyncMessage(ws: WebSocket, msg: SyncMessage) {
         const { col, colrev } = msg
 
-        console.log("HANDLE SYNC")
-
         // TODO error if second sync message
-
-        /*
-        const isAuthorized = await this.sinkron.verifyAuth(token)
-        if (!isAuthorized) {
-            const errorMsg: SyncErrorMessage = {
-                kind: 'sync_error',
-                col,
-                code: ErrorCode.AccessDenied
-            }
-            ws.send(JSON.stringify(errorMsg))
-            return
-        }
-        */
 
         // TODO check collection permission
 

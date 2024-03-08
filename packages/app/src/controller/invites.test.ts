@@ -13,7 +13,7 @@ describe("InvitesController", () => {
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ":memory: " })
         await sinkron.init()
-        app = new App({ sinkron })
+        app = new App({ sinkron, dbPath: ":memory:" })
         await app.init()
 
         const c = app.controller
@@ -30,7 +30,11 @@ describe("InvitesController", () => {
         const spaceRes = await c.spaces.create({ name: "space", ownerId })
         if (spaceRes.isOk) spaceId = spaceRes.value.id
 
-        await c.spaces.addMember({ spaceId, role: "readonly", userId: memberId })
+        await c.spaces.addMember({
+            spaceId,
+            role: "readonly",
+            userId: memberId
+        })
     })
 
     it("send invite", async () => {
@@ -135,7 +139,7 @@ describe("InvitesController", () => {
 
         const res3 = await c.spaces.getMembers(spaceId)
         assert(res3.isOk)
-        const user = res3.value.find(u => u.id === invitedId)
+        const user = res3.value.find((u) => u.id === invitedId)
         assert(user !== undefined)
     })
 })

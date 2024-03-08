@@ -114,7 +114,11 @@ class AuthStore {
     setUser(user: User) {
         this.user = user
         localStorage.setItem("user", JSON.stringify(this.user))
-        this.store = new Store(this, user, undefined)
+        if (this.store) {
+            this.store.updateUser(user)
+        } else {
+            this.store = new Store(this, user, undefined)
+        }
     }
 
     async fetchProfile() {
@@ -133,31 +137,21 @@ class AuthStore {
     }
 
     async authenticate(credentials: Credentials) {
-        let profile
-        try {
-            profile = await fetchApi<User>({
-                method: "POST",
-                url: `${env.apiUrl}/login`,
-                data: credentials
-            })
-        } catch (e) {
-            throw e
-        }
+        const profile = await fetchApi<User>({
+            method: "POST",
+            url: `${env.apiUrl}/login`,
+            data: credentials
+        })
         this.setUser(profile)
         console.log("Logged in")
     }
 
     async signup(credentials: Credentials) {
-        let profile
-        try {
-            profile = await fetchApi<User>({
-                method: "POST",
-                url: `${env.apiUrl}/signup`,
-                data: credentials
-            })
-        } catch (e) {
-            throw e
-        }
+        const profile = await fetchApi<User>({
+            method: "POST",
+            url: `${env.apiUrl}/signup`,
+            data: credentials
+        })
         this.setUser(profile)
         console.log("Signed up")
     }
@@ -192,6 +186,13 @@ class Store {
             },
             { fireImmediately: true }
         )
+    }
+
+    updateUser(user: User) {
+        this.user = user
+        if (!user.spaces.find((s) => s.id === this.spaceId)) {
+            this.spaceId = user.spaces[0].id
+        }
     }
 
     logout() {

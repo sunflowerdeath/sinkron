@@ -35,8 +35,14 @@ const credentialsSchema = {
 
 type AppProps = {
     sinkron: Sinkron
+    dbPath: string
     host?: string
     port?: number
+}
+
+const defaultAppProps = {
+    host: "0.0.0.0",
+    port: 80
 }
 
 class App {
@@ -49,13 +55,13 @@ class App {
     controller: Controller
 
     constructor(props: AppProps) {
-        const { sinkron, host, port } = props
+        const { sinkron, host, port, dbPath } = { ...defaultAppProps, ...props }
         this.host = host
         this.port = port
 
         this.db = new DataSource({
             type: "better-sqlite3",
-            database: ":memory:",
+            database: dbPath,
             entities,
             synchronize: true,
             // logging: ["query", "error"],

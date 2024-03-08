@@ -1,5 +1,7 @@
 const path = require("path")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
+const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
+const { EsbuildPlugin } = require("esbuild-loader")
 
 const isProduction = process.env.NODE_ENV === "production"
 const src = path.resolve(__dirname, "src")
@@ -16,14 +18,14 @@ const rules = [
         ]
     },
     {
-        test: /\.(ts|tsx)$/,
+        test: /\.ts$/,
         include: [src],
-        use: [
-            {
-                loader: "esbuild-loader",
-                options: { loader: "tsx", jsx: "automatic" }
-            }
-        ]
+        use: [{ loader: "esbuild-loader", options: { loader: "ts" } }]
+    },
+    {
+        test: /\.tsx$/,
+        include: [src],
+        use: [{ loader: "esbuild-loader", options: { loader: "tsx" } }]
     },
     {
         test: /\.svg$/i,
@@ -32,26 +34,32 @@ const rules = [
     }
 ]
 
+const plugins = [new HtmlWebpackPlugin({ template: "./src/index.html" })]
+if (process.env.ANALYZE) {
+    plugins.push(new BundleAnalyzerPlugin())
+}
+
 module.exports = {
     entry: {
         main: "./src/index.tsx"
     },
     output: {
         path: path.resolve(__dirname, "./build"),
-        publicPath: "/static/"
+        publicPath: isProduction ? "/static/" : "/"
     },
     mode: isProduction ? "production" : "development",
+    optimization: {
+        minimizer: [new EsbuildPlugin({ target: "es2015" })],
+        minimize: false
+    },
     target: "web",
     resolve: {
         extensions: [".js", ".jsx", ".ts", ".tsx"]
     },
     module: { rules },
     devtool: "cheap-module-source-map",
-    optimization: {
-        minimize: false
-    },
     experiments: { asyncWebAssembly: true },
-    plugins: [new HtmlWebpackPlugin({ template: "./src/index.html" })],
+    plugins,
     devServer: {
         host: "0.0.0.0",
         port: 1337,

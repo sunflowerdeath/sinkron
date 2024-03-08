@@ -1,19 +1,22 @@
 {
     "name": "sinkron-root",
-    "version": "0.0.1",
     "private": true,
     "description": "",
     "scripts": {
-        "build-backend": "pnpm --F=paper-back... build",
-        "start-backend": "cd packages/paper-back && pnpm start",
-        "build-front": "pnpm --F=paper-front... build"
+        "build-app": "pnpm --F=sinkron-app... build",
+        "start-app": "cd packages/app && SINKRON_DB_PATH=./temp pnpm start",
+        "build-front": "pnpm --F=sinkron-front... build",
+        "test": "pnpm -r run test"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
-    "dependencies": {
-        "prettier": "^2.7.1"
-    },
     "packageManager": "pnpm@8.15.4+sha256.cea6d0bdf2de3a0549582da3983c70c92ffc577ff4410cbf190817ddc35137c2",
-    "workspaces": ["packages/*"]
+    "devDependencies": {
+        "prettier": "^2.7.1",
+        "@eslint/js": "^8.57.0",
+        "eslint": "^8.57.0",
+        "globals": "^14.0.0",
+        "typescript": "^5.3.3",
+        "typescript-eslint": "^7.1.1"
+    }
 }
-

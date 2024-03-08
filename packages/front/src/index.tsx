@@ -1,14 +1,12 @@
 import { useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
-import { useTitle, useMedia } from 'react-use'
+import { useTitle } from 'react-use'
 import { observer } from 'mobx-react-lite'
 import { Router, Switch, Route, Redirect } from 'wouter'
-import { OrienteProvider, Col } from 'oriente'
+import { OrienteProvider } from 'oriente'
 
-import * as Automerge from "@automerge/automerge"
-
-import type { ConnectionStatus } from 'sinkron-client'
-import { AuthStore, Store, useStore, StoreContext } from './store'
+// import type { ConnectionStatus } from 'sinkron-client'
+import { AuthStore, StoreContext } from './store'
 
 import SpaceView from './views/SpaceView'
 import { LoginView, SignupView } from './views/LoginView'
@@ -30,6 +28,7 @@ const status = (
 
 const Root = observer(() => {
     const authStore = useMemo(() => {
+        console.log("HOOK")
         const s = new AuthStore()
         window.store = s
         return s

@@ -8,7 +8,7 @@ describe('UsersController', () => {
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ':memory: ' })
         await sinkron.init()
-        app = new App({ sinkron })
+        app = new App({ sinkron, dbPath: ":memory:" })
         await app.init()
     })
 
