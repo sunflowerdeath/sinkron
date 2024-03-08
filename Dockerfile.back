@@ -9,7 +9,7 @@ RUN rm -rf packages/front
 RUN pnpm install --frozen-lockfile
 # RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build-app
-WORKDIR /app/packages/paper-back
+WORKDIR /app/packages/app
 EXPOSE 80
 ENV SINKRON_DB_PATH="/app/mount"
 CMD ["pnpm", "start"]
