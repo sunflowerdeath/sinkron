@@ -44,7 +44,7 @@ export type Invite = {
     id: string
     space: Space
     spaceId: string
-    role: SpaceRole
+    role: "readonly" | "editor" | "admin"
     from: User
     fromId: string
     to: User
@@ -79,9 +79,7 @@ const AuthTokenEntity = new EntitySchema<AuthToken>({
     relations: {
         user: { type: "many-to-one", target: "user" }
     },
-    indices: [
-        { columns: ["userId"] },
-    ]
+    indices: [{ columns: ["userId"] }]
 })
 
 const SpaceEntity = new EntitySchema<Space>({
@@ -110,10 +108,7 @@ const SpaceMemberEntity = new EntitySchema<SpaceMember>({
         space: { type: "many-to-one", target: "space" },
         user: { type: "many-to-one", target: "user" }
     },
-    indices: [
-        { columns: ["userId"] },
-        { columns: ["spaceId"] },
-    ]
+    indices: [{ columns: ["userId"] }, { columns: ["spaceId"] }]
 })
 
 const InviteEntity = new EntitySchema<Invite>({
@@ -134,10 +129,7 @@ const InviteEntity = new EntitySchema<Invite>({
         from: { type: "many-to-one", target: "user" },
         to: { type: "many-to-one", target: "user" }
     },
-    indices: [
-        { columns: ["fromId"] },
-        { columns: ["toId"] },
-    ]
+    indices: [{ columns: ["fromId"] }, { columns: ["toId"] }]
 })
 
 const entities = [

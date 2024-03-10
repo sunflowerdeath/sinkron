@@ -1,36 +1,17 @@
-import { EntitySchema, DataSource, Repository } from "typeorm"
+import { DataSource, Repository } from "typeorm"
 import { Raw } from "typeorm"
 
-import { AuthToken, User, Space, SpaceRole, SpaceMember } from "../entities"
+import { AuthToken, User, Space, SpaceMember } from "../entities"
 import { Result, ResultType } from "../utils/result"
-import { Controller } from "./index"
-
-export enum ErrorCode {
-    // Invalid request format
-    InvalidRequest = "invalid_request",
-
-    // User could not be authenticated, connection will be closed
-    AuthenticationFailed = "auth_failed",
-
-    // User doesn't have permission to perform the operation
-    AccessDenied = "access_denied",
-
-    // Operation cannot be performed
-    UnprocessableRequest = "unprocessable_request",
-
-    // Requested entity not found
-    NotFound = "not_found",
-
-    InternalServerError = "internal_server_error"
-}
-
-type RequestError = {
-    code: ErrorCode
-    details: Object
-    message: string
-}
+import { Controller, ErrorCode } from "./index"
+import { RequestError } from "./index"
 
 const maxTokensPerUser = 10
+
+type Credentials = {
+    name: string
+    password: string
+}
 
 type AuthTokenProps = {
     userId: string
@@ -47,6 +28,11 @@ type Profile = {
 const validateUsername = (name: string) => name.match(/^[a-z0-9_]+$/i) !== null
 const validatePassword = (pwd: string) => pwd.match(/^[^\s]+$/i) !== null
 
+type CreateUserProps = {
+    name: string
+    password: string
+}
+
 class UsersController {
     constructor(db: DataSource, c: Controller) {
         this.controller = c
@@ -61,9 +47,9 @@ class UsersController {
     tokens: Repository<AuthToken>
 
     async createUser(
-        name: string,
-        password: string
+        props: CreateUserProps
     ): Promise<ResultType<User, RequestError>> {
+        const { name, password } = props
         if (!validateUsername(name) || !validatePassword(password)) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
@@ -112,7 +98,7 @@ class UsersController {
         const spaces = await this.db
             .getRepository<Space>("space")
             .findBy({ ownerId: id })
-        for (let i in spaces) {
+        for (const i in spaces) {
             await this.controller.spaces.delete(spaces[i].id)
         }
 
@@ -129,30 +115,22 @@ class UsersController {
         return Result.ok(true)
     }
 
-    async getUser(id: string): Promise<ResultType<User | null, RequestError>> {
-        const user = await this.users.findOne({
-            where: { id },
-            select: { id: true }
-        })
-        return Result.ok(user)
-    }
-
     isTokenExpired(token: AuthToken): boolean {
         const now = new Date()
         return token.expiresAt === null || token.expiresAt > now
     }
 
-    async _deleteExpiredTokens(user: string) {
+    async deleteExpiredTokens(userId: string) {
         await this.tokens.delete({
-            userId: user,
+            userId,
             expiresAt: Raw((f) => `${f} NOT NULL AND ${f} < TIME('now')`)
         })
     }
 
-    async _deleteTokensOverLimit(user: string) {
+    async deleteTokensOverLimit(userId: string) {
         const tokensOverLimit = await this.tokens.find({
             select: { token: true },
-            where: { userId: user },
+            where: { userId },
             order: { lastAccess: "DESC" },
             skip: maxTokensPerUser
         })
@@ -178,10 +156,30 @@ class UsersController {
         const res = await this.tokens.insert({ userId })
         const token = { userId, ...res.generatedMaps[0] } as AuthToken
 
-        this._deleteExpiredTokens(userId)
-        this._deleteTokensOverLimit(userId)
+        this.deleteExpiredTokens(userId)
+        this.deleteTokensOverLimit(userId)
 
         return Result.ok(token)
+    }
+
+    async authorizeWithPassword(
+        credentials: Credentials
+    ): Promise<ResultType<AuthToken, RequestError>> {
+        const { name, password } = credentials
+        const user = await this.users.findOne({
+            where: { name, isDisabled: false },
+            select: { id: true, password: true }
+        })
+        if (user === null || user.password !== password) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Incorrect name or password",
+                details: { user }
+            })
+        }
+        const res = await this.issueAuthToken({ userId: user.id })
+        return res
+        // TODO return profile
     }
 
     async deleteToken(token: string): Promise<ResultType<true, RequestError>> {
@@ -220,8 +218,8 @@ class UsersController {
     }
 
     async getUserTokens(
-        user: string,
-        activeOnly: boolean = false
+        user: string
+        // activeOnly: boolean = false
     ): Promise<ResultType<AuthToken[], RequestError>> {
         const count = await this.users.countBy({ id: user })
         if (count === 0) {
@@ -232,51 +230,32 @@ class UsersController {
             })
         }
 
-        await this._deleteExpiredTokens(user)
+        await this.deleteExpiredTokens(user)
 
         const tokens = await this.tokens.findBy({ userId: user })
         return Result.ok(tokens)
     }
 
-    async authorizeWithPassword(
-        name: string,
-        password: string
-    ): Promise<ResultType<AuthToken, RequestError>> {
-        const user = await this.users.findOne({
-            where: { name, isDisabled: false },
-            select: { id: true, password: true }
-        })
-        if (user === null || user.password !== password) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "Incorrect name or password",
-                details: { user }
-            })
-        }
-
-        const res = await this.issueAuthToken({ userId: user.id })
-        return res
-    }
-
-    async getUserProfile(
-        id: string
+    async getProfile(
+        userId: string
     ): Promise<ResultType<Profile, RequestError>> {
         const user = await this.users.findOne({
-            where: { id, isDisabled: false },
+            where: { id: userId, isDisabled: false },
             select: { id: true, name: true }
         })
-
         if (user === null) {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "User not found",
-                details: { id }
+                details: { userId }
             })
         }
-        const getSpacesRes = await this.controller.spaces.getUserSpaces(user.id)
-        if (!getSpacesRes.isOk) return getSpacesRes
+        const getSpaceListRes = await this.controller.spaces.getUserSpaces(
+            userId
+        )
+        if (!getSpaceListRes.isOk) return getSpaceListRes
 
-        const profile = { ...user, spaces: getSpacesRes.value! } as Profile
+        const profile = { ...user, spaces: getSpaceListRes.value } as Profile
         return Result.ok(profile)
     }
 }

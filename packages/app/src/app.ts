@@ -119,11 +119,11 @@ class App {
 
         app.use(loginRouter(this.controller).routes())
 
-        const requireAuth = async (ctx, next) => {
+        const requireAuthMiddleware = async (ctx, next) => {
             const token = ctx.cookies.get("token")
             if (token) {
                 const res = await this.controller.users.verifyAuthToken(token)
-                if (res.isOk && res !== null) {
+                if (res.isOk && res.value !== null) {
                     ctx.token = res.value
                     await next()
                     return
@@ -134,11 +134,14 @@ class App {
         }
 
         const router = new Router()
-        router.use(requireAuth)
+        router.use(requireAuthMiddleware)
         router.get("/profile", async (ctx) => {
-            const token = ctx.token
-            const res = await this.controller.users.getUserProfile(token.userId)
-            if (!res.isOk) throw "hz"
+            const res = await this.controller.users.getProfile(ctx.token.userId)
+            if (!res.isOk) {
+                ctx.status = 500
+                ctx.end("Server error")
+                return
+            }
             ctx.body = res.value
         })
         router.use(spacesRouter(this.controller).routes())

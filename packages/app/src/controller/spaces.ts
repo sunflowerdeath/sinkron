@@ -1,41 +1,17 @@
 import { DataSource, Repository } from "typeorm"
-import { Raw, In } from "typeorm"
+import { In } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 
 import { Sinkron, Permissions } from "sinkron"
-import type { Permission } from "sinkron"
+// import type { Permission } from "sinkron"
 // import type { ErrorCode } from "sinkron"
 
 import { Result, ResultType } from "../utils/result"
 
-import { AuthToken, User, Space, SpaceRole, SpaceMember } from "../entities"
-import { Controller } from "./index"
-
-export enum ErrorCode {
-    // Invalid request format
-    InvalidRequest = "invalid_request",
-
-    // User could not be authenticated, connection will be closed
-    AuthenticationFailed = "auth_failed",
-
-    // User doesn't have permission to perform the operation
-    AccessDenied = "access_denied",
-
-    // Operation cannot be performed
-    UnprocessableRequest = "unprocessable_request",
-
-    // Requested entity not found
-    NotFound = "not_found",
-
-    InternalServerError = "internal_server_error"
-}
-
-type RequestError = {
-    code: ErrorCode
-    details: Object
-    message: string
-}
+import { User, Space, SpaceRole, SpaceMember, Invite } from "../entities"
+import { Controller, ErrorCode } from "./index"
+import type { RequestError } from "./index"
 
 type CreateSpaceProps = {
     ownerId: string
@@ -45,10 +21,21 @@ type CreateSpaceProps = {
 type AddMemberProps = {
     userId: string
     spaceId: string
-    role: "readonly" | "editor" | "admin" // without owner
+    role: SpaceRole
 }
 
-type UserSpaces = { id: string; name: string; role: SpaceRole }[]
+// type RemoveMemberProps = {
+// spaceId: string
+// memberId: string
+// }
+
+type UserSpace = {
+    id: string
+    name: string
+    role: SpaceRole
+    membersCount: number
+    owner: { id: string }
+}
 
 class SpacesController {
     constructor(db: DataSource, c: Controller) {
@@ -56,6 +43,7 @@ class SpacesController {
         this.controller = c
         this.sinkron = c.sinkron
 
+        this.invites = db.getRepository("invite")
         this.users = db.getRepository("user")
         this.spaces = db.getRepository("space")
         this.members = db.getRepository("space_member")
@@ -65,31 +53,26 @@ class SpacesController {
     controller: Controller
     sinkron: Sinkron
 
+    invites: Repository<Invite>
     users: Repository<User>
     spaces: Repository<Space>
     members: Repository<SpaceMember>
 
+    async exists(id: string): Promise<boolean> {
+        const count = await this.spaces.countBy({ id })
+        return count === 1
+    }
+
     async create(
         props: CreateSpaceProps
-    ): Promise<ResultType<Space, RequestError>> {
-        const { ownerId, name } = props
-
-        const count = await this.users.countBy({ id: ownerId })
-        if (count === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "User not found",
-                details: props
-            })
-        }
-
+    ): Promise<ResultType<UserSpace, RequestError>> {
+        const { name, ownerId } = props
         const createRes = await this.spaces.insert({ name, ownerId })
 
-        const space : Space = {
+        const space: UserSpace = {
             ...createRes.generatedMaps[0],
             name,
             owner: { id: ownerId } as User,
-            // @ts-ignore
             role: "owner",
             membersCount: 1
         }
@@ -116,119 +99,40 @@ class SpacesController {
         const meta = Automerge.from({ meta: true, categories: {} })
         await this.sinkron.createDocument(uuidv4(), col, Automerge.save(meta))
 
-        await this.members.insert({
-            userId: ownerId,
-            spaceId: space.id,
-            role: "owner"
-        })
-        await this.sinkron.addMemberToGroup(ownerId, `spaces/${space.id}/admin`)
+        this.addMember({ userId: ownerId, spaceId: space.id, role: "owner" })
 
         return Result.ok(space)
     }
 
-    async delete(id: string): Promise<ResultType<true, RequestError>> {
-        const count = await this.spaces.countBy({ id })
-        if (count === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Space not found",
-                details: { id }
-            })
-        }
-
-        // TODO members
-        await this.members.delete({ spaceId: id })
-
-        // delete collection
-        const col = `spaces/${id}`
-        await this.sinkron.deleteCollection(col)
-
-        // TODO delete groups
-
-        await this.spaces.delete({ id })
-
-        return Result.ok(true)
+    async delete(spaceId: string) {
+        await this.members.delete({ spaceId })
+        await this.invites.delete({ spaceId })
+        await this.sinkron.deleteCollection(`spaces/${spaceId}`)
+        // TODO delete sinkron groups
+        await this.spaces.delete({ id: spaceId })
     }
 
-    async addMember(
-        props: AddMemberProps
-    ): Promise<ResultType<true, RequestError>> {
+    async getMembers(
+        spaceId: string
+    ): Promise<User[]> {
+        const res = await this.members.find({
+            where: { spaceId },
+            relations: { user: true },
+            select: { user: { id: true, name: true }, role: true }
+        })
+        const members = res.map((m) => ({ role: m.role, ...m.user }))
+        return members
+    }
+
+    async addMember(props: AddMemberProps) {
         const { userId, spaceId, role } = props
-
-        const cnt1 = await this.spaces.countBy({ id: spaceId })
-        if (cnt1 === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Space not found",
-                details: props
-            })
-        }
-
-        const cnt2 = await this.users.countBy({ id: userId })
-        if (cnt2 === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "User not found",
-                details: props
-            })
-        }
-
-        const cnt3 = await this.members.countBy({ spaceId, userId })
-        if (cnt3 !== 0) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "User is already a member",
-                details: props
-            })
-        }
-
         await this.members.insert({ userId, spaceId, role })
         await this.sinkron.addMemberToGroup(userId, `spaces/${spaceId}/${role}`)
-        return Result.ok(true)
-    }
-
-    async removeMember(props: {
-        spaceId: string
-        userId: string
-    }): Promise<ResultType<true, RequestError>> {
-        const { userId, spaceId } = props
-
-        const space = await this.spaces.findOne({
-            where: { id: spaceId },
-            select: { ownerId: true }
-        })
-        if (space !== null && userId === space.ownerId) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "Can't remove owner",
-                details: props
-            })
-        }
-
-        const res = await this.members.delete({ userId, spaceId })
-        if (res.affected === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Member not found",
-                details: props
-            })
-        }
-
-        return Result.ok(true)
     }
 
     async getUserSpaces(
         userId: string
-    ): Promise<ResultType<UserSpaces, RequestError>> {
-        const cnt = await this.users.countBy({ id: userId })
-        if (cnt === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "User not found",
-                details: { id: userId }
-            })
-        }
-
+    ): Promise<ResultType<UserSpace[], RequestError>> {
         const res = await this.members.find({
             where: { userId },
             relations: ["space"],
@@ -238,14 +142,13 @@ class SpacesController {
                 space: { id: true, ownerId: true, name: true }
             }
         })
-        const spaces = res.map((m) => ({
+        const spaces: UserSpace[] = res.map((m) => ({
             id: m.spaceId,
             name: m.space.name,
             role: m.role,
             membersCount: 0,
             owner: { id: m.space.ownerId }
         }))
-
         const membersCount = await this.members
             .createQueryBuilder()
             .select("COUNT(1)", "count")
@@ -253,36 +156,11 @@ class SpacesController {
             .where({ spaceId: In(spaces.map((s) => s.id)) })
             .groupBy("id")
             .getRawMany()
-
         membersCount.forEach((item) => {
             spaces.find((s) => s.id === item.id)!.membersCount = item.count
         })
-
         return Result.ok(spaces)
     }
-
-    async getMembers(id: string) {
-        const cnt = await this.spaces.countBy({ id })
-        if (cnt === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Space not found",
-                details: { id }
-            })
-        }
-
-        const res = await this.members.find({
-            where: { spaceId: id },
-            relations: { user: true },
-            select: { user: { id: true, name: true }, role: true }
-        })
-
-        return Result.ok(res.map((m) => ({ role: m.role, ...m.user })))
-    }
-
-    // update space member
-
-    // remove member from space
 }
 
 export { SpacesController }

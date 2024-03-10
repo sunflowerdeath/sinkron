@@ -85,7 +85,7 @@ const fetchJson = async <T extends object = object>(
         throw { kind: "fetch_error", originalError: e, response }
     }
 
-    let json: Object | undefined
+    let json: object | undefined
     const contentType = response.headers.get("content-type")
     if (contentType && contentType.indexOf("application/json") !== -1) {
         try {
@@ -115,6 +115,7 @@ const fetchApi = async <T extends object = object>(
     params: FetchParams
 ): Promise<T> => {
     return fetchJson<T>(params).catch((error: FetchError) => {
+        // TODO handle http 401
         if (error.kind === "http" && isApiError(error.data)) {
             throw new FetchError({
                 kind: "application",

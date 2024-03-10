@@ -11,8 +11,8 @@ import * as Automerge from "@automerge/automerge"
 import expandLessSvg from '@material-design-icons/svg/outlined/expand_less.svg'
 import arrowBackSvg from '@material-design-icons/svg/outlined/arrow_back.svg'
 import moreHorizSvg from '@material-design-icons/svg/outlined/more_horiz.svg'
-import closeSvg from '@material-design-icons/svg/outlined/close.svg'
 
+import { useSpace, Document } from '../store'
 import { fromAutomerge, applySlateOps } from '../slate'
 
 import SelectCategoriesView from '../views/SelectCategoriesView'
@@ -20,7 +20,6 @@ import CategoriesList from '../components/CategoriesList'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/icon'
 import { Menu, MenuItem } from '../ui/menu'
-import { useStore, Document } from '../store'
 
 const useForceUpdate = () => {
     const [state, setState] = useState({})
@@ -174,9 +173,7 @@ interface DocumentViewProps {
 const DocumentView = observer((props: DocumentViewProps) => {
     const { id } = props
 
-    const store = useStore()
-    const space = store.space
-
+    const space = useSpace()
     const [location, navigate] = useLocation()
     const isMobile = useMedia('(max-width: 1023px)')
 

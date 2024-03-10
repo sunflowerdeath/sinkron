@@ -1,13 +1,11 @@
 import { useMemo } from "react"
 import { observer } from "mobx-react-lite"
-import { fromPromise } from "mobx-utils"
 import { useLocation, Link } from "wouter"
 import { Col, Row } from "oriente"
 
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore } from "../store"
-import { fetchJson } from "../fetchJson"
+import { useStore, useSpace, SpaceRole } from "../store"
 
 import { Avatar } from "../ui/avatar"
 import Container from "../ui/Container"
@@ -15,23 +13,6 @@ import { Button } from "../ui/button"
 import { Icon } from "../ui/icon"
 import { Menu, MenuItem } from "../ui/menu"
 import ActionStateView from "../ui/ActionStateView"
-
-/*
-roles
-    owner - add admins + all other
-    admin - invite and remove users
-    member - only view
-
-invite
-    edit invite
-    cancel invite
-guest:
-    review and change access
-    remove
-member
-    change role
-    remove
-*/
 
 type SpaceMember = {
     role: string
@@ -41,39 +22,81 @@ type SpaceMember = {
 
 type SpaceMemberListItemProps = {
     member: SpaceMember
+    currentUserId: string
+    currentUserRole: SpaceRole
 }
 
 const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
-    const { member } = props
+    const { member, currentUserRole, currentUserId } = props
+
+    const menu = () => {
+        return (
+            <>
+                <MenuItem>Change role</MenuItem>
+                <MenuItem>Remove from space</MenuItem>
+            </>
+        )
+    }
+
+    const isCurrentUser = member.id === currentUserId
+
+    const showActions =
+        !isCurrentUser &&
+        (member.role === "admin"
+            ? currentUserRole === "owner"
+            : ["owner", "admin"].includes(currentUserRole))
+
+    const actionsButton = showActions && (
+        <Menu menu={menu} placement={{ align: "end", offset: 8 }}>
+            {(ref, { open }) => (
+                <Button ref={ref} onClick={open}>
+                    <Icon svg={expandMoreSvg} />
+                </Button>
+            )}
+        </Menu>
+    )
+
     return (
         <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
             <Avatar name={member.name} />
             <Col style={{ flexGrow: 1 }}>
                 <div>{member.name}</div>
-                <div style={{ opacity: ".6" }}>{member.role}</div>
+                <div style={{ opacity: ".6" }}>
+                    {member.role}
+                    {isCurrentUser && " (You)"}
+                </div>
             </Col>
-            <Button>Change</Button>
-            <Button>Remove</Button>
+            {actionsButton}
         </Row>
     )
 })
 
 const SpaceMembersView = observer(() => {
-    const [location, navigate] = useLocation()
     const store = useStore()
+    const space = useSpace()
+    const [location, navigate] = useLocation()
 
-    const fetchMembersState = useMemo(() => store.space.fetchMembers(), [])
+    const fetchMembersState = useMemo(() => space.fetchMembers(), [])
+
+    const role = space.space.role
+    const canInvite = ["admin", "owner"].includes(role)
 
     return (
         <Container title="Space members" onClose={() => navigate("/")}>
-            <Button as={Link} to="/space/invite">
-                Invite
-            </Button>
+            {canInvite && (
+                <Button as={Link} to="/space/invite">
+                    Invite
+                </Button>
+            )}
             <ActionStateView state={fetchMembersState}>
                 {(result) => (
                     <Col gap={8} style={{ alignSelf: "stretch" }}>
                         {result.value.map((m) => (
-                            <SpaceMemberListItem member={m} />
+                            <SpaceMemberListItem
+                                member={m}
+                                currentUserRole={role}
+                                currentUserId={store.user.id}
+                            />
                         ))}
                         <Row
                             gap={8}

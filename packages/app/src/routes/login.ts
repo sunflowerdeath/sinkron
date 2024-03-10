@@ -2,37 +2,45 @@ import Router from "koa-tree-router"
 
 import { Controller } from "../controller"
 
+const timeout = (timeout: number) =>
+    new Promise((resolve) => setTimeout(resolve, timeout))
+
 const loginRouter = (controller: Controller) => {
     const router = new Router()
 
     router.post("/login", async (ctx) => {
-        ctx.type = "application/json"
         const { name, password } = ctx.request.body
-        const res = await controller.users.authorizeWithPassword(name, password)
-        if (res.isOk) {
-            const token = res.value
-            ctx.cookies.set("token", token.token, { httpOnly: false })
-            const profileRes = await controller.users.getUserProfile(
-                token.userId
-            )
-            if (!profileRes.isOk) {
-                ctx.status = 500
-                ctx.body = { error: { message: "Couldn't authorize" } }
-                return
-            }
-            ctx.body = profileRes.value
-        } else {
+
+        await timeout(1500)
+
+        const authRes = await controller.users.authorizeWithPassword({
+            name,
+            password
+        })
+        if (!authRes.isOk) {
             ctx.cookies.set("token")
             ctx.status = 500
-            ctx.body = { error: { message: res.error.message } }
+            ctx.body = { error: authRes.error }
+            return
         }
+
+        const token = authRes.value
+        const profileRes = await controller.users.getProfile(token.userId)
+        if (!profileRes.isOk) {
+            ctx.status = 500
+            ctx.body = { error: { message: "Couldn't authorize" } }
+            return
+        }
+        ctx.cookies.set("token", token.token, { httpOnly: false })
+        ctx.body = profileRes.value
     })
 
     router.post("/signup", async (ctx) => {
-        ctx.type = "application/json"
         const { name, password } = ctx.request.body
 
-        const createRes = await controller.users.createUser(name, password)
+        await timeout(1500)
+
+        const createRes = await controller.users.createUser({ name, password })
         if (!createRes.isOk) {
             ctx.status = 500
             ctx.body = { error: { message: createRes.error.message } }
@@ -48,9 +56,10 @@ const loginRouter = (controller: Controller) => {
         }
         const token = issueTokenRes.value
 
-        ctx.cookies.set("token", token.token, { httpOnly: false })
-        const getProfileRes = await controller.users.getUserProfile(userId)
+        const getProfileRes = await controller.users.getProfile(userId)
         if (!getProfileRes.isOk) return getProfileRes
+
+        ctx.cookies.set("token", token.token, { httpOnly: false })
         ctx.body = getProfileRes.value
     })
 

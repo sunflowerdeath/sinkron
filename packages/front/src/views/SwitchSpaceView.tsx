@@ -9,7 +9,6 @@ import Container from "../ui/Container"
 
 const SwitchSpaceView = observer(() => {
     const store = useStore()
-
     const [location, navigate] = useLocation()
 
     const select = (s: Space) => {

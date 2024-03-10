@@ -10,7 +10,7 @@ import arrowCategoryBackSvg from '@material-design-icons/svg/outlined/subdirecto
 import { Avatar } from '../ui/avatar'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/icon'
-import { Store, useStore, DocumentListItemData } from '../store'
+import { useStore, useSpace, DocumentListItemData } from '../store'
 import { ItemState } from 'sinkron-client'
 
 interface DocumentListItemProps {
@@ -65,9 +65,7 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
 })
 
 const DocumentList = observer(() => {
-    const store = useStore()
-    const space = store.space
-
+    const space = useSpace()
     const [location, navigate] = useLocation()
     const [match, params] = useRoute('/documents/:id')
     const selectedId = match ? params.id : undefined
@@ -101,9 +99,7 @@ const DocumentList = observer(() => {
 })
 
 const DocumentListView = observer(() => {
-    const store = useStore()
-    const space = store.space
-
+    const space = useSpace()
     const [location, navigate] = useLocation()
 
     const createDocument = () => {

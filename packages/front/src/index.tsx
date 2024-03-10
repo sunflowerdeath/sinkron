@@ -28,7 +28,6 @@ const status = (
 
 const Root = observer(() => {
     const authStore = useMemo(() => {
-        console.log("HOOK")
         const s = new AuthStore()
         window.store = s
         return s
@@ -36,13 +35,11 @@ const Root = observer(() => {
 
     useTitle('Box')
 
-    if (!authStore.isInited) return null
-
     return (
         <OrienteProvider>
             <Router>
-                {authStore.user ? (
-                    <StoreContext.Provider value={authStore.store!}>
+                {authStore.store ? (
+                    <StoreContext.Provider value={authStore.store}>
                         <SpaceView />
                     </StoreContext.Provider>
                 ) : (

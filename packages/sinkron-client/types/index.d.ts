@@ -94,6 +94,8 @@ declare class Collection<T extends object> {
     isLoaded: boolean;
     status: ConnectionStatus;
     initialSyncCompleted: boolean;
+    isDestroyed: boolean;
+    destroy(): void;
     init(): Promise<void>;
     loadFromStore(): Promise<void>;
     startSync(): void;

@@ -2,50 +2,21 @@ import { DataSource, Repository, Or, Equal } from "typeorm"
 
 import { Result, ResultType } from "../utils/result"
 
-import {
-    User,
-    Space,
-    Invite,
-    InviteStatus,
-    SpaceMember,
-    SpaceRole
-} from "../entities"
-import { Controller } from "./index"
+import { User, Space, Invite, SpaceMember } from "../entities"
 
-enum ErrorCode {
-    // Invalid request format
-    InvalidRequest = "invalid_request",
+import { Controller, ErrorCode } from "./index"
+import type { RequestContext, RequestError } from "./index"
 
-    // User could not be authenticated, connection will be closed
-    AuthenticationFailed = "auth_failed",
-
-    // User doesn't have permission to perform the operation
-    AccessDenied = "access_denied",
-
-    // Operation cannot be performed
-    UnprocessableRequest = "unprocessable_request",
-
-    // Requested entity not found
-    NotFound = "not_found",
-
-    InternalServerError = "internal_server_error"
-}
-
-type RequestError = {
-    code: ErrorCode
-    details: Object
-    message: string
-}
-
-interface CreateInvitePayload {
+interface CreateInviteProps {
+    spaceId: string
     fromId: string
     toId: string
-    spaceId: string
-    role: SpaceRole
+    role: "readonly" | "editor" | "admin"
 }
 
-interface UpdateInvitePayload {
-    role: SpaceRole
+interface UpdateInviteProps {
+    id: string
+    role: "readonly" | "editor" | "admin"
 }
 
 const inviteFindOptions = {
@@ -97,24 +68,29 @@ class InvitesController {
         return Result.ok(res)
     }
 
-    async create(
-        data: CreateInvitePayload
-    ): Promise<ResultType<Invite, RequestError>> {
-        const { toId, fromId, spaceId } = data
-
-        const usersCount = await this.users.countBy({
-            id: Or(Equal(toId), Equal(fromId))
+    async getSpaceActiveInvites(spaceId: string) {
+        const notifications = await this.invites.find({
+            where: { spaceId, status: "sent" },
+            ...inviteFindOptions
         })
-        const spaceCount = await this.spaces.countBy({ id: spaceId })
-        const member = await this.members.findOne({
+        return Result.ok(notifications)
+    }
+
+    async create(
+        props: CreateInviteProps
+    ): Promise<ResultType<Invite, RequestError>> {
+        const { fromId, toId, spaceId, role } = props
+
+        const userCount = await this.users.countBy({ id: toId })
+        const invitedByMember = await this.members.findOne({
             where: { spaceId, userId: fromId },
             select: { role: true }
         })
-        if (usersCount !== 2 || spaceCount !== 1 || member === null) {
+        if (userCount !== 1 || invitedByMember === null) {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "Couldn't create invite",
-                details: data
+                details: props
             })
         }
 
@@ -123,19 +99,19 @@ class InvitesController {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
                 message: "User already is a member",
-                details: data
+                details: props
             })
         }
 
         const isPermitted =
-            data.role === "admin"
-                ? member.role === "owner"
-                : member.role === "admin" || member.role === "owner"
+            role === "admin"
+                ? invitedByMember.role === "owner"
+                : ["admin", "owner"].includes(invitedByMember.role)
         if (!isPermitted) {
             return Result.err({
                 code: ErrorCode.AccessDenied,
                 message: "Couldn't create invite",
-                details: data
+                details: props
             })
         }
 
@@ -143,109 +119,19 @@ class InvitesController {
         await this.invites.delete({ spaceId, toId, status: "sent" })
 
         const res = await this.invites.insert({
-            ...data,
+            ...props,
             status: "sent",
             notificationHidden: false
         })
 
-        const invite = { ...data, ...res.generatedMaps[0] } as Invite
+        const invite = { ...props, ...res.generatedMaps[0] } as Invite
         return Result.ok(invite)
     }
 
-    async update(id: string, data: UpdateInvitePayload) {
-        const updateRes = await this.invites.update(
-            { id, status: "sent" },
-            data
-        )
-        if (updateRes.affected === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                details: { id },
-                message: "Invite not found"
-            })
-        }
+    // Request Handlers
 
-        return await this.get(id)
-    }
-
-    async accept(id: string): Promise<ResultType<Invite, RequestError>> {
-        const updateRes = await this.invites.update(
-            { id, status: "sent" },
-            { status: "accepted" }
-        )
-        if (updateRes.affected === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                details: { id },
-                message: "Invite not found"
-            })
-        }
-
-        const inviteRes = await this.get(id)
-        if (!inviteRes.isOk) return inviteRes
-        const invite = inviteRes.value
-
-        const res = await this.controller.spaces.addMember({
-            userId: invite.to.id,
-            spaceId: invite.space.id,
-            role: invite.role
-        })
-        if (!res.isOk) return res
-
-        return Result.ok(invite)
-    }
-
-    async decline(id: string): Promise<ResultType<Invite, RequestError>> {
-        const updateRes = await this.invites.update(
-            { id, status: "sent" },
-            { status: "declined" }
-        )
-        if (updateRes.affected === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                details: { id },
-                message: "Invite not found"
-            })
-        }
-
-        return await this.get(id)
-    }
-
-    async cancel(id: string): Promise<ResultType<Invite, RequestError>> {
-        const updateRes = await this.invites.update(
-            { id, status: "sent" },
-            { status: "cancelled" }
-        )
-        if (updateRes.affected === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                details: { id },
-                message: "Invite not found"
-            })
-        }
-
-        return await this.get(id)
-    }
-
-    async hideNotification(
-        id: string
-    ): Promise<ResultType<Invite, RequestError>> {
-        const updateRes = await this.invites.update(
-            { id },
-            { notificationHidden: true }
-        )
-        if (updateRes.affected === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                details: { id },
-                message: "Invite not found"
-            })
-        }
-
-        return await this.get(id)
-    }
-
-    async getActiveNotifications(userId: string) {
+    async getUserActiveNotificationsHandler(ctx: RequestContext) {
+        const userId = ctx.token.userId
         const notifications = await this.invites.find({
             where: [
                 { toId: userId, status: "sent" },

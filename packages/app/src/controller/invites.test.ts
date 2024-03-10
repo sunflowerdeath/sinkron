@@ -18,16 +18,25 @@ describe("InvitesController", () => {
 
         const c = app.controller
 
-        const ownerRes = await c.users.createUser("owner", "password")
+        const ownerRes = await c.users.createUser({
+            name: "owner",
+            password: "password"
+        })
         if (ownerRes.isOk) ownerId = ownerRes.value.id
 
-        const memberRes = await c.users.createUser("member", "password")
-        if (ownerRes.isOk) ownerId = ownerRes.value.id
+        const memberRes = await c.users.createUser({
+            name: "member",
+            password: "password"
+        })
+        if (ownerRes.isOk) memberId = memberRes.value.id
 
-        const invitedRes = await c.users.createUser("invited", "password")
+        const invitedRes = await c.users.createUser({
+            name: "invited",
+            password: "password"
+        })
         if (invitedRes.isOk) invitedId = invitedRes.value.id
 
-        const spaceRes = await c.spaces.create({ name: "space", ownerId })
+        const spaceRes = await c.spaces._createSpace({ name: "space", ownerId })
         if (spaceRes.isOk) spaceId = spaceRes.value.id
 
         await c.spaces.addMember({

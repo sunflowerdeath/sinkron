@@ -1,5 +1,4 @@
 import { observer } from "mobx-react-lite"
-import { Observer } from "mobx-react-lite"
 import { useLocation, Link } from "wouter"
 
 import { Col, Row, useModal } from "oriente"
@@ -10,10 +9,11 @@ import { Avatar } from "../ui/avatar"
 import { Button } from "../ui/button"
 import Container from "../ui/Container"
 
-import { useStore } from "../store"
+import { useStore, useSpace } from "../store"
 
 const AccountAndSpaceView = observer(() => {
     const store = useStore()
+    const space = useSpace()
 
     const [location, navigate] = useLocation()
 
@@ -51,9 +51,9 @@ const AccountAndSpaceView = observer(() => {
         }
     })
 
-    const isOwner = store.user.id === store.space.space.owner.id
+    const isOwner = store.user.id === space.space.owner.id
 
-    const roleText = isOwner ? "Owner" : store.space.space.role
+    const roleText = isOwner ? "Owner" : space.space.role
 
     return (
         <Container title="Account and spaces" onClose={() => navigate("/")}>
@@ -73,12 +73,11 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Space</Heading>
                 <Row gap={8}>
-                    <Avatar name={store.space.space.name} />
+                    <Avatar name={space.space.name} />
                     <Col>
-                        <div>{store.space.space.name}</div>
+                        <div>{space.space.name}</div>
                         <div style={{ opacity: ".6" }}>
-                            {store.space.space.membersCount} member &ndash;{" "}
-                            {roleText}
+                            {space.space.membersCount} member &ndash; {roleText}
                         </div>
                     </Col>
                 </Row>

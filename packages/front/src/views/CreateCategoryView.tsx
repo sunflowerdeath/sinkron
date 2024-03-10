@@ -7,11 +7,10 @@ import { Col, Row } from "oriente"
 import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore } from "../store"
-import { Tree, Category } from "../store"
+import { useSpace } from "../store"
+import type { Category, Tree } from "../store"
 
 import { Input } from "../ui/input"
-import { Heading } from "../ui/heading"
 import { Button } from "../ui/button"
 import { Icon } from "../ui/icon"
 import Container from "../ui/Container"
@@ -19,12 +18,12 @@ import { Menu, MenuItem } from "../ui/menu"
 
 const renderItems = (props: CategorySelectProps) => {
     const { categoryTree, disabledItems, onChange } = props
-    return props.categoryTree.map((c) => (
+    return categoryTree.map((c) => (
         <>
             <MenuItem
                 value={c.id}
                 key={c.id}
-                onSelect={() => props.onChange(c.id)}
+                onSelect={() => onChange(c.id)}
                 isDisabled={disabledItems.includes(c.id)}
             >
                 {c.name}
@@ -162,16 +161,16 @@ const CreateCategoryView = observer(() => {
                 : search.parent
             : null
 
-    const store = useStore()
+    const space = useSpace()
     const [location, navigate] = useLocation()
 
     const create = (values: { name: string; parent: string | null }) => {
-        const id = store.space.createCategory(values)
-        store.space.selectCategory(id)
+        const id = space.createCategory(values)
+        space.selectCategory(id)
         navigate("/")
     }
 
-    if (!store.space.collection.initialSyncCompleted) {
+    if (!space.collection.initialSyncCompleted) {
         return "Loading..."
     }
 
@@ -181,8 +180,8 @@ const CreateCategoryView = observer(() => {
                 initialValues={{ name: "", parent: initialParent }}
                 onSubmit={create}
                 submitButtonText="Create"
-                categoryMap={store.space.categoryMap}
-                categoryTree={store.space.categoryTree}
+                categoryMap={space.categoryMap}
+                categoryTree={space.categoryTree}
                 disabledItems={[]}
             />
         </Container>
@@ -196,16 +195,16 @@ interface EditCategoryViewProps {
 const EditCategoryView = observer((props: EditCategoryViewProps) => {
     const { id } = props
 
-    const store = useStore()
+    const space = useSpace()
     const [location, navigate] = useLocation()
 
-    if (!store.space.collection.initialSyncCompleted) {
+    if (!space.collection.initialSyncCompleted) {
         return "Loading..."
     }
 
-    const category = store.space.meta.categories[id]
+    const category = space.meta.categories[id]
     const update = async (values: { name: string; parent: string | null }) => {
-        await store.space.updateCategory(id, values)
+        await space.updateCategory(id, values)
         navigate("/categories")
     }
 
@@ -215,8 +214,8 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
                 initialValues={category}
                 onSubmit={update}
                 submitButtonText="Save"
-                categoryMap={store.space.categoryMap}
-                categoryTree={store.space.categoryTree}
+                categoryMap={space.categoryMap}
+                categoryTree={space.categoryTree}
                 disabledItems={[id]}
             />
         </Container>

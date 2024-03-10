@@ -6,7 +6,7 @@ import { FormStore, useShowError } from "shadowform"
 import { Col } from "oriente"
 
 import { fetchJson, FetchError } from "../fetchJson"
-import { useStore } from "../store"
+import { useStore, Space } from "../store"
 import { Result, ResultType } from "../../utils/result"
 
 import { Heading } from "../ui/heading"

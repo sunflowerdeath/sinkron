@@ -16,12 +16,12 @@ const run = async () => {
     await app.init()
 
     let user
-    const createUserResult = await app.controller.users.createUser(
-        "test",
-        "password"
-    )
-    if (createUserResult.isOk) {
-        user = createUserResult.value
+    const createUserRes = await app.controller.users.createUser({
+        name: "test",
+        password: "password"
+    })
+    if (createUserRes.isOk) {
+        user = createUserRes.value
         console.log("Created user", user)
     }
 

@@ -1,13 +1,13 @@
 import { observer } from "mobx-react-lite"
 import { useMedia } from "react-use"
-import { Route, Switch, Redirect, useLocation, useSearch } from "wouter"
+import { Route, Switch, Redirect, useLocation } from "wouter"
 import { Col, Row } from "oriente"
 
 import Container from "../ui/Container"
 import { Button } from "../ui/button"
 import { Avatar } from "../ui/avatar"
 
-import { Store, useStore, DocumentListItemData } from "../store"
+import { SpaceContext, useStore } from "../store"
 
 import DocumentListView from "./DocumentListView"
 import DocumentView from "./DocumentView"
@@ -22,7 +22,7 @@ import { Input } from "../ui/input"
 
 const InviteMemberView = observer(() => {
     const [location, navigate] = useLocation()
-    const store = useStore()
+    // const store = useStore()
     return (
         <Container title="Invite member" onClose={() => navigate("/")}>
             <Col gap={8} style={{ alignSelf: "stretch" }}>
@@ -92,6 +92,7 @@ const NotificationsView = observer(() => {
 })
 
 const SpaceView = observer(() => {
+    const store = useStore()
     const isMobile = useMedia("(max-width: 1023px)")
 
     const routes = (
@@ -102,41 +103,35 @@ const SpaceView = observer(() => {
                     <DocumentView key={params.id} id={params.id} />
                 )}
             />
-            <Route
-                path={"/account"}
-                children={(params) => <AccountAndSpaceView />}
-            />
+            <Route path={"/account"} children={() => <AccountAndSpaceView />} />
             <Route
                 path={"/account/settings"}
-                children={(params) => <AccountSettingsView />}
+                children={() => <AccountSettingsView />}
             />
             <Route
                 path={"/notifications"}
-                children={(params) => <NotificationsView />}
+                children={() => <NotificationsView />}
             />
             <Route
                 path={"/create-space"}
-                children={(params) => <CreateSpaceView />}
+                children={() => <CreateSpaceView />}
             />
             <Route
                 path={"/switch-space"}
-                children={(params) => <SwitchSpaceView />}
+                children={() => <SwitchSpaceView />}
             />
             <Route
                 path={"/space/members"}
-                children={(params) => <SpaceMembersView />}
+                children={() => <SpaceMembersView />}
             />
             <Route
                 path={"/space/invite"}
-                children={(params) => <InviteMemberView />}
+                children={() => <InviteMemberView />}
             />
-            <Route
-                path={"/categories"}
-                children={(params) => <CategoriesView />}
-            />
+            <Route path={"/categories"} children={() => <CategoriesView />} />
             <Route
                 path={"/categories/new"}
-                children={(params) => <CreateCategoryView />}
+                children={() => <CreateCategoryView />}
             />
             <Route
                 path={"/categories/:id/edit"}
@@ -148,27 +143,31 @@ const SpaceView = observer(() => {
 
     if (isMobile) {
         return (
-            <Switch>
-                <Route path="/" children={() => <DocumentListView />} />
-                {routes}
-            </Switch>
+            <SpaceContext.Provider value={store.space!}>
+                <Switch>
+                    <Route path="/" children={() => <DocumentListView />} />
+                    {routes}
+                </Switch>
+            </SpaceContext.Provider>
         )
     } else {
         return (
-            <div style={{ display: "flex", height: "100vh" }}>
-                <div
-                    style={{
-                        width: 400,
-                        borderRight: "2px solid #555",
-                        height: "100%"
-                    }}
-                >
-                    <DocumentListView />
+            <SpaceContext.Provider value={store.space!}>
+                <div style={{ display: "flex", height: "100vh" }}>
+                    <div
+                        style={{
+                            width: 400,
+                            borderRight: "2px solid #555",
+                            height: "100%"
+                        }}
+                    >
+                        <DocumentListView />
+                    </div>
+                    <div style={{ flexGrow: 1 }}>
+                        <Switch>{routes}</Switch>
+                    </div>
                 </div>
-                <div style={{ flexGrow: 1 }}>
-                    <Switch>{routes}</Switch>
-                </div>
-            </div>
+            </SpaceContext.Provider>
         )
     }
 })

@@ -348,6 +348,13 @@ class Collection<T extends object> {
     status = ConnectionStatus.Disconnected
     initialSyncCompleted = false
 
+    isDestroyed = false
+
+    destroy() {
+        this.isDestroyed = true
+        this.stopAutoReconnect?.()
+    }
+
     async init() {
         if (this.store) await this.loadFromStore()
         this.isLoaded = true
@@ -361,8 +368,9 @@ class Collection<T extends object> {
         })
         this.transport.emitter.on("message", this.onMessage.bind(this))
 
-        this.stopAutoReconnect = autoReconnect(this.transport)
-        // this.transport.open()
+        if (!this.isDestroyed) {
+            this.stopAutoReconnect = autoReconnect(this.transport)
+        }
     }
 
     async loadFromStore() {

@@ -2,7 +2,6 @@ import { createContext, useContext } from "react"
 import {
     makeAutoObservable,
     reaction,
-    observe,
     makeObservable,
     computed,
     observable
@@ -16,18 +15,20 @@ import {
     Item,
     ItemState,
     WebsocketTransport,
-    IndexedDbCollectionStore,
-    ConnectionStatus
+    IndexedDbCollectionStore
+    // ConnectionStatus
 } from "sinkron-client"
-import { compareAsc, compareDesc } from "date-fns"
+import { compareDesc } from "date-fns"
 
 import { AutomergeNode, toAutomerge } from "./slate"
-
-import { TransformedMap } from "./transformedMap"
-
-import { fetchJson, FetchError } from "./fetchJson"
+import { TransformedMap } from "./utils/transformedMap"
+import { fetchJson } from "./fetchJson"
 import { fetchApi } from "./fetchJson2"
 import env from "./env"
+import listToTree from "./utils/listToTree"
+import type { Tree, TreeNode } from "./utils/listToTree"
+
+export type { Tree, TreeNode }
 
 export interface Space {
     id: string
@@ -37,7 +38,7 @@ export interface Space {
     role: SpaceRole
 }
 
-export type SpaceRole = "readonly" | "editor" | "admin"
+export type SpaceRole = "readonly" | "editor" | "admin" | "owner"
 
 export interface User {
     id: string
@@ -91,41 +92,92 @@ const getDocumentListItemData = (
 }
 
 class AuthStore {
-    isInited?: boolean = false
-    user?: User = undefined
     store?: Store = undefined
 
     constructor() {
-        this.init()
+        const user = localStorage.getItem("user")
+        if (user !== null) {
+            this.store = new Store({
+                user: JSON.parse(user),
+                authStore: this
+            })
+            this.store.fetchUser()
+        }
         makeAutoObservable(this)
     }
 
-    async init() {
-        const user = localStorage.getItem("user")
-        if (user !== null) {
-            this.setUser(JSON.parse(user))
-            this.isInited = true
-            await this.fetchProfile()
-        } else {
-            this.isInited = true
-        }
+    async login(credentials: Credentials) {
+        const user = await fetchApi<User>({
+            method: "POST",
+            url: `${env.apiUrl}/login`,
+            data: credentials
+        })
+        localStorage.setItem("user", JSON.stringify(user))
+        this.store = new Store({ user, authStore: this })
+        console.log(`Logged in as "${user.name}"`)
     }
 
-    setUser(user: User) {
+    async signup(credentials: Credentials) {
+        const user = await fetchApi<User>({
+            method: "POST",
+            url: `${env.apiUrl}/signup`,
+            data: credentials
+        })
+        localStorage.setItem("user", JSON.stringify(user))
+        this.store = new Store({ user, authStore: this })
+        console.log(`Signed up as ${user.name}`)
+    }
+
+    logout() {
+        console.log("Logout")
+        localStorage.removeItem("user")
+        this.store = undefined
+        history.pushState({}, "", "/")
+    }
+}
+
+interface StoreProps {
+    user: User
+    spaceId?: string
+    authStore: AuthStore
+}
+
+class Store {
+    authStore: AuthStore
+    user: User
+    spaceId?: string = undefined
+    space?: SpaceStore = undefined
+
+    constructor(props: StoreProps) {
+        const { user, authStore, spaceId } = props
+        this.authStore = authStore
         this.user = user
-        localStorage.setItem("user", JSON.stringify(this.user))
-        if (this.store) {
-            this.store.updateUser(user)
-        } else {
-            this.store = new Store(this, user, undefined)
-        }
+        this.spaceId = spaceId || user.spaces[0]?.id
+
+        makeAutoObservable(this)
+
+        reaction(
+            () => this.spaceId,
+            () => {
+                this.space?.dispose()
+                const space = this.user.spaces.find(
+                    (s) => s.id === this.spaceId
+                )!
+                this.space = new SpaceStore(space)
+            },
+            { fireImmediately: true }
+        )
     }
 
-    async fetchProfile() {
+    dispose() {
+        this.space?.dispose()
+    }
+
+    async fetchUser() {
         console.log("Fetching user...")
         const res = await fetchJson<User>({ url: `${env.apiUrl}/profile` })
         if (res.isOk) {
-            this.setUser(res.value)
+            this.updateUser(res.value)
             console.log("Fetch user success")
         } else {
             if (res.error.kind === "http") {
@@ -134,58 +186,6 @@ class AuthStore {
                 this.logout()
             }
         }
-    }
-
-    async authenticate(credentials: Credentials) {
-        const profile = await fetchApi<User>({
-            method: "POST",
-            url: `${env.apiUrl}/login`,
-            data: credentials
-        })
-        this.setUser(profile)
-        console.log("Logged in")
-    }
-
-    async signup(credentials: Credentials) {
-        const profile = await fetchApi<User>({
-            method: "POST",
-            url: `${env.apiUrl}/signup`,
-            data: credentials
-        })
-        this.setUser(profile)
-        console.log("Signed up")
-    }
-
-    logout() {
-        console.log("Logout")
-        this.user = undefined
-        localStorage.removeItem("user")
-        history.pushState({}, "", "/")
-    }
-}
-
-class Store {
-    authStore: AuthStore
-    user: User
-    spaceId: string
-    space!: SpaceStore
-
-    constructor(authStore: AuthStore, user: User, spaceId: string | undefined) {
-        this.authStore = authStore
-        this.user = user
-        this.spaceId = spaceId || user.spaces[0].id
-        makeAutoObservable(this)
-
-        reaction(
-            () => this.spaceId,
-            () => {
-                const space = this.user.spaces.find(
-                    (s) => s.id === this.spaceId
-                )!
-                this.space = new SpaceStore(space)
-            },
-            { fireImmediately: true }
-        )
     }
 
     updateUser(user: User) {
@@ -212,7 +212,6 @@ class Store {
 
     changeSpace(spaceId: string) {
         if (this.spaceId !== spaceId) {
-            this.space?.collection.stopAutoReconnect?.()
             this.spaceId = spaceId
         }
     }
@@ -230,34 +229,10 @@ const makeInitialDocument = () => ({
     categories: []
 })
 
-const getUpdatedAt = <T,>(item: Item<T>) =>
+const getUpdatedAt = <T>(item: Item<T>) =>
     item.state === ItemState.Synchronized
         ? item.updatedAt!
         : item.localUpdatedAt!
-
-type ListItem = { id: string; parent: string | null }
-
-export type TreeNode<T extends {}> = T & { children: TreeNode<T>[] }
-
-export type Tree<T extends {}> = TreeNode<T>[]
-
-const listToTree = <T extends ListItem>(list: T[]): Tree<T> => {
-    const index: { [id: string]: TreeNode<T> } = {}
-    list.forEach((c) => {
-        index[c.id] = { ...c, children: [] }
-    })
-    const tree: TreeNode<T>[] = []
-    list.forEach((item) => {
-        const node = index[item.id]
-        if (item.parent) {
-            const parentNode = index[item.parent]
-            parentNode.children.push(node)
-        } else {
-            tree.push(node)
-        }
-    })
-    return tree
-}
 
 class SpaceStore {
     space: Space
@@ -301,6 +276,10 @@ class SpaceStore {
             categoryMap: computed,
             categoryTree: computed
         })
+    }
+
+    dispose() {
+        this.collection.destroy()
     }
 
     get sortedDocumentList() {
@@ -402,8 +381,18 @@ class SpaceStore {
     }
 }
 
-const StoreContext = createContext<Store>(null)
+const StoreContext = createContext<Store | null>(null)
+const useStore = () => {
+    const store = useContext(StoreContext)
+    if (store === null) throw new Error("Store not provided")
+    return store
+}
 
-const useStore = () => useContext(StoreContext)
+const SpaceContext = createContext<SpaceStore | null>(null)
+const useSpace = () => {
+    const space = useContext(SpaceContext)
+    if (space === null) throw new Error("Space not provided")
+    return space
+}
 
-export { AuthStore, Store, useStore, StoreContext }
+export { AuthStore, Store, useStore, useSpace, StoreContext, SpaceContext }

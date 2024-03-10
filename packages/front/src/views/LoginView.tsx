@@ -24,7 +24,7 @@ const LoginView = observer((props: LoginViewProps) => {
         fromPromise.resolve()
     )
     const auth = () => {
-        const state = props.store.authenticate({ name: login, password })
+        const state = props.store.login({ name: login, password })
         setAuthState(fromPromise(state))
     }
 

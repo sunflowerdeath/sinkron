@@ -10,12 +10,8 @@ import ButtonsGrid from "../ui/ButtonsGrid"
 
 import CategoriesList from "../components/CategoriesList"
 
-import { useStore } from "../store"
-
 import checkBoxSvg from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutlineSvg from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
-import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
-import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 
 import { Category, TreeNode } from "../store"
 

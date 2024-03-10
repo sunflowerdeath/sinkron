@@ -1,8 +1,8 @@
-import { DataSource, Repository, EntityManager } from 'typeorm';
-import * as Automerge from '@automerge/automerge';
-import type { Document, Collection, Group, GroupMember } from './entities';
-import { ResultType } from './result';
-import { ErrorCode } from './protocol';
+import { DataSource, Repository, EntityManager } from "typeorm";
+import * as Automerge from "@automerge/automerge";
+import type { Document, Collection, Group, GroupMember } from "./entities";
+import { ResultType } from "./result";
+import { ErrorCode } from "./protocol";
 type ChangedDocuments = {
     col: string;
     colrev: number;

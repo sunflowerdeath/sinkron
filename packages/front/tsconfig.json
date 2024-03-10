@@ -9,7 +9,7 @@
         "isolatedModules": true,
 
         "target": "es2015",
-        "lib": ["es6", "es7", "dom", "esnext"],
+        "lib": ["es6", "es7", "es2015", "dom", "esnext"],
         "jsx": "react-jsx",
 
         "outDir": "build",
