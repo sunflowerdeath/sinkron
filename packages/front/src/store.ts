@@ -246,6 +246,7 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const store = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
+        console.log("TOKEN", token)
         const transport = new WebsocketTransport(`${env.wsUrl}/${token}`)
         this.collection = new Collection<Document>({
             transport,
@@ -289,7 +290,7 @@ class SpaceStore {
     }
 
     get metaItem() {
-        for (let [key, item] of this.collection.items.entries()) {
+        for (const [key, item] of this.collection.items.entries()) {
             if (item.local?.meta === true) return item
         }
     }
