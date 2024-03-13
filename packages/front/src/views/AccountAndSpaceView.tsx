@@ -11,6 +11,15 @@ import Container from "../ui/Container"
 
 import { useStore, useSpace } from "../store"
 
+import { ConnectionStatus } from "sinkron-client"
+
+const statusMap = {
+    [ConnectionStatus.Disconnected]: "Waiting for connection...",
+    [ConnectionStatus.Connected]: "Connecting...",
+    [ConnectionStatus.Sync]: "Receiving changes...",
+    [ConnectionStatus.Ready]: "Connected"
+}
+
 const AccountAndSpaceView = observer(() => {
     const store = useStore()
     const space = useSpace()
@@ -54,6 +63,12 @@ const AccountAndSpaceView = observer(() => {
     const isOwner = store.user.id === space.space.owner.id
 
     const roleText = isOwner ? "Owner" : space.space.role
+
+    const status = (
+        <div style={{ color: "var(--color-secondary)" }}>
+            Connection: {statusMap[space.collection.status]}
+        </div>
+    )
 
     return (
         <Container title="Account and spaces" onClose={() => navigate("/")}>
@@ -108,6 +123,7 @@ const AccountAndSpaceView = observer(() => {
                     Create space
                 </Button>
             </ButtonsGrid>
+            {status}
             {leaveModal.render()}
             {deleteModal.render()}
         </Container>

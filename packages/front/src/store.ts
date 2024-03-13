@@ -380,6 +380,16 @@ class SpaceStore {
             })
         )
     }
+
+    sendInvite(toName: string, role: string) {
+        return fromPromise(
+            fetchJson({
+                method: "POST",
+                url: `${env.apiUrl}/invites/new`,
+                data: { spaceId: this.space.id, toName, role }
+            })
+        )
+    }
 }
 
 const StoreContext = createContext<Store | null>(null)

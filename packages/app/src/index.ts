@@ -16,7 +16,7 @@ const run = async () => {
     await app.init()
 
     let user
-    const createUserRes = await app.services.users.createUser(app.models, {
+    const createUserRes = await app.services.users.create(app.models, {
         name: "test",
         password: "password"
     })

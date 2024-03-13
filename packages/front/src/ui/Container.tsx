@@ -62,7 +62,7 @@ const Container = (props: ContainerProps) => {
                 align="normal"
                 style={{
                     padding: isMobile ? '0 10px' : '0 40px',
-                    paddingTop: 80,
+                    paddingTop: isMobile ? 20 : 80,
                     overflow: 'auto',
                     paddingBottom: 20,
                     boxSizing: 'border-box',

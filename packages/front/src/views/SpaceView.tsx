@@ -16,29 +16,8 @@ import CreateSpaceView from "./CreateSpaceView"
 import SpaceMembersView from "./SpaceMembersView"
 import SwitchSpaceView from "./SwitchSpaceView"
 import AccountAndSpaceView from "./AccountAndSpaceView"
+import InviteMemberView from "./InviteMemberView"
 import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
-
-import { Input } from "../ui/input"
-
-const InviteMemberView = observer(() => {
-    const [location, navigate] = useLocation()
-    // const store = useStore()
-    return (
-        <Container title="Invite member" onClose={() => navigate("/")}>
-            <Col gap={8} style={{ alignSelf: "stretch" }}>
-                Username
-                <Input style={{ width: 400 }} autoFocus />
-            </Col>
-
-            <Col gap={8} style={{ alignSelf: "stretch" }}>
-                Role
-                <Input style={{ width: 400 }} />
-            </Col>
-
-            <Button>Send invite</Button>
-        </Container>
-    )
-})
 
 const AccountSettingsView = observer(() => {
     const [location, navigate] = useLocation()

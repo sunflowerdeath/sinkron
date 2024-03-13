@@ -15,6 +15,7 @@ import {
     Space,
     SpaceMember,
     Invite,
+    InviteStatus,
     SpaceRole
 } from "./entities"
 
@@ -454,7 +455,7 @@ class SpaceService {
 interface CreateInviteProps {
     spaceId: string
     fromId: string
-    toId: string
+    toName: string
     role: "readonly" | "editor" | "admin"
 }
 
@@ -531,34 +532,29 @@ class InviteService {
         models: Models,
         props: CreateInviteProps
     ): Promise<ResultType<Invite, RequestError>> {
-        const { fromId, toId, spaceId, role } = props
+        const { fromId, toName, spaceId, role } = props
 
-        const userCount = await models.users.countBy({ id: toId })
-        const invitedByMember = await models.members.findOne({
+        const toUser = await models.users.findOne({
+            where: { name: toName },
+            select: { id: true }
+        })
+        if (toUser === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: `User with name "${toName}" not found`,
+                details: props
+            })
+        }
+
+        const fromMember = await models.members.findOne({
             where: { spaceId, userId: fromId },
             select: { role: true }
         })
-        if (userCount !== 1 || invitedByMember === null) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Couldn't create invite",
-                details: props
-            })
-        }
-
-        const count = await models.members.countBy({ spaceId, userId: toId })
-        if (count !== 0) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "User already is a member",
-                details: props
-            })
-        }
-
         const isPermitted =
-            role === "admin"
-                ? invitedByMember.role === "owner"
-                : ["admin", "owner"].includes(invitedByMember.role)
+            fromMember !== null &&
+            (role === "admin"
+                ? fromMember.role === "owner"
+                : ["admin", "owner"].includes(fromMember.role))
         if (!isPermitted) {
             return Result.err({
                 code: ErrorCode.AccessDenied,
@@ -567,16 +563,35 @@ class InviteService {
             })
         }
 
-        // Only one active invite to space per user
-        await models.invites.delete({ spaceId, toId, status: "sent" })
+        const count = await models.members.countBy({
+            spaceId,
+            userId: toUser.id
+        })
+        if (count !== 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "User already is a member",
+                details: props
+            })
+        }
 
-        const res = await models.invites.insert({
-            ...props,
-            status: "sent",
-            notificationHidden: false
+        // Only one active invite to space per user
+        await models.invites.delete({
+            spaceId,
+            toId: toUser.id,
+            status: "sent"
         })
 
-        const invite = { ...props, ...res.generatedMaps[0] } as Invite
+        const data = {
+            toId: toUser.id,
+            fromId: fromId,
+            spaceId,
+            role,
+            status: "sent" as InviteStatus,
+            notificationHidden: false
+        }
+        const res = await models.invites.insert(data)
+        const invite = { ...data, ...res.generatedMaps[0] } as Invite
         return Result.ok(invite)
     }
 }
@@ -796,12 +811,12 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
 const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post("/invites/new", async (request, reply) => {
-        const { spaceId, toId, role } = request.body
+        const { spaceId, toName, role } = request.body
         await app.transaction(async (models) => {
             const res = await app.services.invites.create(models, {
                 fromId: request.token.userId,
                 spaceId,
-                toId,
+                toName,
                 role
             })
             if (!res.isOk) {
