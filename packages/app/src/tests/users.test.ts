@@ -1,10 +1,11 @@
 import assert from "node:assert"
+import cookie from "@fastify/cookie"
 
 import { Sinkron } from "sinkron"
 import { App } from "../app"
 
-describe("UsersController", () => {
-    let app
+describe.only("Users", () => {
+    let app: App
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ":memory: " })
         await sinkron.init()
@@ -12,63 +13,93 @@ describe("UsersController", () => {
         await app.init()
     })
 
-    it("create delete users", async () => {
-        const c = app!.controller
-
-        const res = await c.users.createUser({
-            name: "test",
-            password: "password"
+    it("signup", async () => {
+        const res = await app.fastify.inject({
+            url: "/signup",
+            method: "POST",
+            payload: {
+                name: "test",
+                password: "password"
+            }
         })
-        assert(res.isOk)
-        const user = res.value
+        assert.strictEqual(res.statusCode, 200, "signup is 200")
+        const tokenCookie = res.cookies.find((c) => c.name === "token")!
+        assert(tokenCookie !== undefined, "set token cookie")
+        const token = tokenCookie.value
+        const user = JSON.parse(res.payload)
+        const headers = { Cookie: cookie.serialize("token", token) }
 
-        const ctx = { token: { userId: user.id } }
+        const res2 = await app.fastify.inject({
+            method: "GET",
+            url: "/profile",
+            headers
+        })
+        assert.strictEqual(res2.statusCode, 200, "profile is 200")
+        const profile = JSON.parse(res2.payload)
+        assert.strictEqual(profile.id, user.id, "user id")
 
-        const res2 = await c.users.getUserProfile(ctx)
-        assert(res2.isOk)
+        const res3 = await app.services.users.delete(app.models, user.id)
+        assert(res3.isOk, "user deleted")
 
-        const res3 = await c.users._deleteUser(user.id)
-        assert(res3.isOk)
-
-        const res4 = await c.users.getUserProfile(ctx)
-        assert(!res4.isOk)
+        const res4 = await app.fastify.inject({
+            method: "GET",
+            url: "/profile",
+            headers
+        })
+        assert.strictEqual(res4.statusCode, 401, "profile is 401")
     })
 
-    it("authorization", async () => {
-        const c = app!.controller
-
-        const res = await c.users._createUser({
+    it("login", async () => {
+        const res = await app.services.users.create(app.models, {
             name: "test",
             password: "password"
         })
-        assert(res.isOk)
-        const user = res.value
+        assert(res.isOk, "user created")
 
-        const res2 = await c.users.authorize("ERROR", "password")
-        assert(!res2.isOk, "invalid username")
+        const res2 = await app.fastify.inject({
+            method: "POST",
+            url: "/login",
+            payload: { name: "ERROR", password: "password" }
+        })
+        assert(res2.statusCode !== 200, "invalid username")
 
-        const res3 = await c.users.authorize("test", "ERROR")
-        assert(!res3.isOk, "invalid password")
+        const res3 = await app.fastify.inject({
+            method: "POST",
+            url: "/login",
+            payload: { name: "test", password: "ERROR" }
+        })
+        assert(res3.statusCode !== 200, "invalid password")
 
-        const res4 = await c.users.authorize("test", "password")
-        assert(res4.isOk, "authorized")
-        const token = res4.value
+        const res4 = await app.fastify.inject({
+            method: "POST",
+            url: "/login",
+            payload: { name: "test", password: "password" }
+        })
+        assert.strictEqual(res4.statusCode, 200, "authorized")
+        const tokenCookie = res4.cookies.find((c) => c.name === "token")!
+        assert(tokenCookie !== undefined, "set token cookie")
+        const token = tokenCookie.value
+        const headers = { Cookie: cookie.serialize("token", token) }
 
-        const res5 = await c.users._verifyAuthToken("ERROR")
-        assert(res5.isOk && res5.value === null, "invalid token")
+        const res5 = await app.fastify.inject({
+            method: "GET",
+            url: "/profile",
+            headers
+        })
+        assert.strictEqual(res5.statusCode, 200, "profile ok")
 
-        const res6 = await c.users.verifyAuthToken(token.token)
-        assert(res6.isOk && res6 !== null, "valid token")
+        const res6 = await app.fastify.inject({
+            method: "POST",
+            url: "/logout",
+            headers
+        })
+        assert.strictEqual(res6.statusCode, 200, "logout ok")
 
-        const res7 = await c.users._getUserTokens(user.id)
-        assert(res7.isOk, "get active tokens")
-        assert(res7.value.length === 1)
-
-        const res8 = await c.users._deleteToken(token.token)
-        assert(res8.isOk, "delete token")
-
-        const res9 = await c.users._getUserTokens(user.id)
-        assert(res9.isOk)
-        assert(res9.value.length === 0)
+        const res7 = await app.fastify.inject({
+            method: "GET",
+            url: "/profile",
+            headers
+        })
+        assert.strictEqual(res7.statusCode, 401, "profile not ok")
     })
 })

@@ -4,7 +4,7 @@ import { Sinkron } from "sinkron"
 import { App } from "../app"
 
 describe("InvitesController", () => {
-    let app
+    let app: App
     let ownerId = ""
     let memberId = ""
     let invitedId = ""
@@ -16,30 +16,31 @@ describe("InvitesController", () => {
         app = new App({ sinkron, dbPath: ":memory:" })
         await app.init()
 
-        const c = app.controller
-
-        const ownerRes = await c.users.createUser({
+        const ownerRes = await app.services.users.createUser(app.models, {
             name: "owner",
             password: "password"
         })
         if (ownerRes.isOk) ownerId = ownerRes.value.id
 
-        const memberRes = await c.users.createUser({
+        const memberRes = await app.services.users.createUser(app.models, {
             name: "member",
             password: "password"
         })
-        if (ownerRes.isOk) memberId = memberRes.value.id
+        if (memberRes.isOk) memberId = memberRes.value.id
 
-        const invitedRes = await c.users.createUser({
+        const invitedRes = await app.services.users.createUser(app.models, {
             name: "invited",
             password: "password"
         })
         if (invitedRes.isOk) invitedId = invitedRes.value.id
 
-        const spaceRes = await c.spaces._createSpace({ name: "space", ownerId })
+        const spaceRes = await app.services.spaces.create(app.models, {
+            name: "space",
+            ownerId
+        })
         if (spaceRes.isOk) spaceId = spaceRes.value.id
 
-        await c.spaces.addMember({
+        await app.services.spaces.addMember(app.models, {
             spaceId,
             role: "readonly",
             userId: memberId
@@ -47,34 +48,41 @@ describe("InvitesController", () => {
     })
 
     it("send invite", async () => {
-        const c = app!.controller
-
         // invalid fromId
-        const res1 = await c.invites.create({
-            fromId: "invalid",
-            toId: invitedId,
-            spaceId: spaceId,
-            role: "readonly"
+        const res1 = await app.fastify.inject({
+            url: "/invites/new",
+            payload: {
+                fromId: "invalid",
+                toId: invitedId,
+                spaceId: spaceId,
+                role: "readonly"
+            }
         })
-        assert(!res1.isOk, "invalid fromId")
+        assert(res1.statusCode !== 200, "invalid fromId")
 
         // invalid toId
-        const res2 = await c.invites.create({
-            fromId: ownerId,
-            toId: "invalid",
-            spaceId: spaceId,
-            role: "readonly"
+        const res2 = await app.fastify.inject({
+            url: "/invites/new",
+            payload: {
+                fromId: ownerId,
+                toId: "invalid",
+                spaceId: spaceId,
+                role: "readonly"
+            }
         })
-        assert(!res2.isOk, "invalid toId")
+        assert(res2.statusCode !== 200, "invalid toId")
 
         // invalid spaceId
-        const res3 = await c.invites.create({
-            fromId: ownerId,
-            toId: invitedId,
-            spaceId: "invalid",
-            role: "readonly"
+        const res3 = await app.fastify.inject({
+            url: "/invites/new",
+            payload: {
+                fromId: ownerId,
+                toId: invitedId,
+                spaceId: "invalid",
+                role: "readonly"
+            }
         })
-        assert(!res3.isOk, "invalid spaceId")
+        assert(res3.statusCode !== 200, "invalid spaceId")
 
         // invalid role
         const res4 = await c.invites.create({

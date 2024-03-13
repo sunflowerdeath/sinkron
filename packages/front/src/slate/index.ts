@@ -102,7 +102,7 @@ const setNode = (root: AutomergeNode, op: SetNodeOperation): AutomergeNode => {
     const node = findNode(root, op.path)
 
     const newProperties = op.newProperties as any
-    for (let key in newProperties) {
+    for (const key in newProperties) {
         const val = newProperties[key]
         if (val !== undefined) {
             node[key] = val
@@ -201,18 +201,16 @@ const applyOperation = (root: AutomergeNode, op: Operation) => {
     ops[op.type](root, op)
 }
 
-const applySlateOps = <T>(root: AutomergeNode, ops: Operation[]) => {
-    ops.forEach((op) => applyOperation(root, op))
-}
-
-export { applyOperation, applySlateOps, toAutomerge, fromAutomerge }
-
 // Applies slate operations to automerge document
 // Editor state has to match state of the automerge document.
-const applySlateToAutomerge = <T>(root: AutomergeNode, ops: Operation[]) => {
+const applySlateOps = (root: AutomergeNode, ops: Operation[]) => {
     ops.forEach((op) => applyOperation(root, op))
 }
 
 // Applies Automerge changes as Slate operations.
 // Editor state has to match state of the automerge document.
-const applyAutomergeToSlate = () => {}
+const applyAutomergeToSlate = () => {
+    // TODO
+}
+
+export { applyOperation, applySlateOps, toAutomerge, fromAutomerge }

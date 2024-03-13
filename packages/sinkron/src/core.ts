@@ -58,10 +58,6 @@ type ChangedDocuments = {
     documents: Document[]
 }
 
-type Credentials = { name: string; password: string }
-
-type AuthResult = { token: string; user: string }
-
 export type RequestError = { code: ErrorCode; details?: string }
 
 interface SinkronProps {
@@ -154,8 +150,6 @@ class Sinkron {
         await models.collections.insert({ id, colrev: 1 })
         // TODO generated fields
         const col = { id, colrev: 1 }
-
-        // create meta document
 
         return Result.ok(col as Collection)
     }

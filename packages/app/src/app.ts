@@ -69,7 +69,7 @@ class UserService {
         this.app = app
     }
 
-    async createUser(
+    async create(
         models: Models,
         props: CreateUserProps
     ): Promise<ResultType<User, RequestError>> {
@@ -108,7 +108,7 @@ class UserService {
         return Result.ok(user)
     }
 
-    async deleteUser(
+    async delete(
         models: Models,
         id: string
     ): Promise<ResultType<true, RequestError>> {
@@ -612,7 +612,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: credentialsSchema } },
         async (request, reply) => {
             const { name, password } = request.body
-            await timeout(1500)
+            // await timeout(1500)
             await app.transaction(async (models) => {
                 const authRes = await app.services.auth.authorizeWithPassword(
                     models,
@@ -647,8 +647,11 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
     )
 
     fastify.post("/logout", async (request, reply) => {
-        reply.clearCookie("token")
-        reply.code(200)
+        const token = request.cookies["token"]
+        if (token !== undefined && token.length > 1) {
+            await app.services.auth.deleteAuthToken(app.models, token)
+        }
+        reply.clearCookie("token").send()
     })
 
     fastify.post(
@@ -656,9 +659,9 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: credentialsSchema } },
         async (request, reply) => {
             const { name, password } = request.body
-            await timeout(1500)
+            // await timeout(1500)
             await app.transaction(async (models) => {
-                const createRes = await app.services.users.createUser(models, {
+                const createRes = await app.services.users.create(models, {
                     name,
                     password
                 })

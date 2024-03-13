@@ -19,9 +19,9 @@ const rules = [
 module.exports = {
     entry: {
         test: [
-            "./src/controller/users.test.ts",
-            "./src/controller/spaces.test.ts",
-            "./src/controller/invites.test.ts"
+            "./src/tests/users.test.ts",
+            "./src/tests/spaces.test.ts",
+            "./src/tests/invites.test.ts"
         ]
     },
     output: {
