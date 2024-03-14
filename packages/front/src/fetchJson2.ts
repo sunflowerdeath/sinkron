@@ -20,7 +20,7 @@ export type FetchErrorKind =
     | "application"
 
 const fetchErrorMessages: { [key: string]: string } = {
-    fetch: "Check your internet connection and try again",
+    fetch_error: "Check your internet connection and try again",
     abort: "Request was aborted",
     http: "Server error",
     json: "Server error"
@@ -68,7 +68,7 @@ const fetchJson = async <T extends object = object>(
         headers["Content-type"] = "application/json;charset=UTF-8"
     }
 
-    const request = fetch(url, {
+    let request = fetch(url, {
         method,
         body: data ? JSON.stringify(data) : undefined,
         credentials: "include",
@@ -82,7 +82,11 @@ const fetchJson = async <T extends object = object>(
         if (isAbortError(e as Error)) {
             throw new FetchError({ kind: "abort", originalError: e })
         }
-        throw { kind: "fetch_error", originalError: e, response }
+        throw new FetchError({
+            kind: "fetch_error",
+            originalError: e,
+            response
+        })
     }
 
     let json: object | undefined

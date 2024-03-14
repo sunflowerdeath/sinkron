@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 
@@ -12,6 +13,7 @@ import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Menu, MenuItem } from "../ui/menu"
 import { Icon } from "../ui/icon"
+import { Toast, useToast } from "../ui/toast"
 
 interface SelectOption {
     value: string
@@ -79,7 +81,7 @@ const Select = (props: SelectProps) => {
                         )}
                     </div>
                     {value ? (
-                        <Button size="s" onClick={() => onChange(null)}>
+                        <Button size="s" onClick={() => onChange(undefined)}>
                             <Icon svg={closeSvg} />
                         </Button>
                     ) : (
@@ -93,15 +95,26 @@ const Select = (props: SelectProps) => {
 
 const InviteMemberView = observer(() => {
     const [location, navigate] = useLocation()
+    const toast = useToast()
 
     const space = useSpace()
 
     const [role, setRole] = useState<string | undefined>()
     const [name, setName] = useState("")
 
-    const [sendInviteState, setSendInviteState] = useState(Promise.resolve())
+    const [sendInviteState, setSendInviteState] = useState<
+        IPromiseBasedObservable<any>
+    >(fromPromise.resolve())
+
     const sendInvite = () => {
+        const state = space.sendInvite(name, role!)
         setSendInviteState(space.sendInvite(name, role!))
+        state
+            .then(() => {
+                navigate("/")
+                toast.show({ children: <Toast>Invite sent</Toast> })
+            })
+            .catch(() => {})
     }
 
     const options = [
@@ -112,7 +125,12 @@ const InviteMemberView = observer(() => {
         options.push({ value: "admin", label: "Admin" })
     }
 
-    const isValid = role !== undefined && name.length > 0
+    const isValid = name.length > 0 && role !== undefined
+
+    let error: React.ReactNode
+    if (sendInviteState.state === "rejected") {
+        error = "Couldn't send invite: " + sendInviteState.value.message
+    }
 
     return (
         <Container title="Invite member" onClose={() => navigate("/")}>
@@ -137,6 +155,9 @@ const InviteMemberView = observer(() => {
             <Button isDisabled={!isValid} onClick={sendInvite}>
                 Send invite
             </Button>
+            {error && (
+                <div style={{ color: "var(--color-error)" }}>{error}</div>
+            )}
         </Container>
     )
 })

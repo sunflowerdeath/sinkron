@@ -374,7 +374,7 @@ class SpaceStore {
 
     fetchMembers() {
         return fromPromise(
-            fetchJson({
+            fetchApi({
                 method: "GET",
                 url: `${env.apiUrl}/spaces/${this.space.id}/members`
             })
@@ -383,7 +383,7 @@ class SpaceStore {
 
     sendInvite(toName: string, role: string) {
         return fromPromise(
-            fetchJson({
+            fetchApi({
                 method: "POST",
                 url: `${env.apiUrl}/invites/new`,
                 data: { spaceId: this.space.id, toName, role }

@@ -546,8 +546,7 @@ class InviteService {
         if (!isPermitted) {
             return Result.err({
                 code: ErrorCode.AccessDenied,
-                message: "Not permitted",
-                details: props
+                message: "Operation not permitted"
             })
         }
 
@@ -558,8 +557,7 @@ class InviteService {
         if (toUser === null) {
             return Result.err({
                 code: ErrorCode.NotFound,
-                message: `User with name "${toName}" not found`,
-                details: props
+                message: `User "${toName}" not found`
             })
         }
 
@@ -570,8 +568,7 @@ class InviteService {
         if (count !== 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                message: "User already is a member",
-                details: props
+                message: `User "${toName}" is already a member of the space`
             })
         }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert"
 import cookie from "@fastify/cookie"
-
 import { Sinkron } from "sinkron"
+
 import { App } from "../app"
 import { User } from "../entities"
 
@@ -16,10 +16,8 @@ const createUser = async (app: App, name: string) => {
     return res2.value
 }
 
-const getAuthHeaders = async (app: App, id: string) => {
-    const res = await app.services.auth.issueAuthToken(app.models, {
-        userId: id
-    })
+const getAuthHeaders = async (app: App, userId: string) => {
+    const res = await app.services.auth.issueAuthToken(app.models, { userId })
     assert(res.isOk)
     return { Cookie: cookie.serialize("token", res.value.token) }
 }
@@ -45,7 +43,6 @@ describe("Invites", () => {
 
         const spaceId = owner.spaces[0].id
 
-        // User not found
         const res1 = await app.fastify.inject({
             method: "POST",
             url: "/invites/new",
@@ -58,7 +55,6 @@ describe("Invites", () => {
         })
         assert(res1.statusCode !== 200, "user not found")
 
-        // Already a member
         const res2 = await app.fastify.inject({
             method: "POST",
             url: "/invites/new",
