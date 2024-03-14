@@ -534,18 +534,6 @@ class InviteService {
     ): Promise<ResultType<Invite, RequestError>> {
         const { fromId, toName, spaceId, role } = props
 
-        const toUser = await models.users.findOne({
-            where: { name: toName },
-            select: { id: true }
-        })
-        if (toUser === null) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: `User with name "${toName}" not found`,
-                details: props
-            })
-        }
-
         const fromMember = await models.members.findOne({
             where: { spaceId, userId: fromId },
             select: { role: true }
@@ -559,6 +547,18 @@ class InviteService {
             return Result.err({
                 code: ErrorCode.AccessDenied,
                 message: "Not permitted",
+                details: props
+            })
+        }
+
+        const toUser = await models.users.findOne({
+            where: { name: toName },
+            select: { id: true }
+        })
+        if (toUser === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: `User with name "${toName}" not found`,
                 details: props
             })
         }

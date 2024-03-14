@@ -7,7 +7,8 @@ const ButtonsGrid = (props: ButtonsGridProps) => {
         <div
             style={{
                 display: 'grid',
-                width: 400,
+                maxWidth: 400,
+                width: "100%",
                 gridTemplateColumns: 'repeat(2, 1fr)',
                 gridGap: 8
             }}

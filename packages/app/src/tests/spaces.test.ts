@@ -1,12 +1,14 @@
 import assert from "node:assert"
+import cookie from "@fastify/cookie"
 
 import { Sinkron } from "sinkron"
 import { App } from "../app"
 
-describe("SpacesController", () => {
-    let app
+describe("Spaces", () => {
+    let app: App
     let user
-    let user2
+    // let user2
+    let headers: { [key: string]: string }
 
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ":memory: " })
@@ -14,60 +16,61 @@ describe("SpacesController", () => {
         app = new App({ sinkron, dbPath: ":memory:" })
         await app.init()
 
-        const c = app!.controller
-        const res = await c.users.createUser("test", "password")
+        const res = await app.services.users.create(app.models, {
+            name: "test",
+            password: "password"
+        })
         assert(res.isOk)
         user = res.value
 
-        const res2 = await c.users.createUser("user2", "password")
+        /*
+        const res2 = await app.services.users.create(app.models, {
+            name: "user2",
+            password: "password"
+        })
         assert(res2.isOk)
         user2 = res2.value
+        */
+
+        const tokenRes = await app.services.auth.issueAuthToken(app.models, {
+            userId: user.id
+        })
+        assert(tokenRes.isOk)
+        headers = { Cookie: cookie.serialize("token", tokenRes.value.token) }
     })
 
-    it("create delete members", async () => {
-        const c = app!.controller
-
-        const res = await c.spaces.create({ ownerId: user!.id, name: "test" })
-        assert(res.isOk, "created")
-        const space = res.value
-
-        const res2 = await c.spaces.getUserSpaces(user!.id)
-        assert(res2.isOk)
-        const spaces = res2.value
-        assert.strictEqual(spaces.length, 2)
-
-        const res3 = await c.spaces.removeMember({
-            spaceId: space.id,
-            userId: user!.id
+    it("create space", async () => {
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/spaces/new",
+            headers,
+            payload: { name: "test" }
         })
-        assert(!res3.isOk, "can't delete owner")
+        assert.strictEqual(res.statusCode, 200, "create")
+        const space = JSON.parse(res.payload)
 
-        const res4 = await c.spaces.removeMember({
-            spaceId: space.id,
-            userId: user2!.id
+        const res2 = await app.fastify.inject({
+            method: "GET",
+            url: `/spaces/${space.id}/members`,
+            headers
         })
-        assert(!res4.isOk, "not found member")
+        assert.strictEqual(res2.statusCode, 200, "get members")
+        const members = JSON.parse(res2.payload)
+        assert(Array.isArray(members) && members.length === 1)
+        const memberId = members[0].id
 
-        const res5 = await c.spaces.addMember({
-            spaceId: space.id,
-            userId: user2!.id,
-            role: "editor"
+        const res3 = await app.fastify.inject({
+            method: "GET",
+            url: `/spaces/${space.id}/members/${memberId}/remove`,
+            headers
         })
-        assert(res5.isOk, "add member")
+        assert(res3.statusCode !== 200, "can't delete owner")
 
-        const res6 = await c.spaces.addMember({
-            spaceId: space.id,
-            userId: user2!.id,
-            role: "editor"
+        const res4 = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/delete`,
+            headers
         })
-        assert(!res6.isOk, "add existing")
-
-        const res7 = await c.spaces.getMembers(space.id)
-        assert(res7.isOk, "get members")
-        const members = res7.value
-        assert.strictEqual(members.length, 2, "2 members")
-
-        const res8 = await c.spaces.delete(space.id)
-        assert(res8.isOk, "delete space")
+        assert.strictEqual(res4.statusCode, 200, "delete space")
     })
 })

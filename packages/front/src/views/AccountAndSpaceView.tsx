@@ -1,7 +1,8 @@
 import { observer } from "mobx-react-lite"
 import { useLocation, Link } from "wouter"
-
+import { ConnectionStatus } from "sinkron-client"
 import { Col, Row, useModal } from "oriente"
+
 import { Modal } from "../ui/modal"
 import { Heading } from "../ui/heading"
 import ButtonsGrid from "../ui/ButtonsGrid"
@@ -11,13 +12,18 @@ import Container from "../ui/Container"
 
 import { useStore, useSpace } from "../store"
 
-import { ConnectionStatus } from "sinkron-client"
-
 const statusMap = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",
     [ConnectionStatus.Connected]: "Connecting...",
     [ConnectionStatus.Sync]: "Receiving changes...",
     [ConnectionStatus.Ready]: "Connected"
+}
+
+const roleMap = {
+    readonly: "Read-only",
+    editor: "Editor",
+    admin: "Admin",
+    owner: "Owner"
 }
 
 const AccountAndSpaceView = observer(() => {
@@ -60,9 +66,8 @@ const AccountAndSpaceView = observer(() => {
         }
     })
 
-    const isOwner = store.user.id === space.space.owner.id
-
-    const roleText = isOwner ? "Owner" : space.space.role
+    const role = space.space.role
+    const canInvite = role === "admin" || role === "owner"
 
     const status = (
         <div style={{ color: "var(--color-secondary)" }}>
@@ -82,7 +87,7 @@ const AccountAndSpaceView = observer(() => {
                     <Button as={Link} to="/account/settings">
                         Account settings
                     </Button>
-                    <Button onClick={() => store.logout()}>Log Out</Button>
+                    <Button onClick={() => store.logout()}>Log out</Button>
                 </ButtonsGrid>
             </Col>
             <Col gap={16}>
@@ -92,7 +97,8 @@ const AccountAndSpaceView = observer(() => {
                     <Col>
                         <div>{space.space.name}</div>
                         <div style={{ opacity: ".6" }}>
-                            {space.space.membersCount} member &ndash; {roleText}
+                            {space.space.membersCount} member &ndash;{" "}
+                            {roleMap[role]}
                         </div>
                     </Col>
                 </Row>
@@ -100,14 +106,18 @@ const AccountAndSpaceView = observer(() => {
                     <Button as={Link} to="/space/members">
                         Members
                     </Button>
-                    <Button as={Link} to="/space/invite">
-                        Invite
-                    </Button>
-                    <Button>Space settings</Button>
-                    {isOwner ? (
-                        <Button onClick={() => deleteModal.open()}>
-                            Delete space
+                    {canInvite && (
+                        <Button as={Link} to="/space/invite">
+                            Invite
                         </Button>
+                    )}
+                    {role === "owner" ? (
+                        <>
+                            <Button>Space settings</Button>
+                            <Button onClick={() => deleteModal.open()}>
+                                Delete space
+                            </Button>
+                        </>
                     ) : (
                         <Button onClick={() => leaveModal.open()}>
                             Leave space

@@ -55,6 +55,7 @@ const Select = (props: SelectProps) => {
             matchWidth
             autoSelectFirstItem={false}
             maxHeight={240}
+            placement={{ padding: 8 }}
         >
             {(ref, { open }) => (
                 <Row
@@ -62,7 +63,8 @@ const Select = (props: SelectProps) => {
                         height: 60,
                         border: "2px solid #999",
                         padding: "0 8px",
-                        alignSelf: "normal"
+                        alignSelf: "normal",
+                        boxSizing: "border-box"
                     }}
                     align="center"
                     ref={ref}
@@ -70,7 +72,7 @@ const Select = (props: SelectProps) => {
                     gap={8}
                 >
                     <div style={{ flexGrow: 1 }}>
-                        {value ? (
+                        {selectedOption ? (
                             selectedOption.label
                         ) : (
                             <div style={{ color: "#999" }}>{placeholder}</div>
@@ -114,10 +116,10 @@ const InviteMemberView = observer(() => {
 
     return (
         <Container title="Invite member" onClose={() => navigate("/")}>
-            <Col gap={8} style={{ alignSelf: "stretch" }}>
+            <Col gap={8} style={{ alignSelf: "stretch" }} align="normal">
                 Username
                 <Input
-                    style={{ width: 400 }}
+                    style={{ maxWidth: 400 }}
                     autoFocus
                     value={name}
                     onChange={setName}

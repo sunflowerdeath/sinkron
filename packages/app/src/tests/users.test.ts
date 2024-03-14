@@ -4,7 +4,7 @@ import cookie from "@fastify/cookie"
 import { Sinkron } from "sinkron"
 import { App } from "../app"
 
-describe.only("Users", () => {
+describe("Users", () => {
     let app: App
     beforeEach(async () => {
         const sinkron = new Sinkron({ dbPath: ":memory: " })
