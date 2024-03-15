@@ -17,6 +17,7 @@ import SpaceMembersView from "./SpaceMembersView"
 import SwitchSpaceView from "./SwitchSpaceView"
 import AccountAndSpaceView from "./AccountAndSpaceView"
 import InviteMemberView from "./InviteMemberView"
+import NotificationsView from "./NotificationsView"
 import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
 
 const AccountSettingsView = observer(() => {
@@ -34,41 +35,6 @@ const AccountSettingsView = observer(() => {
     )
 })
 
-const NotificationsView = observer(() => {
-    const [location, navigate] = useLocation()
-    const store = useStore()
-    // No notifications
-    return (
-        <Container title="Notifications" onClose={() => navigate("/")}>
-            <Col gap={32}>
-                <Col gap={8}>
-                    <div style={{ color: "#999" }}>Today, 18:57</div>
-                    User @sunflowerdeath invites you to join space "Food" with a
-                    role "Admin".
-                    <Row gap={8}>
-                        <Button>Decline</Button>
-                        <Button>Accept</Button>
-                    </Row>
-                </Col>
-                <Col gap={8}>
-                    <div style={{ color: "#999" }}>Today, 18:57</div>
-                    You invited user @sunflowerdeath to space "Food" with a role
-                    "Admin"
-                    <Row gap={8}>
-                        <Button>Cancel invite</Button>
-                        <Button>Edit invite</Button>
-                    </Row>
-                </Col>
-                <Col gap={8}>
-                    <div style={{ color: "#999" }}>Today, 18:57</div>
-                    User @sunflowerdeath accepted your invite to join space
-                    "Food".
-                    <Button>Hide</Button>
-                </Col>
-            </Col>
-        </Container>
-    )
-})
 
 const SpaceView = observer(() => {
     const store = useStore()

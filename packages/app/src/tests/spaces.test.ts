@@ -39,7 +39,7 @@ describe("Spaces", () => {
         headers = { Cookie: cookie.serialize("token", tokenRes.value.token) }
     })
 
-    it("create space", async () => {
+    it("create, delete", async () => {
         const res = await app.fastify.inject({
             method: "POST",
             url: "/spaces/new",

@@ -3,9 +3,6 @@ import { Col, Row } from "oriente"
 import { Link, useLocation } from "wouter"
 
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
-import arrowDownSvg from "@material-design-icons/svg/outlined/expand_more.svg"
-import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
-import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 
 import { Menu, MenuItem } from "../ui/menu"
 import { Button } from "../ui/button"
@@ -49,6 +46,7 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
             </MenuItem>
         </>
     )
+
     return (
         <>
             <Row align="center" gap={8} style={{ alignSelf: "stretch" }}>
@@ -57,10 +55,7 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                     kind="transparent"
                     onClick={() => onSelect(category.id)}
                 >
-                    <Row gap={8}>
-                        <div>{category.name}</div>
-                        <div style={{ color: "#999" }}>{category.count}</div>
-                    </Row>
+                    {category.name}
                 </Button>
                 <Menu
                     menu={menu}
@@ -100,6 +95,7 @@ const CategoryList = (props: CategoryListProps) => {
         <Col style={{ alignSelf: "stretch" }} gap={8}>
             {categories.map((c) => (
                 <CategoryListItem
+                    key={c.id}
                     category={c}
                     onSelect={onSelect}
                     onDelete={onDelete}

@@ -37,21 +37,16 @@ describe("Invites", () => {
         user = await createUser(app, "user")
     })
 
-    it.only("send invite", async () => {
+    it("send invite", async () => {
         const ownerHeaders = await getAuthHeaders(app, owner.id)
-        // const userHeaders = await getAuthHeaders(app, user.id)
-
+        const userHeaders = await getAuthHeaders(app, user.id)
         const spaceId = owner.spaces[0].id
 
         const res1 = await app.fastify.inject({
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: {
-                toName: "not found",
-                spaceId,
-                role: "readonly"
-            }
+            payload: { toName: "ERROR", spaceId, role: "readonly" }
         })
         assert(res1.statusCode !== 200, "user not found")
 
@@ -59,11 +54,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: {
-                toName: "owner",
-                spaceId,
-                role: "readonly"
-            }
+            payload: { toName: "owner", spaceId, role: "readonly" }
         })
         assert(res2.statusCode !== 200, "already member")
 
@@ -71,71 +62,98 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: {
-                toName: "user",
-                spaceId,
-                role: "editor"
-            }
+            payload: { toName: "user", spaceId, role: "editor" }
         })
         assert.strictEqual(res3.statusCode, 200, "send invite")
+        const invite = JSON.parse(res3.payload)
+
+        const res4 = await app.fastify.inject({
+            method: "GET",
+            url: "/notifications",
+            headers: userHeaders
+        })
+        assert.strictEqual(res4.statusCode, 200, "notifications")
+        const notifications = JSON.parse(res4.payload)
+        assert(
+            Array.isArray(notifications.invites) &&
+                notifications.invites.length === 1,
+            "notifications"
+        )
+        assert.strictEqual(
+            notifications.invites[0].id,
+            invite.id,
+            "notification"
+        )
     })
 
-    /*
     it("cancel", async () => {
-        const c = app!.controller
+        const ownerHeaders = await getAuthHeaders(app, owner.id)
+        const spaceId = owner.spaces[0].id
 
-        const res = await c.invites.create({
-            fromId: ownerId,
-            toId: invitedId,
-            spaceId: spaceId,
-            role: "readonly"
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/invites/new",
+            headers: ownerHeaders,
+            payload: { toName: "user", spaceId, role: "editor" }
         })
-        assert(res.isOk)
-        const invite = res.value
+        assert.strictEqual(res.statusCode, 200, "send invite")
+        const invite = JSON.parse(res.payload)
 
-        const res2 = await c.invites.cancel(invite.id)
-        assert(res2.isOk)
-        assert(res2.value.status === "cancelled")
+        const res2 = await app.fastify.inject({
+            method: "POST",
+            url: `/invites/${invite.id}/cancel`,
+            headers: ownerHeaders
+        })
+        assert.strictEqual(res2.statusCode, 200, "cancel")
+        const cancelledInvite = JSON.parse(res2.payload)
+        assert.strictEqual(cancelledInvite.status, "cancelled", "cancelled")
     })
 
     it("decline", async () => {
-        const c = app!.controller
+        const ownerHeaders = await getAuthHeaders(app, owner.id)
+        const userHeaders = await getAuthHeaders(app, user.id)
+        const spaceId = owner.spaces[0].id
 
-        const res = await c.invites.create({
-            fromId: ownerId,
-            toId: invitedId,
-            spaceId: spaceId,
-            role: "readonly"
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/invites/new",
+            headers: ownerHeaders,
+            payload: { toName: "user", spaceId, role: "editor" }
         })
-        assert(res.isOk)
-        const invite = res.value
+        assert.strictEqual(res.statusCode, 200, "send invite")
+        const invite = JSON.parse(res.payload)
 
-        const res2 = await c.invites.decline(invite.id)
-        assert(res2.isOk)
-        assert(res2.value.status === "declined")
+        const res2 = await app.fastify.inject({
+            method: "POST",
+            url: `/invites/${invite.id}/decline`,
+            headers: userHeaders
+        })
+        assert.strictEqual(res2.statusCode, 200, "decline")
+        const declinedInvite = JSON.parse(res2.payload)
+        assert.strictEqual(declinedInvite.status, "declined", "declined")
     })
 
     it("accept", async () => {
-        const c = app!.controller
+        const ownerHeaders = await getAuthHeaders(app, owner.id)
+        const userHeaders = await getAuthHeaders(app, user.id)
+        const spaceId = owner.spaces[0].id
 
-        const res = await c.invites.create({
-            fromId: ownerId,
-            toId: invitedId,
-            spaceId: spaceId,
-            role: "readonly"
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/invites/new",
+            headers: ownerHeaders,
+            payload: { toName: "user", spaceId, role: "editor" }
         })
-        assert(res.isOk)
-        const invite = res.value
+        assert.strictEqual(res.statusCode, 200, "send invite")
+        const invite = JSON.parse(res.payload)
 
-        const res2 = await c.invites.accept(invite.id)
-        assert(res2.isOk)
-        const accepted = res2.value
-        assert(accepted.status === "accepted")
-
-        const res3 = await c.spaces.getMembers(spaceId)
-        assert(res3.isOk)
-        const user = res3.value.find((u) => u.id === invitedId)
-        assert(user !== undefined)
+        const res2 = await app.fastify.inject({
+            method: "POST",
+            url: `/invites/${invite.id}/accept`,
+            headers: userHeaders
+        })
+        assert.strictEqual(res2.statusCode, 200, "accept")
+        const declinedInvite = JSON.parse(res2.payload)
+        assert.strictEqual(declinedInvite.status, "accepted", "accepted")
     })
-    */
 })

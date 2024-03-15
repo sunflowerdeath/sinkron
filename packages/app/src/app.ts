@@ -987,12 +987,13 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.get("/notifications", async (request, reply) => {
         await app.transaction(async (models) => {
-            const activeInvites =
+            const invites =
                 await app.services.invites.getUserActiveInvites(
                     models,
                     request.token.userId
                 )
-            reply.send(activeInvites)
+            const res = { invites }
+            reply.send(res)
         })
     })
 

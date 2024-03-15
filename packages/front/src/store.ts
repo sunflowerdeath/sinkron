@@ -215,6 +215,21 @@ class Store {
             this.spaceId = spaceId
         }
     }
+
+    fetchNotifications() {
+        return fromPromise(
+            fetchApi({ method: "GET", url: `${env.apiUrl}/notifications` })
+        )
+    }
+
+    inviteAction(id: string, action: "accept" | "decline" | "cancel" | "hide") {
+        return fromPromise(
+            fetchApi({
+                method: "POST",
+                url: `${env.apiUrl}/invites/${id}/${action}`
+            })
+        )
+    }
 }
 
 const makeInitialDocument = () => ({

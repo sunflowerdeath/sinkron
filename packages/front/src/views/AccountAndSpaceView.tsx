@@ -16,7 +16,7 @@ const statusMap = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",
     [ConnectionStatus.Connected]: "Connecting...",
     [ConnectionStatus.Sync]: "Receiving changes...",
-    [ConnectionStatus.Ready]: "Connected"
+    [ConnectionStatus.Ready]: "Connected to server"
 }
 
 const roleMap = {
@@ -71,7 +71,7 @@ const AccountAndSpaceView = observer(() => {
 
     const status = (
         <div style={{ color: "var(--color-secondary)" }}>
-            Connection: {statusMap[space.collection.status]}
+            {statusMap[space.collection.status]}
         </div>
     )
 

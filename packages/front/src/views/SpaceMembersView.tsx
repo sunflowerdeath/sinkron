@@ -89,44 +89,15 @@ const SpaceMembersView = observer(() => {
                 </Button>
             )}
             <ActionStateView state={fetchMembersState}>
-                {(result) => (
+                {(members) => (
                     <Col gap={8} style={{ alignSelf: "stretch" }}>
-                        {result.value.map((m) => (
+                        {members.map((m) => (
                             <SpaceMemberListItem
                                 member={m}
                                 currentUserRole={role}
                                 currentUserId={store.user.id}
                             />
                         ))}
-                        <Row
-                            gap={8}
-                            style={{ alignSelf: "stretch" }}
-                            align="center"
-                        >
-                            <Avatar name="Usernamelonglonglong" />
-                            <Col style={{ flexGrow: 1 }}>
-                                <div>Sunflowerdeath (You)</div>
-                                <div style={{ opacity: ".6" }}>Owner</div>
-                            </Col>
-                        </Row>
-                        <Row
-                            gap={8}
-                            style={{ alignSelf: "stretch" }}
-                            align="center"
-                        >
-                            <Avatar name="Usernamelonglonglong" />
-                            <Col style={{ flexGrow: 1 }}>
-                                <div>Usernamelonglonglong</div>
-                                <div
-                                    style={{ color: "var(--color-secondary)" }}
-                                >
-                                    Invited to join as admin
-                                </div>
-                            </Col>
-                            <Button>
-                                <Icon svg={expandMoreSvg} />
-                            </Button>
-                        </Row>
                         <Row
                             gap={8}
                             style={{ alignSelf: "stretch" }}
