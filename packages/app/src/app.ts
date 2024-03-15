@@ -2,7 +2,7 @@ import { createServer } from "http"
 import type { IncomingMessage } from "http"
 import Fastify, { FastifyInstance } from "fastify"
 import fastifyCookie from "@fastify/cookie"
-import { DataSource, Raw, In, Or, Equal, Repository } from "typeorm"
+import { DataSource, Raw, In, Or, Equal, Not, Repository } from "typeorm"
 import { Sinkron, SinkronServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
@@ -474,7 +474,7 @@ const inviteFindOptions = {
         from: { id: true, name: true },
         to: { id: true, name: true },
         space: { id: true, name: true },
-        notificationHidden: true
+        isHidden: true
     },
     relations: { from: true, to: true, space: true }
 }
@@ -520,7 +520,7 @@ class InviteService {
                 {
                     fromId: userId,
                     status: Or(Equal("accepted"), Equal("declined")),
-                    notificationHidden: false
+                    isHidden: false
                 }
             ],
             ...inviteFindOptions
@@ -585,7 +585,7 @@ class InviteService {
             spaceId,
             role,
             status: "sent" as InviteStatus,
-            notificationHidden: false
+            isHidden: false
         }
         const res = await models.invites.insert(data)
         const invite = { ...data, ...res.generatedMaps[0] } as Invite
@@ -737,6 +737,22 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 return
             }
             await app.services.spaces.delete(models, id)
+            reply.send({})
+        })
+    })
+
+    fastify.post("/spaces/:id/leave", async (request, reply) => {
+        const { id } = request.params
+        await app.transaction(async (models) => {
+            const res = await models.members.delete({
+                spaceId: id,
+                userId: request.token.userId,
+                role: Not(Equal("owner"))
+            })
+            if (res.affected === 0) {
+                reply.code(500).send({ error: { message: "Invalid request" } })
+                return
+            }
             reply.send({})
         })
     })
@@ -951,7 +967,28 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 
     fastify.post("/invites/:id/hide", async (request, reply) => {
-        // TODO
+        const id = request.params.id
+        await app.transaction(async (models) => {
+            const updateRes = await models.invites.update(
+                {
+                    id,
+                    status: Or(Equal("accepted"), Equal("declined")),
+                    fromId: request.token.userId
+                },
+                { isHidden: true }
+            )
+            if (updateRes.affected === 0) {
+                reply.code(500).send({ error: { message: "Invite not found" } })
+                return
+            }
+
+            const inviteRes = await app.services.invites.get(models, id)
+            if (!inviteRes.isOk) {
+                reply.code(500).send()
+                return
+            }
+            reply.send(inviteRes.value)
+        })
     })
 }
 
@@ -987,11 +1024,10 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.get("/notifications", async (request, reply) => {
         await app.transaction(async (models) => {
-            const invites =
-                await app.services.invites.getUserActiveInvites(
-                    models,
-                    request.token.userId
-                )
+            const invites = await app.services.invites.getUserActiveInvites(
+                models,
+                request.token.userId
+            )
             const res = { invites }
             reply.send(res)
         })

@@ -131,6 +131,7 @@ class AuthStore {
     logout() {
         console.log("Logout")
         localStorage.removeItem("user")
+        this.store?.dispose()
         this.store = undefined
         history.pushState({}, "", "/")
     }
@@ -214,6 +215,17 @@ class Store {
         if (this.spaceId !== spaceId) {
             this.spaceId = spaceId
         }
+    }
+
+    async leaveSpace() {
+        if (!this.spaceId) return
+        await fetchApi({
+            method: "POST",
+            url: `${env.apiUrl}/spaces/${this.spaceId}/leave`
+        })
+        const idx = this.user.spaces.findIndex((s) => s.id === this.spaceId)
+        this.user.spaces.splice(idx, 1)
+        this.spaceId = this.user.spaces[0].id
     }
 
     fetchNotifications() {

@@ -35,7 +35,6 @@ const AccountSettingsView = observer(() => {
     )
 })
 
-
 const SpaceView = observer(() => {
     const store = useStore()
     const isMobile = useMedia("(max-width: 1023px)")
