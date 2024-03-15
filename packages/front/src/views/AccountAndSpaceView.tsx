@@ -37,7 +37,6 @@ const AccountAndSpaceView = observer(() => {
     const toast = useToast()
 
     const [leaveState, setLeaveState] = useState()
-
     const leave = () => {
         const state = fromPromise(store.leaveSpace())
         const name = space.space.name
@@ -45,7 +44,7 @@ const AccountAndSpaceView = observer(() => {
         state
             .then(() => {
                 toast.show({
-                    children: <Toast>You have left space "{name}"</Toast>
+                    children: <Toast>You have left the space "{name}"</Toast>
                 })
                 navigate("/")
             })
@@ -62,11 +61,12 @@ const AccountAndSpaceView = observer(() => {
 
     const leaveModal = useModal({
         Component: Modal,
-        width: 440,
+        width: 400,
         isCentered: true,
         children: (close) => {
             return (
-                <Col gap={32}>
+                <Col gap={16}>
+                    <Heading>Leave space</Heading>
                     Are you sure you want to leave space "{space.space.name}"?
                     <ButtonsGrid>
                         <Button onClick={close}>Cancel</Button>

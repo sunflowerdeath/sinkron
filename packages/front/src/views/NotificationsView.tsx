@@ -13,7 +13,7 @@ import { useToast, Toast } from "../ui/toast"
 
 type InviteStatus = "sent" | "cancelled" | "accepted" | "declined" | "rejected"
 
-type SpaceRole = "owner" | "admin" | "editor" | "read-only"
+type SpaceRole = "owner" | "admin" | "editor" | "readonly"
 
 type Invite = {
     id: string
@@ -37,6 +37,8 @@ const initialActionState = <T = object,>(): ActionState<T> =>
 const InviteListItem = observer((props: InviteListItemProps) => {
     const { invite, onRemoveFromList } = props
 
+    const [location, navigate] = useLocation()
+
     const toast = useToast()
     const store = useStore()
 
@@ -51,8 +53,19 @@ const InviteListItem = observer((props: InviteListItemProps) => {
                 } else if (action === "decline") {
                     toast.show({ children: <Toast>Invite declined</Toast> })
                 } else if (action === "accept") {
-                    toast.show({ children: <Toast>Invite accepted</Toast> })
-                    // TODO go to space
+                    toast.show({
+                        children: (
+                            <Toast>
+                                You have joined the space "{invite.space.name}"
+                            </Toast>
+                        )
+                    })
+                    store.user.spaces.push({
+                        ...invite.space,
+                        role: invite.role
+                    })
+                    store.changeSpace(invite.space.id)
+                    navigate("/")
                 }
                 onRemoveFromList()
             })
@@ -72,14 +85,14 @@ const InviteListItem = observer((props: InviteListItemProps) => {
         if (invite.status === "sent") {
             content = (
                 <>
-                    You invited user @{invite.to.name} to join space "
-                    {invite.space.name}" with a role {invite.role}
+                    You invited @{invite.to.name} to join space "
+                    {invite.space.name}" with a role {invite.role}.
                     <ButtonsGrid>
                         <Button
                             onClick={() => runAction("cancel")}
                             isDisabled={actionState.state === "pending"}
                         >
-                            Cancel
+                            Cancel invite
                         </Button>
                     </ButtonsGrid>
                 </>
@@ -88,7 +101,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
             const text = invite.status === "accepted" ? "accepted" : "declined"
             content = (
                 <>
-                    User @{invite.to.name} {text} your invite to join space "
+                    @{invite.to.name} {text} your invite to join space "
                     {invite.space.name}" with a role {invite.role}.
                     <Button onClick={() => runAction("hide")}>Hide</Button>
                 </>
@@ -98,14 +111,14 @@ const InviteListItem = observer((props: InviteListItemProps) => {
         // invite.to === store.user.id
         content = (
             <>
-                User @{invite.from.name} invites you to join space "
+                @{invite.from.name} invites you to join space "
                 {invite.space.name}" with a role {invite.role}.
-                <Row gap={8}>
+                <ButtonsGrid>
                     <Button onClick={() => runAction("decline")}>
                         Decline
                     </Button>
                     <Button onClick={() => runAction("accept")}>Accept</Button>
-                </Row>
+                </ButtonsGrid>
             </>
         )
     }

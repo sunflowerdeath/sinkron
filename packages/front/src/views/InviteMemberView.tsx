@@ -112,7 +112,13 @@ const InviteMemberView = observer(() => {
         state
             .then(() => {
                 navigate("/")
-                toast.show({ children: <Toast>Invite sent</Toast> })
+                toast.show({
+                    children: (
+                        <Toast>
+                            You have sent an invite to the user @{name}
+                        </Toast>
+                    )
+                })
             })
             .catch(() => {})
     }
