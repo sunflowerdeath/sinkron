@@ -1140,6 +1140,9 @@ class App {
             }
         })
 
+        fastify.get("/", (request, reply) => {
+            reply.send("Sinkron API")
+        })
         fastify.register(fastifyCookie)
         fastify.register(loginRoutes(this))
         fastify.register(appRoutes(this))
