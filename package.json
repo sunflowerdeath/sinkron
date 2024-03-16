@@ -4,7 +4,7 @@
     "description": "",
     "scripts": {
         "build-app": "pnpm --F=sinkron-app... build",
-        "start-app": "cd packages/app && SINKRON_DB_PATH=./temp pnpm start",
+        "start-app": "cd packages/app && pnpm migrate && pnpm start",
         "build-front": "pnpm --F=sinkron-front... build",
         "test": "pnpm -r run test"
     },
