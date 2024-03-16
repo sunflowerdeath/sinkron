@@ -52,7 +52,7 @@ export type Invite = {
     createdAt: Date
     updatedAt: Date
     status: InviteStatus
-    notificationHidden: boolean
+    isHidden: boolean
 }
 
 const UserEntity = new EntitySchema<User>({
@@ -122,7 +122,7 @@ const InviteEntity = new EntitySchema<Invite>({
         createdAt: { type: Date, createDate: true },
         updatedAt: { type: Date, updateDate: true },
         status: { type: String },
-        notificationHidden: { type: Boolean }
+        isHidden: { type: Boolean }
     },
     relations: {
         space: { type: "many-to-one", target: "space" },
