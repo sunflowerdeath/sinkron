@@ -47,7 +47,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
         const state = store.inviteAction(invite.id, action)
         setActionState(state)
         state
-            .then(() => {
+            .then((invite: Invite) => {
                 if (action === "cancel") {
                     toast.show({ children: <Toast>Invite cancelled</Toast> })
                 } else if (action === "decline") {
@@ -103,7 +103,9 @@ const InviteListItem = observer((props: InviteListItemProps) => {
                 <>
                     @{invite.to.name} {text} your invite to join space "
                     {invite.space.name}" with a role {invite.role}.
-                    <Button onClick={() => runAction("hide")}>Hide</Button>
+                    <ButtonsGrid>
+                        <Button onClick={() => runAction("hide")}>Hide</Button>
+                    </ButtonsGrid>
                 </>
             )
         }
@@ -138,7 +140,16 @@ type InviteListProps = {
 const InviteList = observer((props: InviteListProps) => {
     const invites = useLocalObservable(() => props.invites)
 
-    if (invites.length == 0) return "You have no notifications"
+    if (invites.length == 0) {
+        return (
+            <Col
+                align="center"
+                style={{ paddingTop: 16, color: "var(--color-secondary)" }}
+            >
+                No notifications
+            </Col>
+        )
+    }
 
     return (
         <Col gap={32}>

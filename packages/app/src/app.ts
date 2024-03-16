@@ -7,8 +7,8 @@ import { Sinkron, SinkronServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 
-import { entities } from "./entities"
 import { Result, ResultType } from "./utils/result"
+import db from "./db"
 import {
     User,
     AuthToken,
@@ -595,7 +595,6 @@ class InviteService {
 
 type AppProps = {
     sinkron: Sinkron
-    dbPath: string
     host?: string
     port?: number
 }
@@ -900,6 +899,10 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             }
             const invite = inviteRes.value
 
+            invite.space.membersCount = await models.members.countBy({
+                spaceId: invite.spaceId
+            })
+
             await app.services.spaces.addMember(models, {
                 userId: invite.to.id,
                 spaceId: invite.space.id,
@@ -1055,17 +1058,18 @@ class App {
     services: Services
 
     constructor(props: AppProps) {
-        const { sinkron, host, port, dbPath } = { ...defaultAppProps, ...props }
+        const { sinkron, host, port } = { ...defaultAppProps, ...props }
         this.host = host
         this.port = port
 
-        this.db = new DataSource({
-            type: "better-sqlite3",
-            database: dbPath,
-            entities,
-            synchronize: true,
-            logging: ["error"]
-        })
+        this.db = db
+
+        this.services = {
+            users: new UserService(this),
+            auth: new AuthService(this),
+            spaces: new SpaceService(this),
+            invites: new InviteService(this)
+        }
 
         this.models = {
             users: this.db.getRepository<User>("user"),
@@ -1073,13 +1077,6 @@ class App {
             spaces: this.db.getRepository<Space>("space"),
             members: this.db.getRepository<SpaceMember>("space_member"),
             invites: this.db.getRepository<Invite>("invite")
-        }
-
-        this.services = {
-            users: new UserService(this),
-            auth: new AuthService(this),
-            spaces: new SpaceService(this),
-            invites: new InviteService(this)
         }
 
         this.sinkron = sinkron

@@ -1,17 +1,17 @@
-import { observer } from 'mobx-react-lite'
-import { useLocation, useRoute, Link } from 'wouter'
-import { Col, Row } from 'oriente'
+import { observer } from "mobx-react-lite"
+import { useLocation, useRoute, Link } from "wouter"
+import { Col, Row } from "oriente"
 
-import notificationsSvg from '@material-design-icons/svg/outlined/notifications.svg'
-import addSvg from '@material-design-icons/svg/outlined/add.svg'
-import syncSvg from '@material-design-icons/svg/outlined/sync.svg'
-import arrowCategoryBackSvg from '@material-design-icons/svg/outlined/subdirectory_arrow_left.svg'
+import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
+import addSvg from "@material-design-icons/svg/outlined/add.svg"
+import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
+import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
-import { Avatar } from '../ui/avatar'
-import { Button } from '../ui/button'
-import { Icon } from '../ui/icon'
-import { useStore, useSpace, DocumentListItemData } from '../store'
-import { ItemState } from 'sinkron-client'
+import { Avatar } from "../ui/avatar"
+import { Button } from "../ui/button"
+import { Icon } from "../ui/icon"
+import { useStore, useSpace, DocumentListItemData } from "../store"
+import { ItemState } from "sinkron-client"
 
 interface DocumentListItemProps {
     data: DocumentListItemData
@@ -27,15 +27,15 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
             style={{
                 height: 60,
                 padding: 8,
-                borderBottom: '2px solid #555',
-                background: isSelected ? '#555' : 'transparent',
+                borderBottom: "2px solid #555",
+                background: isSelected ? "#555" : "transparent",
                 gap: 12,
-                cursor: 'pointer'
+                cursor: "pointer"
             }}
             onClick={onSelect}
             align="center"
         >
-            <Col gap={4} style={{ flexGrow: 1, overflow: 'hidden' }}>
+            <Col gap={4} style={{ flexGrow: 1, overflow: "hidden" }}>
                 <div>
                     {data.title ?? (
                         <span style={{ opacity: 0.5 }}>Empty document</span>
@@ -44,11 +44,11 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
                 {data.subtitle && (
                     <div
                         style={{
-                            opacity: '.5',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            maxWidth: '100%'
+                            opacity: ".5",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            maxWidth: "100%"
                         }}
                     >
                         {data.subtitle}
@@ -67,7 +67,7 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
 const DocumentList = observer(() => {
     const space = useSpace()
     const [location, navigate] = useLocation()
-    const [match, params] = useRoute('/documents/:id')
+    const [match, params] = useRoute("/documents/:id")
     const selectedId = match ? params.id : undefined
 
     let content
@@ -80,22 +80,9 @@ const DocumentList = observer(() => {
                 onSelect={() => navigate(`/documents/${item.id}`)}
             />
         ))
-    } else {
-        content = (
-            <div
-                style={{
-                    opacity: 0.5,
-                    padding: '24px 8px',
-                    display: 'flex',
-                    justifyContent: 'center'
-                }}
-            >
-                No documents
-            </div>
-        )
     }
 
-    return <div style={{ flexGrow: 1, overflow: 'auto' }}>{content}</div>
+    return <div style={{ flexGrow: 1, overflow: "auto" }}>{content}</div>
 })
 
 const DocumentListView = observer(() => {
@@ -120,16 +107,16 @@ const DocumentListView = observer(() => {
                 >
                     <Icon
                         svg={arrowCategoryBackSvg}
-                        style={{ transform: 'rotate(90deg)' }}
+                        style={{ transform: "rotate(90deg)" }}
                     />
                 </Button>
             )}
             <Button
-                style={{ flexGrow: 1, justifyContent: 'start' }}
+                style={{ flexGrow: 1, justifyContent: "start" }}
                 as={Link}
                 to="/categories"
             >
-                {space.category?.name || 'All documents'}
+                {space.category?.name || "All documents"}
             </Button>
             <Button onClick={createDocument}>
                 <Icon svg={addSvg} />
@@ -140,7 +127,7 @@ const DocumentListView = observer(() => {
     const bottomBar = (
         <Row gap={8}>
             <Button
-                style={{ justifyContent: 'start', flexGrow: 1 }}
+                style={{ justifyContent: "start", flexGrow: 1 }}
                 as={Link}
                 to="/account"
             >
@@ -156,7 +143,7 @@ const DocumentListView = observer(() => {
     )
 
     return (
-        <Col style={{ alignItems: 'stretch', height: '100dvh' }} gap={8}>
+        <Col style={{ alignItems: "stretch", height: "100dvh" }} gap={8}>
             {topBar}
             <DocumentList />
             {bottomBar}

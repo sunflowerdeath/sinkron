@@ -3,16 +3,13 @@ import { Sinkron } from "sinkron"
 import { App } from "./app"
 
 const run = async () => {
-    const dbPath = process.env.SINKRON_DB_PATH
-
-    const sinkronDbPath =
-        dbPath === undefined ? ":memory:" : path.join(dbPath, "sinkron.sqlite")
+    const sinkronDbPath = process.env.SINKRON_DB_PATH
+        ? path.join(process.env.SINKRON_DB_PATH, "sinkron.sqlite")
+        : path.join(__dirname, "../temp/sinkron.sqlite")
     const sinkron = new Sinkron({ dbPath: sinkronDbPath })
     await sinkron.init()
 
-    const paperDbPath =
-        dbPath === undefined ? ":memory:" : path.join(dbPath, "paper.sqlite")
-    const app = new App({ sinkron, dbPath: paperDbPath })
+    const app = new App({ sinkron })
     await app.init()
 
     let user

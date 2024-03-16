@@ -12,4 +12,5 @@ RUN pnpm run build-app
 WORKDIR /app/packages/app
 EXPOSE 80
 ENV SINKRON_DB_PATH="/app/mount"
+RUN pnpm run migrate
 CMD ["pnpm", "start"]
