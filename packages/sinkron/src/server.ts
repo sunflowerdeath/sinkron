@@ -1,6 +1,6 @@
-import Ajv, { JSONSchemaType } from 'ajv'
-import { WebSocketServer, WebSocket } from 'ws'
-import pino from 'pino'
+import Ajv, { JSONSchemaType } from "ajv"
+import { WebSocketServer, WebSocket } from "ws"
+import pino from "pino"
 
 import { Document } from "./entities"
 import { Sinkron, RequestError } from "./core"
@@ -18,51 +18,52 @@ import {
     ErrorMessage,
     DocMessage,
     ClientMessage
-} from './protocol'
+} from "./protocol"
+import { MessageQueue, WsMessage } from "./messageQueue"
 
 const syncMessageSchema = {
-    type: 'object',
+    type: "object",
     properties: {
-        kind: { const: 'sync' },
+        kind: { const: "sync" },
         // token: { type: 'string' },
-        col: { type: 'string' },
-        colrev: { type: 'integer' }
+        col: { type: "string" },
+        colrev: { type: "integer" }
     },
-    required: ['kind', 'col'],
+    required: ["kind", "col"],
     additionalProperties: false
 }
 
 const changeMessageSchema = {
-    type: 'object',
+    type: "object",
     properties: {
-        kind: { const: 'change' },
-        col: { type: 'string' },
-        id: { type: 'string' },
-        changeid: { type: 'string' },
-        op: { type: 'string' },
+        kind: { const: "change" },
+        col: { type: "string" },
+        id: { type: "string" },
+        changeid: { type: "string" },
+        op: { type: "string" },
         data: {
             oneOf: [
-                { type: 'string' },
-                { type: 'array', items: { type: 'string' } }
+                { type: "string" },
+                { type: "array", items: { type: "string" } }
             ]
         }
     },
-    required: ['kind', 'col', 'id', 'changeid', 'op'],
+    required: ["kind", "col", "id", "changeid", "op"],
     additionalProperties: false,
     oneOf: [
         {
             properties: {
                 op: { const: Op.Create },
-                data: { type: 'string' }
+                data: { type: "string" }
             },
-            required: ['data']
+            required: ["data"]
         },
         {
             properties: {
                 op: { const: Op.Modify },
-                data: { type: 'array', items: { type: 'string' } }
+                data: { type: "array", items: { type: "string" } }
             },
-            required: ['data']
+            required: ["data"]
         },
         {
             properties: {
@@ -84,39 +85,7 @@ const createValidator = () => {
 
 const validateMessage = createValidator()
 
-type MessageQueueCallback<T> = (msg: T) => Promise<void>
-
-class SequentialMessageQueue<T> {
-    constructor(callback: MessageQueueCallback<T>) {
-        this.callback = callback
-    }
-
-    messages: T[] = []
-    callback: (msg: T) => Promise<void>
-    isRunning = false
-
-    push(msg: T) {
-        this.messages.push(msg)
-        if (this.isRunning) return
-        this.isRunning = true
-        this.processMessage()
-    }
-
-    async processMessage() {
-        const msg = this.messages.shift()
-        if (msg === undefined) {
-            this.isRunning = false
-            return
-        }
-        await this.callback(msg)
-        this.processMessage()
-    }
-}
-
-
 const serializeDate = (d: Date) => d.toISOString()
-
-type WsMessage = [WebSocket, Buffer]
 
 const clientDisconnectTimeout = 10000
 
@@ -127,7 +96,7 @@ interface SinkronServerOptions {
 }
 
 const defaultServerOptions = {
-    host: '127.0.0.1',
+    host: "127.0.0.1",
     port: 8080
 }
 
@@ -139,70 +108,68 @@ class SinkronServer {
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
 
     logger: ReturnType<typeof pino>
-    messageQueue: SequentialMessageQueue<WsMessage>
+    messageQueue: MessageQueue
 
     constructor(options: SinkronServerOptions) {
         this.logger = pino({
-            transport: { target: 'pino-pretty' }
+            transport: { target: "pino-pretty" }
         })
-        this.logger.level = 'debug'
+        this.logger.level = "debug"
 
         const { sinkron, host, port } = { ...defaultServerOptions, ...options }
         this.sinkron = sinkron
 
-        this.messageQueue = new SequentialMessageQueue<WsMessage>(
-            async (msg: WsMessage) => {
-                try {
-                    await this.handleMessage(msg)
-                } catch (e) {
-                    this.logger.error(
-                        'Unhandled exception while handling message, %o',
-                        e
-                    )
-                }
+        this.messageQueue = new MessageQueue(async (msg: WsMessage) => {
+            try {
+                await this.handleMessage(msg)
+            } catch (e) {
+                this.logger.error(
+                    "Unhandled exception while handling message, %o",
+                    e
+                )
             }
-        )
+        })
 
         this.ws = new WebSocketServer({ noServer: true })
-        this.ws.on('connection', this.onConnect.bind(this))
+        this.ws.on("connection", this.onConnect.bind(this))
     }
 
     async onConnect(ws: WebSocket) {
-        this.logger.debug('Client connected')
+        this.logger.debug("Client connected")
         this.clients.set(ws, { subscriptions: new Set() })
         setTimeout(() => {
             const client = this.clients.get(ws)
             if (client === undefined) return
             if (client.subscriptions.size === 0) ws.close()
         }, clientDisconnectTimeout)
-        ws.on('message', (msg: Buffer) => this.messageQueue.push([ws, msg]))
-        ws.on('close', () => this.onDisconnect(ws))
+        ws.on("message", (msg: Buffer) => this.messageQueue.push([ws, msg]))
+        ws.on("close", () => this.onDisconnect(ws))
     }
 
     async handleMessage([ws, msg]: WsMessage) {
-        const str = msg.toString('utf-8')
+        const str = msg.toString("utf-8")
 
         let parsed: ClientMessage
         try {
             parsed = JSON.parse(str.toString())
         } catch (e) {
-            this.logger.debug('Invalid JSON in message')
+            this.logger.debug("Invalid JSON in message")
             return
         }
 
-        this.logger.trace('Message recieved: %o', parsed)
+        this.logger.trace("Message recieved: %o", parsed)
 
         const isValid = validateMessage(parsed)
         if (!isValid) {
             // TODO react something
             this.logger.debug(
-                'Invalid message schema: %o',
+                "Invalid message schema: %o",
                 validateMessage.errors
             )
             return
         }
 
-        if (parsed.kind === 'sync') {
+        if (parsed.kind === "sync") {
             await this.handleSyncMessage(ws, parsed)
         } else {
             // parsed.kind === "change"
@@ -220,7 +187,7 @@ class SinkronServer {
         const result = await this.sinkron.syncCollection(col, colrev)
         if (!result.isOk) {
             const errorMsg: SyncErrorMessage = {
-                kind: 'sync_error',
+                kind: "sync_error",
                 col,
                 code: result.error.code
             }
@@ -230,11 +197,11 @@ class SinkronServer {
 
         result.value.documents.forEach((doc) => {
             const msg: DocMessage = {
-                kind: 'doc',
+                kind: "doc",
                 col,
                 id: doc.id,
                 // @ts-ignore
-                data: doc.data ? doc.data.toString('base64') : null,
+                data: doc.data ? doc.data.toString("base64") : null,
                 createdAt: serializeDate(doc.createdAt),
                 updatedAt: serializeDate(doc.updatedAt)
             }
@@ -242,14 +209,14 @@ class SinkronServer {
         })
 
         const syncCompleteMsg = {
-            kind: 'sync_complete',
+            kind: "sync_complete",
             col,
             colrev: result.value.colrev
         }
         ws.send(JSON.stringify(syncCompleteMsg))
 
         this.addSubscriber(msg.col, ws)
-        this.logger.debug('Client subscribed to collection %s', msg.col)
+        this.logger.debug("Client subscribed to collection %s", msg.col)
     }
 
     async handleChangeMessage(msg: ChangeMessage, client: WebSocket) {
@@ -268,13 +235,13 @@ class SinkronServer {
         }
         if (!res.isOk) {
             this.logger.debug(
-                'Failed to apply change, id: %s, error: %s, %s',
+                "Failed to apply change, id: %s, error: %s, %s",
                 msg.id,
                 res.error.code,
                 res.error.details
             )
             const errorMsg: ErrorMessage = {
-                kind: 'error',
+                kind: "error",
                 id: msg.id,
                 changeid: msg.changeid,
                 code: res.error.code
@@ -283,7 +250,7 @@ class SinkronServer {
             return
         }
         const doc = res.value
-        this.logger.debug('Change applied, id: %s, op: %s', msg.id, msg.op)
+        this.logger.debug("Change applied, id: %s, op: %s", msg.id, msg.op)
 
         const collection = this.collections.get(col)
         if (collection) {
@@ -304,7 +271,7 @@ class SinkronServer {
         return await this.sinkron.createDocument(
             id!,
             col,
-            Buffer.from(data, 'base64')
+            Buffer.from(data, "base64")
         )
     }
 
@@ -312,13 +279,13 @@ class SinkronServer {
         const { id, col, data } = msg
         const doc = await this.sinkron.updateDocument(
             id,
-            data.map((c) => Buffer.from(c, 'base64'))
+            data.map((c) => Buffer.from(c, "base64"))
         )
         return doc
     }
 
     onDisconnect(ws: WebSocket) {
-        this.logger.debug('Client disconnected')
+        this.logger.debug("Client disconnected")
         const client = this.clients.get(ws)
         if (client) {
             client.subscriptions.forEach((col) => {

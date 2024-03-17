@@ -28,6 +28,12 @@ const LoginView = observer((props: LoginViewProps) => {
         setAuthState(fromPromise(state))
     }
 
+    const onKeyPress = (event) => {
+        if (event.key === "Enter") {
+            if (isValid) auth()
+        }
+    }
+
     return (
         <Col
             align="normal"
@@ -61,6 +67,7 @@ const LoginView = observer((props: LoginViewProps) => {
                     value={password}
                     onChange={setPassword}
                     style={{ width: "100%" }}
+                    onKeyPress={onKeyPress}
                 />
             </Col>
             <Button

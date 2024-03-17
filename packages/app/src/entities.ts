@@ -6,6 +6,7 @@ export type User = {
     isDisabled: boolean
     name: string
     password: string
+    hasUnreadNotifications: boolean
 }
 
 export type AuthToken = {
@@ -62,7 +63,8 @@ const UserEntity = new EntitySchema<User>({
         createdAt: { type: Date, createDate: true },
         isDisabled: { type: Boolean },
         name: { type: String, unique: true },
-        password: { type: String }
+        password: { type: String },
+        hasUnreadNotifications: { type: Boolean }
     }
 })
 

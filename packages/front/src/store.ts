@@ -15,8 +15,8 @@ import {
     Item,
     ItemState,
     WebsocketTransport,
-    IndexedDbCollectionStore
-    // ConnectionStatus
+    IndexedDbCollectionStore,
+    ChannelClient
 } from "sinkron-client"
 import { compareDesc } from "date-fns"
 
@@ -44,6 +44,7 @@ export interface User {
     id: string
     name: string
     spaces: Space[]
+    hasUnreadNotifications: boolean
 }
 
 export type Credentials = { name: string; password: string }
@@ -148,6 +149,7 @@ class Store {
     user: User
     spaceId?: string = undefined
     space?: SpaceStore = undefined
+    channel: ChannelClient
 
     constructor(props: StoreProps) {
         const { user, authStore, spaceId } = props
@@ -168,10 +170,22 @@ class Store {
             },
             { fireImmediately: true }
         )
+
+        const token = Cookies.get("token")
+        this.channel = new ChannelClient({
+            url: `${env.wsUrl}/channels/${token}`,
+            channel: `users/${user.id}`,
+            handler: (msg) => {
+                if (msg === "notification") {
+                    this.user.hasUnreadNotifications = true
+                }
+            }
+        })
     }
 
     dispose() {
         this.space?.dispose()
+        this.channel.dispose()
     }
 
     async fetchUser() {
@@ -229,6 +243,7 @@ class Store {
     }
 
     fetchNotifications() {
+        this.user.hasUnreadNotifications = false
         return fromPromise(
             fetchApi({ method: "GET", url: `${env.apiUrl}/notifications` })
         )
@@ -273,8 +288,7 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const store = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
-        console.log("TOKEN", token)
-        const transport = new WebsocketTransport(`${env.wsUrl}/${token}`)
+        const transport = new WebsocketTransport(`${env.wsUrl}/sinkron/${token}`)
         this.collection = new Collection<Document>({
             transport,
             col,

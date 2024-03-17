@@ -654,4 +654,29 @@ class Collection<T extends object> {
     }
 }
 
-export { Collection, WebsocketTransport, IndexedDbCollectionStore }
+export interface ChannelClientProps {
+    url: string
+    channel: string
+    handler: (msg: string) => void
+}
+
+class ChannelClient {
+    transport: Transport
+    dispose: () => void
+    constructor(props: ChannelClientProps) {
+        const { url, channel, handler } = props
+        this.transport = new WebsocketTransport(url)
+        this.transport.emitter.on("open", () => {
+            this.transport.send(`subscribe:${channel}`)
+        })
+        this.transport.emitter.on("message", handler)
+        this.dispose = autoReconnect(this.transport)
+    }
+}
+
+export {
+    Collection,
+    WebsocketTransport,
+    IndexedDbCollectionStore,
+    ChannelClient
+}

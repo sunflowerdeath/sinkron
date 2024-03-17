@@ -3,7 +3,7 @@ import type { IncomingMessage } from "http"
 import Fastify, { FastifyInstance } from "fastify"
 import fastifyCookie from "@fastify/cookie"
 import { DataSource, Raw, In, Or, Equal, Not, Repository } from "typeorm"
-import { Sinkron, SinkronServer } from "sinkron"
+import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 
@@ -57,6 +57,7 @@ type Profile = {
     id: string
     name: string
     spaces: { id: string; role: string }[]
+    hasUnreadNotifications: boolean
 }
 
 const validateUsername = (name: string) => name.match(/^[a-z0-9_]+$/i) !== null
@@ -92,7 +93,12 @@ class UserService {
             })
         }
 
-        const data = { name, password, isDisabled: false }
+        const data = {
+            name,
+            password,
+            isDisabled: false,
+            hasUnreadNotifications: false
+        }
         const res = await models.users.insert(data)
         const user = {
             name,
@@ -107,6 +113,15 @@ class UserService {
         if (!res2.isOk) return res2
 
         return Result.ok(user)
+    }
+
+    async setUnreadNotifications(
+        models: Models,
+        id: string,
+        value: boolean = true
+    ) {
+        await models.users.update({ id }, { hasUnreadNotifications: value })
+        if (value) this.app.channels.send(`users/${id}`, "notification")
     }
 
     async delete(
@@ -139,7 +154,7 @@ class UserService {
     ): Promise<ResultType<Profile, RequestError>> {
         const user = await models.users.findOne({
             where: { id: userId, isDisabled: false },
-            select: { id: true, name: true }
+            select: { id: true, name: true, hasUnreadNotifications: true }
         })
         if (user === null) {
             return Result.err({
@@ -835,6 +850,10 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 reply.code(500).send({ error: res.error })
                 return
             }
+            await app.services.users.setUnreadNotifications(
+                models,
+                res.value.toId
+            )
             reply.send(res.value)
         })
     })
@@ -1032,6 +1051,11 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 request.token.userId
             )
             const res = { invites }
+            app.services.users.setUnreadNotifications(
+                models,
+                request.token.userId,
+                false
+            )
             reply.send(res)
         })
     })
@@ -1050,6 +1074,7 @@ type Services = {
 class App {
     sinkron: Sinkron
     sinkronServer: SinkronServer
+    channels: ChannelServer
     fastify: FastifyInstance
     host: string
     port: number
@@ -1082,6 +1107,8 @@ class App {
         this.sinkron = sinkron
         this.sinkronServer = new SinkronServer({ sinkron })
 
+        this.channels = new ChannelServer({})
+
         this.fastify = this.createFastify()
     }
 
@@ -1103,17 +1130,52 @@ class App {
     }
 
     async handleUpgrade(request: IncomingMessage, socket, head) {
-        const token = request.url!.slice(1)
-        const res = await this.services.auth.verifyAuthToken(this.models, token)
-        if (res.isOk && res.value !== null) {
-            this.sinkronServer.ws.handleUpgrade(request, socket, head, (ws) => {
-                this.sinkronServer.ws.emit("connection", ws, request)
-            })
-        } else {
-            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
-            socket.destroy()
-            return
+        const matchSinkron = request.url!.match(/^\/sinkron\/(.+)$/)
+        if (matchSinkron) {
+            const token = matchSinkron[1]
+            const res = await this.services.auth.verifyAuthToken(
+                this.models,
+                token
+            )
+            if (res.isOk && res.value !== null) {
+                this.sinkronServer.ws.handleUpgrade(
+                    request,
+                    socket,
+                    head,
+                    (ws) => {
+                        this.sinkronServer.ws.emit("connection", ws, request)
+                    }
+                )
+                return
+            } else {
+                socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
+                socket.destroy()
+                return
+            }
         }
+
+        const matchChannels = request.url!.match(/^\/channels\/(.+)$/)
+        if (matchChannels) {
+            const token = matchChannels[1]
+            const res = await this.services.auth.verifyAuthToken(
+                this.models,
+                token
+            )
+            if (res.isOk && res.value !== null) {
+                this.channels.ws.handleUpgrade(request, socket, head, (ws) => {
+                    this.channels.ws.emit("connection", ws, request)
+                })
+                return
+            } else {
+                socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
+                socket.destroy()
+                return
+            }
+        }
+
+        socket.write("HTTP/1.1 404 Not Found\r\n\r\n")
+        socket.destroy()
+        return
     }
 
     createFastify() {
@@ -1137,6 +1199,7 @@ class App {
                 reply.status(500).send({
                     error: { message: "Internal server error" }
                 })
+                console.log(error)
             }
         })
 

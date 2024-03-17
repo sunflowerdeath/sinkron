@@ -1,20 +1,10 @@
-/// <reference types="node" />
-import { WebSocketServer, WebSocket } from 'ws';
-import pino from 'pino';
+import { WebSocketServer, WebSocket } from "ws";
+import pino from "pino";
 import { Document } from "./entities";
 import { Sinkron, RequestError } from "./core";
 import { ResultType } from "./result";
-import { SyncMessage, ChangeMessage, ModifyMessage, CreateMessage } from './protocol';
-type MessageQueueCallback<T> = (msg: T) => Promise<void>;
-declare class SequentialMessageQueue<T> {
-    constructor(callback: MessageQueueCallback<T>);
-    messages: T[];
-    callback: (msg: T) => Promise<void>;
-    isRunning: boolean;
-    push(msg: T): void;
-    processMessage(): Promise<void>;
-}
-type WsMessage = [WebSocket, Buffer];
+import { SyncMessage, ChangeMessage, ModifyMessage, CreateMessage } from "./protocol";
+import { MessageQueue, WsMessage } from "./messageQueue";
 interface SinkronServerOptions {
     sinkron: Sinkron;
     host?: string;
@@ -30,7 +20,7 @@ declare class SinkronServer {
         subscribers: Set<WebSocket>;
     }>;
     logger: ReturnType<typeof pino>;
-    messageQueue: SequentialMessageQueue<WsMessage>;
+    messageQueue: MessageQueue;
     constructor(options: SinkronServerOptions);
     onConnect(ws: WebSocket): Promise<void>;
     handleMessage([ws, msg]: WsMessage): Promise<void>;

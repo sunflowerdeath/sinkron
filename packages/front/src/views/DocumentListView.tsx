@@ -86,6 +86,7 @@ const DocumentList = observer(() => {
 })
 
 const DocumentListView = observer(() => {
+    const store = useStore()
     const space = useSpace()
     const [location, navigate] = useLocation()
 
@@ -124,6 +125,20 @@ const DocumentListView = observer(() => {
         </Row>
     )
 
+    const unreadMarker = store.user.hasUnreadNotifications && (
+        <div
+            style={{
+                width: 12,
+                height: 12,
+                background: "var(--color-error)",
+                position: "absolute",
+                left: 36,
+                top: 8,
+                borderRadius: "50%"
+            }}
+        />
+    )
+
     const bottomBar = (
         <Row gap={8}>
             <Button
@@ -136,8 +151,13 @@ const DocumentListView = observer(() => {
                     <div style={{ flexGrow: 1 }}>{space.space.name}</div>
                 </Row>
             </Button>
-            <Button as={Link} to="/notifications">
+            <Button
+                as={Link}
+                to="/notifications"
+                style={{ position: "relative" }}
+            >
                 <Icon svg={notificationsSvg} />
+                {unreadMarker}
             </Button>
         </Row>
     )

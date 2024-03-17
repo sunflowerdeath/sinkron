@@ -111,4 +111,14 @@ declare class Collection<T extends object> {
     change(id: string, callback: ChangeFn<T>): void;
     delete(id: string): void;
 }
-export { Collection, WebsocketTransport, IndexedDbCollectionStore };
+export interface ChannelClientProps {
+    url: string;
+    channel: string;
+    handler: (msg: string) => void;
+}
+declare class ChannelClient {
+    transport: Transport;
+    dispose: () => void;
+    constructor(props: ChannelClientProps);
+}
+export { Collection, WebsocketTransport, IndexedDbCollectionStore, ChannelClient };

@@ -85,7 +85,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
         if (invite.status === "sent") {
             content = (
                 <>
-                    You invited @{invite.to.name} to join space "
+                    You invited user @{invite.to.name} to join space "
                     {invite.space.name}" with a role {invite.role}.
                     <ButtonsGrid>
                         <Button
@@ -101,7 +101,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
             const text = invite.status === "accepted" ? "accepted" : "declined"
             content = (
                 <>
-                    @{invite.to.name} {text} your invite to join space "
+                    User @{invite.to.name} {text} your invite to join space "
                     {invite.space.name}" with a role {invite.role}.
                     <ButtonsGrid>
                         <Button onClick={() => runAction("hide")}>Hide</Button>
@@ -113,7 +113,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
         // invite.to === store.user.id
         content = (
             <>
-                @{invite.from.name} invites you to join space "
+                User @{invite.from.name} invites you to join space "
                 {invite.space.name}" with a role {invite.role}.
                 <ButtonsGrid>
                     <Button onClick={() => runAction("decline")}>
