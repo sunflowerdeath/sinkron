@@ -1,9 +1,9 @@
-import { Row } from 'oriente'
+import { Row } from "oriente"
 
-import closeSvg from '@material-design-icons/svg/outlined/close.svg'
+import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 
-import { Button } from '../ui/button'
-import { Icon } from '../ui/icon'
+import { Button } from "../ui/button"
+import { Icon } from "../ui/icon"
 
 interface CategoriesListProps {
     items: { id: string; name: string }[]
@@ -18,10 +18,22 @@ const CategoriesList = (props: CategoriesListProps) => {
             {items.map((item) => (
                 <Row
                     align="center"
-                    style={{ background: '#444' }}
+                    style={{ background: "#444" }}
                     key={item.id}
                 >
-                    <div style={{ padding: '0 8px' }}>{item.name}</div>
+                    <div
+                        style={{
+                            paddingLeft: 8,
+                            paddingRight: 4,
+                            boxSizing: "border-box",
+                            maxWidth: 120,
+                            textOverflow: "ellipsis",
+                            overflow: "hidden",
+                            whiteSpace: "nowrap"
+                        }}
+                    >
+                        {item.name}
+                    </div>
                     <Button
                         kind="transparent"
                         size="s"

@@ -1031,11 +1031,9 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/profile", async (request, reply) => {
+        const userId = request.token.userId
         await app.transaction(async (models) => {
-            const res = await app.services.users.getProfile(
-                models,
-                request.token.userId
-            )
+            const res = await app.services.users.getProfile(models, userId)
             if (!res.isOk) {
                 reply.code(500).send({ error: { message: "Server error" } })
                 return
@@ -1045,17 +1043,14 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/notifications", async (request, reply) => {
+        const userId = request.token.userId
         await app.transaction(async (models) => {
             const invites = await app.services.invites.getUserActiveInvites(
                 models,
-                request.token.userId
+                userId
             )
             const res = { invites }
-            app.services.users.setUnreadNotifications(
-                models,
-                request.token.userId,
-                false
-            )
+            app.services.users.setUnreadNotifications(models, userId, false)
             reply.send(res)
         })
     })

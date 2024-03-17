@@ -25,10 +25,11 @@ const renderItems = (props: CategorySelectProps) => {
                 key={c.id}
                 onSelect={() => onChange(c.id)}
                 isDisabled={disabledItems.includes(c.id)}
+                style={{ whiteSpace: "nowrap", overflow: "hidden" }}
             >
                 {c.name}
             </MenuItem>
-            {c.children && (
+            {c.children.length > 0 && (
                 <div style={{ paddingLeft: 30 }}>
                     {renderItems({ ...props, categoryTree: c.children })}
                 </div>
@@ -62,6 +63,8 @@ const CategorySelect = (props: CategorySelectProps) => {
             matchWidth
             autoSelectFirstItem={false}
             maxHeight={240}
+            placement={{ padding: 8 }}
+            styles={{ list: { overflowX: "hidden" } }}
         >
             {(ref, { open }) => (
                 <Row
@@ -76,7 +79,14 @@ const CategorySelect = (props: CategorySelectProps) => {
                     onClick={open}
                     gap={8}
                 >
-                    <div style={{ flexGrow: 1 }}>
+                    <div
+                        style={{
+                            flexGrow: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap"
+                        }}
+                    >
                         {value ? (
                             categoryMap[value].name
                         ) : (

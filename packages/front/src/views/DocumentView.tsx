@@ -1,25 +1,25 @@
-import { useState, useCallback, useMemo } from 'react'
-import { observer } from 'mobx-react-lite'
-import { useLocation, Redirect, Link } from 'wouter'
-import { useMedia } from 'react-use'
-import { createEditor, Node, Transforms } from 'slate'
-import { withReact, ReactEditor, Slate, Editable } from 'slate-react'
-import { Col, Row } from 'oriente'
-import { without } from 'lodash-es'
+import { useState, useCallback, useMemo } from "react"
+import { observer } from "mobx-react-lite"
+import { useLocation, Redirect, Link } from "wouter"
+import { useMedia } from "react-use"
+import { createEditor, Node, Transforms } from "slate"
+import { withReact, ReactEditor, Slate, Editable } from "slate-react"
+import { Col, Row } from "oriente"
+import { without } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 
-import expandLessSvg from '@material-design-icons/svg/outlined/expand_less.svg'
-import arrowBackSvg from '@material-design-icons/svg/outlined/arrow_back.svg'
-import moreHorizSvg from '@material-design-icons/svg/outlined/more_horiz.svg'
+import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
+import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
+import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
-import { useSpace, Document } from '../store'
-import { fromAutomerge, applySlateOps } from '../slate'
+import { useSpace, Document } from "../store"
+import { fromAutomerge, applySlateOps } from "../slate"
 
-import SelectCategoriesView from '../views/SelectCategoriesView'
-import CategoriesList from '../components/CategoriesList'
-import { Button } from '../ui/button'
-import { Icon } from '../ui/icon'
-import { Menu, MenuItem } from '../ui/menu'
+import SelectCategoriesView from "../views/SelectCategoriesView"
+import CategoriesList from "../components/CategoriesList"
+import { Button } from "../ui/button"
+import { Icon } from "../ui/icon"
+import { Menu, MenuItem } from "../ui/menu"
 
 const useForceUpdate = () => {
     const [state, setState] = useState({})
@@ -31,9 +31,9 @@ const useForceUpdate = () => {
 
 const renderElement = (props) => {
     switch (props.element.type) {
-        case 'paragraph':
+        case "paragraph":
             return <p {...props.attributes}>{props.children}</p>
-        case 'title':
+        case "title":
             return (
                 <div
                     style={{ fontSize: 24, marginBottom: 30, fontWeight: 650 }}
@@ -69,18 +69,18 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
             for (const [child, childPath] of Node.children(editor, path)) {
                 const index = childPath[0]
                 if (index === 0) {
-                    if (child.type !== 'title') {
+                    if (child.type !== "title") {
                         Transforms.setNodes(
                             editor,
-                            { type: 'title' },
+                            { type: "title" },
                             { at: childPath }
                         )
                     }
                 } else {
-                    if (child.type === 'title') {
+                    if (child.type === "title") {
                         Transforms.setNodes(
                             editor,
-                            { type: 'paragraph' },
+                            { type: "paragraph" },
                             { at: childPath }
                         )
                     }
@@ -100,17 +100,19 @@ interface EditorViewProps {
 const EditorView = observer((props: EditorViewProps) => {
     const { doc, onChange } = props
 
-    const isMobile = useMedia('(max-width: 1023px)')
+    const isMobile = useMedia("(max-width: 1023px)")
 
     const [location, navigate] = useLocation()
     const forceUpdate = useForceUpdate()
 
-    const editor = useMemo(() => createDocumentEditor(
-            (hz) => {
+    const editor = useMemo(
+        () =>
+            createDocumentEditor((hz) => {
                 // console.log("onchange", operation)
                 // onChange?.(editor)
-            }
-    ), [])
+            }),
+        []
+    )
     const value = useMemo(
         () => (fromAutomerge(doc.content) as any).children,
         [doc]
@@ -130,7 +132,6 @@ const EditorView = observer((props: EditorViewProps) => {
                     onChange?.(editor)
                     editor.operations.fired = true
                 }
-                
             }}
         >
             <Editable
@@ -138,9 +139,9 @@ const EditorView = observer((props: EditorViewProps) => {
                 style={{
                     padding: isMobile ? 10 : 40,
                     paddingTop: 20,
-                    outline: 'none',
+                    outline: "none",
                     flexGrow: 1,
-                    overflow: 'auto'
+                    overflow: "auto"
                 }}
                 autoFocus
                 placeholder="Empty document"
@@ -150,11 +151,11 @@ const EditorView = observer((props: EditorViewProps) => {
                             {...attributes}
                             style={{
                                 opacity: 0.4,
-                                position: 'absolute',
+                                position: "absolute",
                                 top: 20,
                                 left: isMobile ? 10 : 40,
-                                pointerEvents: 'none',
-                                userSelect: 'none'
+                                pointerEvents: "none",
+                                userSelect: "none"
                             }}
                         >
                             {children}
@@ -175,7 +176,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
 
     const space = useSpace()
     const [location, navigate] = useLocation()
-    const isMobile = useMedia('(max-width: 1023px)')
+    const isMobile = useMedia("(max-width: 1023px)")
 
     const item = space.collection.items.get(id)
     if (item === undefined || item.local === null) {
@@ -186,7 +187,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
 
     const onChange = (editor: ReactEditor) => {
         const ops = editor.operations.filter(
-            (op) => op.type !== 'set_selection'
+            (op) => op.type !== "set_selection"
         )
         if (ops.length > 0) {
             console.log(ops)
@@ -198,7 +199,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
 
     const onDelete = () => {
         space.collection.delete(id)
-        navigate('/')
+        navigate("/")
     }
 
     const menu = () => {
@@ -209,7 +210,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     <div>Created: 1 sep 10:27</div>
                     <div>Last modified: 1 sep 10:27</div>
                 </Col>
-                <div style={{ alignSelf: 'stretch' }}>
+                <div style={{ alignSelf: "stretch" }}>
                     <MenuItem>Share</MenuItem>
                     <MenuItem>Copy to another space</MenuItem>
                     <MenuItem>Publish</MenuItem>
@@ -222,17 +223,19 @@ const DocumentView = observer((props: DocumentViewProps) => {
     let categoriesList
     if (doc.categories.length > 0) {
         categoriesList = (
-            <Row gap={8} align="center">
-                <CategoriesList
-                    items={doc.categories.map(
-                        (id) => space.meta.categories[id]!
-                    )}
-                    onRemove={(c) => {
-                        space.collection.change(id, (doc) => {
-                            doc.categories = without(doc.categories, c)
-                        })
-                    }}
-                />
+            <Row gap={8} align="center" style={{ width: "100%" }}>
+                <div style={{ overflow: "scroll" }}>
+                    <CategoriesList
+                        items={doc.categories.map(
+                            (id) => space.meta.categories[id]!
+                        )}
+                        onRemove={(c) => {
+                            space.collection.change(id, (doc) => {
+                                doc.categories = without(doc.categories, c)
+                            })
+                        }}
+                    />
+                </div>
                 <Button size="s" onClick={() => setShowSelect(true)}>
                     <Icon svg={expandLessSvg} />
                 </Button>
@@ -252,12 +255,12 @@ const DocumentView = observer((props: DocumentViewProps) => {
         selectCategories = (
             <div
                 style={{
-                    position: 'absolute',
+                    position: "absolute",
                     top: 0,
                     left: 0,
-                    height: '100dvh',
-                    width: isMobile ? '100%' : 480,
-                    background: '#333'
+                    height: "100dvh",
+                    width: isMobile ? "100%" : 480,
+                    background: "#333"
                 }}
             >
                 <SelectCategoriesView
@@ -278,7 +281,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
     const menuButton = (
         <Menu
             menu={menu}
-            styles={{ list: { background: '#555' } }}
+            styles={{ list: { background: "#555" } }}
             placement={{ padding: 0, offset: 8, align: "end" }}
             autoSelectFirstItem={false}
         >
@@ -299,7 +302,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
             {menuButton}
         </Row>
     ) : (
-        <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 1 }}>
+        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}>
             {menuButton}
         </div>
     )
@@ -307,17 +310,23 @@ const DocumentView = observer((props: DocumentViewProps) => {
     return (
         <div
             style={{
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100dvh'
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                height: "100dvh"
             }}
         >
             {top}
             <EditorView doc={item.local} onChange={onChange} />
             {selectCategories}
             <Row
-                style={{ height: 60, padding: isMobile ? '0 10px' : '0 40px' }}
+                style={{
+                    height: 60,
+                    flexShrink: 0,
+                    padding: isMobile ? "0 10px" : "0 40px",
+                    boxSizing: "border-box",
+                    overflow: "scroll"
+                }}
                 align="center"
             >
                 {categoriesList}

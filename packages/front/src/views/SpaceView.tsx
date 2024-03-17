@@ -97,17 +97,20 @@ const SpaceView = observer(() => {
     } else {
         return (
             <SpaceContext.Provider value={store.space!}>
-                <div style={{ display: "flex", height: "100vh" }}>
+                <div
+                    style={{ display: "flex", height: "100vh", width: "100%" }}
+                >
                     <div
                         style={{
                             width: 400,
                             borderRight: "2px solid #555",
-                            height: "100%"
+                            height: "100%",
+                            flexShrink: 0
                         }}
                     >
                         <DocumentListView />
                     </div>
-                    <div style={{ flexGrow: 1 }}>
+                    <div style={{ flexGrow: 1, overflow: "hidden" }}>
                         <Switch>{routes}</Switch>
                     </div>
                 </div>

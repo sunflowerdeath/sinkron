@@ -28,10 +28,20 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
     const isSelected = value.includes(category.id)
     return (
         <Col gap={8} style={{ alignSelf: "stretch" }}>
-            <Row align="center" style={{ alignSelf: "stretch" }} gap={8}>
+            <Row
+                align="center"
+                style={{ alignSelf: "stretch", overflow: "hidden" }}
+                gap={8}
+            >
                 <Button
                     kind="transparent"
-                    style={{ flexGrow: 1, justifyContent: "start", gap: 8 }}
+                    style={{
+                        flexGrow: 1,
+                        justifyContent: "start",
+                        gap: 8,
+                        overflow: "hidden",
+                        flexShrink: 1
+                    }}
                     onClick={() => {
                         const nextValue = isSelected
                             ? without(value, category.id)
@@ -40,7 +50,16 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
                     }}
                 >
                     <Icon svg={isSelected ? checkBoxSvg : checkBoxOutlineSvg} />
-                    <div style={{ flexGrow: 1 }}>{category.name}</div>
+                    <div
+                        style={{
+                            flexGrow: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap"
+                        }}
+                    >
+                        {category.name}
+                    </div>
                 </Button>
             </Row>
             <div style={{ marginLeft: 32, alignSelf: "stretch" }}>
@@ -107,17 +126,23 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
         )
 
     return (
-        <Container title="Select categories" onClose={onClose}>
+        <Container
+            title="Select categories"
+            onClose={onClose}
+            styles={{ content: { paddingBottom: 0 } }}
+        >
             <Button as={Link} to="/categories">
                 Manage categories
             </Button>
-            <div style={{ flexGrow: 1, paddingBottom: 60 }}>{treeElem}</div>
+            <div style={{ flexGrow: 1, paddingBottom: 20 }}>{treeElem}</div>
             <div
                 style={{
-                    position: "fixed",
+                    position: "sticky",
                     bottom: 0,
                     width: "100%",
-                    background: "var(--color-background)"
+                    background: "var(--color-background)",
+                    flexShrink: 0,
+                    overflow: "scroll"
                 }}
             >
                 <CategoriesList

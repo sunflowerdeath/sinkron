@@ -51,11 +51,24 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
         <>
             <Row align="center" gap={8} style={{ alignSelf: "stretch" }}>
                 <Button
-                    style={{ flexGrow: 1, justifyContent: "start" }}
+                    style={{
+                        flexGrow: 1,
+                        justifyContent: "start",
+                        flexShrink: 1,
+                        overflow: "hidden"
+                    }}
                     kind="transparent"
                     onClick={() => onSelect(category.id)}
                 >
-                    {category.name}
+                    <div
+                        style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap"
+                        }}
+                    >
+                        {category.name}
+                    </div>
                 </Button>
                 <Menu
                     menu={menu}
@@ -139,7 +152,7 @@ const CategoriesView = observer(() => {
                     >
                         <Row gap={8} align="center">
                             <div>All documents</div>
-                            <div style={{ color: "#999" }}>2</div>
+                            {/*<div style={{ color: "#999" }}>2</div>*/}
                         </Row>
                     </Button>
                     <CategoryList
