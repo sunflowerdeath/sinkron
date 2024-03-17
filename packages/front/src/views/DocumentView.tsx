@@ -202,23 +202,14 @@ const DocumentView = observer((props: DocumentViewProps) => {
         navigate("/")
     }
 
-    const menu = () => {
-        return (
-            <Col gap={20}>
-                <Col style={{ padding: 8 }} gap={8}>
-                    <div>Status: Synchronized</div>
-                    <div>Created: 1 sep 10:27</div>
-                    <div>Last modified: 1 sep 10:27</div>
-                </Col>
-                <div style={{ alignSelf: "stretch" }}>
-                    <MenuItem>Share</MenuItem>
-                    <MenuItem>Copy to another space</MenuItem>
-                    <MenuItem>Publish</MenuItem>
-                    <MenuItem onSelect={onDelete}>Delete</MenuItem>
-                </div>
-            </Col>
-        )
-    }
+    const menu = () => (
+        <>
+            <MenuItem>Share</MenuItem>
+            <MenuItem>Copy to another space</MenuItem>
+            <MenuItem>Publish</MenuItem>
+            <MenuItem onSelect={onDelete}>Delete</MenuItem>
+        </>
+    )
 
     let categoriesList
     if (doc.categories.length > 0) {

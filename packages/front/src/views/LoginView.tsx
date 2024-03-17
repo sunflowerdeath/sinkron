@@ -10,6 +10,8 @@ import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Heading } from "../ui/heading"
 
+import logoUrl from "../logo.png"
+
 interface LoginViewProps {
     store: AuthStore
 }
@@ -42,10 +44,19 @@ const LoginView = observer((props: LoginViewProps) => {
                 height: "100%",
                 width: 320,
                 margin: "auto",
-                paddingTop: 40
+                paddingTop: 36
             }}
             gap={16}
         >
+            <img
+                src={logoUrl}
+                style={{
+                    width: 120,
+                    height: 100,
+                    alignSelf: "center",
+                    marginBottom: 48
+                }}
+            />
             <Heading style={{ alignSelf: "center" }}>Log In</Heading>
 
             {authState.state === "rejected" && (

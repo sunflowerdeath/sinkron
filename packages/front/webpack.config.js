@@ -31,10 +31,21 @@ const rules = [
         test: /\.svg$/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
         use: ["raw-loader"]
+    },
+    {
+        test: /\.png/i,
+        issuer: /\.(js|jsx|ts|tsx)$/,
+        use: ["file-loader"]
     }
 ]
 
-const plugins = [new HtmlWebpackPlugin({ template: "./src/index.html" })]
+const plugins = [
+    new HtmlWebpackPlugin({
+        template: "./src/index.html",
+        favicon: "src/favicon.ico"
+    })
+]
+
 if (process.env.ANALYZE) {
     plugins.push(new BundleAnalyzerPlugin())
 }

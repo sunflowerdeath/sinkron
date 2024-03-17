@@ -17,7 +17,7 @@ const Root = observer(() => {
         return s
     }, [])
 
-    useTitle('Box')
+    useTitle('Sinkron')
 
     return (
         <OrienteProvider>
