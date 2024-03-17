@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { Link } from "wouter"
 import { Col, Row } from "oriente"
 import { without } from "lodash-es"
@@ -6,8 +5,6 @@ import { without } from "lodash-es"
 import { Button } from "../ui/button"
 import { Icon } from "../ui/icon"
 import Container from "../ui/Container"
-import ButtonsGrid from "../ui/ButtonsGrid"
-
 import CategoriesList from "../components/CategoriesList"
 
 import checkBoxSvg from "@material-design-icons/svg/outlined/check_box.svg"
