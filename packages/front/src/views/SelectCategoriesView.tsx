@@ -20,9 +20,10 @@ interface CategoriesTreeItemProps {
 
 const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
     const { category, value, onChange } = props
-    const hasChildren = category.children !== undefined
 
+    const hasChildren = category.children.length > 0
     const isSelected = value.includes(category.id)
+
     return (
         <Col gap={8} style={{ alignSelf: "stretch" }}>
             <Row
@@ -59,15 +60,15 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
                     </div>
                 </Button>
             </Row>
-            <div style={{ marginLeft: 32, alignSelf: "stretch" }}>
-                {hasChildren && (
+            {hasChildren && (
+                <div style={{ marginLeft: 32, alignSelf: "stretch" }}>
                     <CategoriesTree
                         value={value}
                         onChange={onChange}
                         categories={category.children}
                     />
-                )}
-            </div>
+                </div>
+            )}
         </Col>
     )
 }
@@ -131,7 +132,7 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
             <Button as={Link} to="/categories">
                 Manage categories
             </Button>
-            <div style={{ flexGrow: 1, paddingBottom: 20 }}>{treeElem}</div>
+            <div style={{ flexGrow: 1 }}>{treeElem}</div>
             <div
                 style={{
                     position: "sticky",

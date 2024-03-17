@@ -18,19 +18,27 @@ const containerStyles = (
     props: ContainerProps,
     isMobile: boolean
 ): StyleMap => ({
-    root: {
-        maxWidth: 480,
-        borderRight: isMobile ? "none" : "2px solid #555",
-        height: "100%",
-        position: "relative"
-    },
+    root: isMobile
+        ? {
+              position: "relative",
+              minHeight: "100dvh",
+              display: "flex",
+              flexDirection: "column"
+          }
+        : {
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              width: 480,
+              height: "100dvh",
+              borderRight: "2px solid #555",
+              overflow: "scroll"
+          },
     content: {
         padding: isMobile ? "0 10px" : "0 40px",
-        paddingTop: isMobile ? 20 : 80,
-        overflow: "auto",
+        paddingTop: 20,
         paddingBottom: 20,
-        boxSizing: "border-box",
-        height: "100%"
+        flexGrow: 1
     }
 })
 
@@ -41,31 +49,26 @@ const Container = (props: ContainerProps) => {
 
     const styles = useStyles(containerStyles, [props, isMobile])
 
-    const heading = isMobile ? (
-        <Row style={{ height: 60, flexShrink: 0 }} gap={8} align="center">
-            <Button onClick={onClose}>
-                <Icon svg={arrowBackSvg} />
-            </Button>
-            {title && <Heading style={{ flexGrow: 1 }}>{title}</Heading>}
-        </Row>
-    ) : (
+    const heading = (
         <Row
             style={{
                 height: 60,
-                paddingLeft: 40,
-                position: "absolute",
-                top: 0,
-                width: "100%",
-                background: "var(--color-background)",
-                boxSizing: "border-box"
+                paddingLeft: isMobile ? 0 : 40
             }}
             gap={8}
             align="center"
         >
+            {isMobile && (
+                <Button onClick={onClose}>
+                    <Icon svg={arrowBackSvg} />
+                </Button>
+            )}
             {title && <Heading style={{ flexGrow: 1 }}>{title}</Heading>}
-            <Button onClick={onClose}>
-                <Icon svg={closeSvg} />
-            </Button>
+            {!isMobile && (
+                <Button onClick={onClose}>
+                    <Icon svg={closeSvg} />
+                </Button>
+            )}
         </Row>
     )
 

@@ -135,7 +135,7 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
     return (
         <>
             <Col gap={8} style={{ alignSelf: "stretch" }} align="normal">
-                Name:
+                Name
                 <Input
                     style={{ maxWidth: 400 }}
                     value={name}
@@ -143,7 +143,7 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
                 />
             </Col>
             <Col gap={8}>
-                Parent category:
+                Parent category
                 <CategorySelect
                     disabledItems={disabledItems}
                     categoryMap={categoryMap}

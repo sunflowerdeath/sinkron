@@ -103,8 +103,8 @@ const AccountAndSpaceView = observer(() => {
         </div>
     )
 
-    return (
-        <Container title="Account and spaces" onClose={() => navigate("/")}>
+    const content = (
+        <Col gap={16} align="normal" style={{ flexGrow: 1 }}>
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
@@ -161,6 +161,12 @@ const AccountAndSpaceView = observer(() => {
                     Create space
                 </Button>
             </ButtonsGrid>
+        </Col>
+    )
+
+    return (
+        <Container title="Account and spaces" onClose={() => navigate("/")}>
+            {content}
             {status}
             {leaveModal.render()}
             {deleteModal.render()}
