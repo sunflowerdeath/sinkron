@@ -142,12 +142,7 @@ const InviteMemberView = observer(() => {
         <Container title="Invite member" onClose={() => navigate("/")}>
             <Col gap={8} style={{ alignSelf: "stretch" }} align="normal">
                 Username
-                <Input
-                    style={{ maxWidth: 400 }}
-                    autoFocus
-                    value={name}
-                    onChange={setName}
-                />
+                <Input autoFocus value={name} onChange={setName} />
             </Col>
             <Col gap={8} style={{ alignSelf: "stretch" }}>
                 Role

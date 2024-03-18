@@ -538,6 +538,7 @@ class InviteService {
                     isHidden: false
                 }
             ],
+            order: { updatedAt: "desc" },
             ...inviteFindOptions
         })
         return invites

@@ -32,7 +32,6 @@ const roleMap = {
 const AccountAndSpaceView = observer(() => {
     const store = useStore()
     const space = useSpace()
-
     const [location, navigate] = useLocation()
     const toast = useToast()
 

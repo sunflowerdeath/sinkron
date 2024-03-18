@@ -72,7 +72,8 @@ const CategorySelect = (props: CategorySelectProps) => {
                         height: 60,
                         border: "2px solid #999",
                         padding: "0 8px",
-                        alignSelf: "normal"
+                        alignSelf: "normal",
+                        boxSizing: "border-box"
                     }}
                     align="center"
                     ref={ref}
@@ -136,11 +137,7 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
         <>
             <Col gap={8} style={{ alignSelf: "stretch" }} align="normal">
                 Name
-                <Input
-                    style={{ maxWidth: 400 }}
-                    value={name}
-                    onChange={(value) => setName(value)}
-                />
+                <Input value={name} onChange={(value) => setName(value)} />
             </Col>
             <Col gap={8}>
                 Parent category

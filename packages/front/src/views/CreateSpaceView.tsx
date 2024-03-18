@@ -5,15 +5,13 @@ import { FormStore, useShowError } from "shadowform"
 
 import { Col } from "oriente"
 
-import { fetchJson, FetchError } from "../fetchJson"
+import { FetchError } from "../fetchJson"
 import { useStore, Space } from "../store"
 import { Result, ResultType } from "../../utils/result"
 
-import { Heading } from "../ui/heading"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import Container from "../ui/Container"
-import ButtonsGrid from "../ui/ButtonsGrid"
 
 interface InputProps<T = string> {
     value: T
@@ -108,7 +106,11 @@ const CreateSpaceView = observer(() => {
 
     return (
         <Container title="Create space" onClose={() => navigate("/")}>
-            <Field field={form.fields.name} showValidationErrors="onChange">
+            <Field
+                field={form.fields.name}
+                showValidationErrors="onChange"
+                showRequiredError="never"
+            >
                 {({ inputProps, error }) => (
                     <Col gap={8} style={{ alignSelf: "stretch" }}>
                         Name

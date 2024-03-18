@@ -22,6 +22,7 @@ const containerStyles = (
         ? {
               position: "relative",
               minHeight: "100dvh",
+              maxWidth: 480,
               display: "flex",
               flexDirection: "column"
           }
@@ -35,9 +36,7 @@ const containerStyles = (
               overflow: "scroll"
           },
     content: {
-        padding: isMobile ? "0 10px" : "0 40px",
-        paddingTop: 20,
-        paddingBottom: 20,
+        padding: isMobile ? "20px 10px" : "20px 40px",
         flexGrow: 1
     }
 })
@@ -46,7 +45,6 @@ const Container = (props: ContainerProps) => {
     const { children, title, onClose } = props
 
     const isMobile = useMedia("(max-width: 1023px)")
-
     const styles = useStyles(containerStyles, [props, isMobile])
 
     const heading = (

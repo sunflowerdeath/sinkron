@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useMedia } from "react-use"
 import { observer } from "mobx-react-lite"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { Col } from "oriente"
@@ -8,15 +9,17 @@ import { AuthStore } from "../store"
 
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
+import { Icon } from "../ui/icon"
 import { Heading } from "../ui/heading"
 
-import logoUrl from "../logo.png"
+import logoSvg from "../logo.svg"
 
 interface LoginViewProps {
     store: AuthStore
 }
 
 const LoginView = observer((props: LoginViewProps) => {
+    const isMobile = useMedia("(max-width: 1023px)")
     const [login, setLogin] = useState("")
     const [password, setPassword] = useState("")
 
@@ -48,17 +51,17 @@ const LoginView = observer((props: LoginViewProps) => {
             }}
             gap={16}
         >
-            <img
-                src={logoUrl}
+            <Icon
+                svg={logoSvg}
                 style={{
-                    width: 120,
-                    height: 100,
+                    marginBottom: 32,
                     alignSelf: "center",
-                    marginBottom: 48
+                    width: 200,
+                    opacity: 0.5
                 }}
+                fill="var(--color-secondary)"
             />
             <Heading style={{ alignSelf: "center" }}>Log In</Heading>
-
             {authState.state === "rejected" && (
                 <div style={{ color: "var(--color-error)" }}>
                     {authState.value.message}
@@ -86,10 +89,10 @@ const LoginView = observer((props: LoginViewProps) => {
                 onClick={auth}
                 isDisabled={!isValid || authState.state === "pending"}
             >
-                Log In
+                Log in
             </Button>
             <Button kind="transparent" as={Link} to="/signup">
-                Create Account
+                Create account
             </Button>
         </Col>
     )

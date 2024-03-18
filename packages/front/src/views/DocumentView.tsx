@@ -139,9 +139,10 @@ const EditorView = observer((props: EditorViewProps) => {
                 style={{
                     padding: isMobile ? 10 : 40,
                     paddingTop: 20,
+                    paddingBottom: isMobile ? 0 : 60,
                     outline: "none",
-                    flexGrow: 1,
-                    overflow: "auto"
+                    flexGrow: 1
+                    // overflow: "auto"
                 }}
                 autoFocus
                 placeholder="Empty document"
@@ -250,8 +251,9 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     top: 0,
                     left: 0,
                     height: "100dvh",
-                    width: isMobile ? "100%" : 480,
-                    background: "#333"
+                    width: "100%",
+                    background: "var(--color-background)",
+                    overflow: "scroll"
                 }}
             >
                 <SelectCategoriesView
@@ -283,45 +285,64 @@ const DocumentView = observer((props: DocumentViewProps) => {
             )}
         </Menu>
     )
-    const top = isMobile ? (
-        <Row justify="space-between">
-            {isMobile && (
-                <Button as={Link} to="/">
-                    <Icon svg={arrowBackSvg} />
-                </Button>
-            )}
-            {menuButton}
-        </Row>
-    ) : (
-        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}>
-            {menuButton}
-        </div>
-    )
+
+    const editor = <EditorView doc={item.local} onChange={onChange} />
+
+    if (isMobile) {
+        return (
+            <div
+                style={{
+                    height: "100dvh",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "scroll"
+                }}
+            >
+                <Row justify="space-between">
+                    <Button as={Link} to="/">
+                        <Icon svg={arrowBackSvg} />
+                    </Button>
+                    {menuButton}
+                </Row>
+                <div style={{ flexGrow: 1 }}>{editor}</div>
+                <Row
+                    style={{
+                        height: 60,
+                        flexShrink: 0,
+                        padding: "0 10px",
+                        overflow: "auto"
+                    }}
+                    align="center"
+                >
+                    {categoriesList}
+                </Row>
+                {selectCategories}
+            </div>
+        )
+    }
 
     return (
-        <div
-            style={{
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                height: "100dvh"
-            }}
-        >
-            {top}
-            <EditorView doc={item.local} onChange={onChange} />
-            {selectCategories}
+        <div style={{ height: "100dvh", position: "relative" }}>
+            <div style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}>
+                {menuButton}
+            </div>
+            <div style={{ height: "100%", overflow: "scroll" }}>{editor}</div>
             <Row
                 style={{
+                    background: "var(--color-background)",
+                    position: "absolute",
+                    bottom: 0,
+                    width: "100%",
                     height: 60,
-                    flexShrink: 0,
-                    padding: isMobile ? "0 10px" : "0 40px",
+                    padding: "0 40px",
                     boxSizing: "border-box",
-                    overflow: "scroll"
+                    overflow: "auto"
                 }}
                 align="center"
             >
                 {categoriesList}
             </Row>
+            {selectCategories}
         </div>
     )
 })

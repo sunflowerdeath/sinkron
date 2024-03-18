@@ -132,7 +132,7 @@ const DocumentListView = observer(() => {
                 height: 12,
                 background: "var(--color-error)",
                 position: "absolute",
-                left: 36,
+                right: 8,
                 top: 8,
                 borderRadius: "50%"
             }}
