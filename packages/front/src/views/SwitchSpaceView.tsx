@@ -18,11 +18,11 @@ const SwitchSpaceView = observer(() => {
 
     return (
         <Container title="Switch space" onClose={() => navigate("/")}>
-            <Col gap={10}>
+            <Col gap={10} align="normal">
                 {store.user.spaces.map((s) => (
                     <Button
                         onClick={() => select(s)}
-                        style={{ width: 400, justifyContent: "start" }}
+                        style={{ justifyContent: "start" }}
                         key={s.id}
                     >
                         <Row gap={8} align="center">
@@ -37,7 +37,7 @@ const SwitchSpaceView = observer(() => {
                     </Button>
                 ))}
             </Col>
-            <Button as={Link} to="/create-space" style={{ width: 400 }}>
+            <Button as={Link} to="/create-space">
                 Create new space
             </Button>
         </Container>

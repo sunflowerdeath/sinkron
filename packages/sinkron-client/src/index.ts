@@ -438,6 +438,7 @@ class Collection<T extends object> {
         } else if (parsed.kind === "change") {
             this.handleChangeMessage(parsed)
         }
+
         // TODO
         // error
         // sync_error
@@ -473,8 +474,6 @@ class Collection<T extends object> {
             this.handleModifyMessage(msg)
         }
 
-        this.backupQueue.add(id)
-
         this.colrev = colrev!
     }
 
@@ -483,7 +482,7 @@ class Collection<T extends object> {
 
         if (data === null) {
             this.items.delete(id)
-            // this.backupQueue.add(id)
+            this.backupQueue.add(id)
             return
         }
         const doc = Automerge.load<T>(Base64.toUint8Array(data))
@@ -523,7 +522,7 @@ class Collection<T extends object> {
                 this.flushQueue.delete(id)
             }
         }
-        // this.backupQueue.add(id)
+        this.backupQueue.add(id)
     }
 
     handleModifyMessage(msg: ModifyMessage) {
