@@ -140,7 +140,8 @@ type StoredItem<T> = {
 }
 
 export interface CollectionStore<T> {
-    save(id: string, item: Item<T>, colrev: number): void
+    save(id: string, item: Item<T>, colrev: number): Promise<void>
+    delete(id: string, colrev: number): Promise<void>
     load(): Promise<{ items: StoredItem<T>[]; colrev: number }>
 }
 
@@ -170,13 +171,11 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
         const req = indexedDB.open(key)
         req.onsuccess = (event) => {
             this.db = req.result
-            console.log("open", this.db)
             deferred.resolve()
         }
         req.onupgradeneeded = (event) => {
             // @ts-ignore
             const db = event.target.result
-            console.log("upgrade", db)
             db!.createObjectStore("items") // TODO wait until success?
             localStorage.setItem(`stored_collection/${key}`, "-1")
         }
@@ -213,6 +212,17 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
         }
         const deferred = new Deferred<void>()
         const req = store.put(serialized, id)
+        req.onsuccess = () => deferred.resolve()
+        await deferred.promise
+        localStorage.setItem(`stored_collection/${this.key}`, String(colrev))
+    }
+
+    async delete(id: string, colrev: number) {
+        const store = this.db!.transaction("items", "readwrite").objectStore(
+            "items"
+        )
+        const deferred = new Deferred<void>()
+        const req = store.delete(id)
         req.onsuccess = () => deferred.resolve()
         await deferred.promise
         localStorage.setItem(`stored_collection/${this.key}`, String(colrev))
@@ -398,7 +408,7 @@ class Collection<T extends object> {
             if (isChanged) this.flushQueue.add(id)
         })
         console.log(
-            `Loaded collection with ${items.length} items, colrev: ${colrev}`
+            `Loaded from local store ${items.length} items, colrev: ${colrev}`
         )
     }
 
@@ -438,6 +448,7 @@ class Collection<T extends object> {
         this.flush()
         this.status = ConnectionStatus.Ready
         this.initialSyncCompleted = true
+        this.backup()
     }
 
     handleChangeMessage(msg: ChangeMessage) {
@@ -455,13 +466,14 @@ class Collection<T extends object> {
             if (this.items.has(id)) {
                 this.items.delete(id)
                 console.log("Deleted document:", id)
-                // TODO backup
             }
         } else if (op === Op.Create) {
             this.handleDocMessage(msg)
         } else if (op === Op.Modify) {
             this.handleModifyMessage(msg)
         }
+
+        this.backupQueue.add(id)
 
         this.colrev = colrev!
     }
@@ -471,6 +483,7 @@ class Collection<T extends object> {
 
         if (data === null) {
             this.items.delete(id)
+            // this.backupQueue.add(id)
             return
         }
         const doc = Automerge.load<T>(Base64.toUint8Array(data))
@@ -510,7 +523,7 @@ class Collection<T extends object> {
                 this.flushQueue.delete(id)
             }
         }
-        this.backupQueue.add(id)
+        // this.backupQueue.add(id)
     }
 
     handleModifyMessage(msg: ModifyMessage) {
@@ -552,14 +565,18 @@ class Collection<T extends object> {
         this.backupQueue.add(id)
     }
 
-    backup() {
-        // TODO handle delete
-        console.log(`Backup to local store, ${this.backupQueue.size} items`)
-        this.backupQueue.forEach((key) => {
+    async backup() {
+        console.log(
+            `Backup to local store, changed ${this.backupQueue.size} items`
+        )
+        for (const key of this.backupQueue) {
             const item = this.items.get(key)
-            if (!item) return
-            this.store!.save(key, item, this.colrev)
-        })
+            if (item) {
+                await this.store!.save(key, item, this.colrev)
+            } else {
+                await this.store!.delete(key, this.colrev)
+            }
+        }
         this.backupQueue.clear()
     }
 

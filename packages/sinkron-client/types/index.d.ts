@@ -27,7 +27,8 @@ type StoredItem<T> = {
     localUpdatedAt?: Date;
 };
 export interface CollectionStore<T> {
-    save(id: string, item: Item<T>, colrev: number): void;
+    save(id: string, item: Item<T>, colrev: number): Promise<void>;
+    delete(id: string, colrev: number): Promise<void>;
     load(): Promise<{
         items: StoredItem<T>[];
         colrev: number;
@@ -48,6 +49,7 @@ declare class IndexedDbCollectionStore<T> implements CollectionStore<T> {
     db?: IDBDatabase;
     clear(): Promise<void>;
     save(id: string, item: Item<T>, colrev: number): Promise<void>;
+    delete(id: string, colrev: number): Promise<void>;
     deserializeItem(item: SerializedItem): StoredItem<T>;
     load(): Promise<{
         colrev: number;
@@ -104,7 +106,7 @@ declare class Collection<T extends object> {
     handleChangeMessage(msg: ChangeMessage): void;
     handleDocMessage(msg: DocMessage | CreateMessage): void;
     handleModifyMessage(msg: ModifyMessage): void;
-    backup(): void;
+    backup(): Promise<void>;
     flush(): void;
     onChangeItem(id: string, flushImmediate: boolean): void;
     create(initialData: T): string;

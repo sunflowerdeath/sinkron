@@ -98,9 +98,11 @@ class AuthStore {
     constructor() {
         const user = localStorage.getItem("user")
         if (user !== null) {
+            const spaceId = localStorage.getItem("space")
             this.store = new Store({
+                authStore: this,
                 user: JSON.parse(user),
-                authStore: this
+                spaceId: spaceId || undefined
             })
             this.store.fetchUser()
         }
@@ -114,7 +116,7 @@ class AuthStore {
             data: credentials
         })
         localStorage.setItem("user", JSON.stringify(user))
-        this.store = new Store({ user, authStore: this })
+        this.store = new Store({ authStore: this, user })
         console.log(`Logged in as "${user.name}"`)
     }
 
@@ -125,13 +127,14 @@ class AuthStore {
             data: credentials
         })
         localStorage.setItem("user", JSON.stringify(user))
-        this.store = new Store({ user, authStore: this })
+        this.store = new Store({ authStore: this, user })
         console.log(`Signed up as ${user.name}`)
     }
 
     logout() {
         console.log("Logout")
         localStorage.removeItem("user")
+        localStorage.removeItem("space")
         this.store?.dispose()
         this.store = undefined
         history.pushState({}, "", "/")
@@ -167,6 +170,7 @@ class Store {
                     (s) => s.id === this.spaceId
                 )!
                 this.space = new SpaceStore(space)
+                localStorage.setItem("space", space.id)
             },
             { fireImmediately: true }
         )
@@ -288,7 +292,9 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const store = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
-        const transport = new WebsocketTransport(`${env.wsUrl}/sinkron/${token}`)
+        const transport = new WebsocketTransport(
+            `${env.wsUrl}/sinkron/${token}`
+        )
         this.collection = new Collection<Document>({
             transport,
             col,
