@@ -1,5 +1,6 @@
 import { createServer } from "http"
 import type { IncomingMessage } from "http"
+import { Duplex } from "stream"
 import Fastify, { FastifyInstance } from "fastify"
 import fastifyCookie from "@fastify/cookie"
 import { DataSource, Raw, In, Or, Equal, Not, Repository } from "typeorm"
@@ -19,6 +20,13 @@ import {
     SpaceRole
 } from "./entities"
 
+// Except for "loginRoutes"
+declare module "fastify" {
+    interface FastifyRequest {
+        token: AuthToken
+    }
+}
+
 export enum ErrorCode {
     // Invalid request format
     InvalidRequest = "invalid_request",
@@ -37,7 +45,7 @@ export enum ErrorCode {
 export type RequestError = {
     code: ErrorCode
     message?: string
-    details?: Object
+    details?: object
 }
 
 type Models = {
@@ -222,7 +230,7 @@ class AuthService {
         models: Models,
         props: AuthTokenProps
     ): Promise<ResultType<AuthToken, RequestError>> {
-        const { userId, client, expiration } = props
+        const { userId } = props // TODO client, expiration
 
         const count = await models.users.countBy({ id: userId })
         if (count === 0) {
@@ -360,8 +368,9 @@ class SpaceService {
         const { name, ownerId } = props
         const createRes = await models.spaces.insert({ name, ownerId })
 
+        const { id } = createRes.generatedMaps[0]
         const space: SpaceView = {
-            ...createRes.generatedMaps[0],
+            id,
             name,
             owner: { id: ownerId } as User,
             role: "owner",
@@ -620,8 +629,8 @@ const defaultAppProps = {
     port: 80
 }
 
-const timeout = (timeout: number) =>
-    new Promise((resolve) => setTimeout(resolve, timeout))
+// const timeout = (timeout: number) =>
+// new Promise((resolve) => setTimeout(resolve, timeout))
 
 const credentialsSchema = {
     type: "object",
@@ -633,8 +642,13 @@ const credentialsSchema = {
     additionalProperties: false
 }
 
+interface LoginRouteBody {
+    name: string
+    password: string
+}
+
 const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
-    fastify.post(
+    fastify.post<{ Body: LoginRouteBody }>(
         "/login",
         { schema: { body: credentialsSchema } },
         async (request, reply) => {
@@ -681,7 +695,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         reply.clearCookie("token").send()
     })
 
-    fastify.post(
+    fastify.post<{ Body: LoginRouteBody }>(
         "/signup",
         { schema: { body: credentialsSchema } },
         async (request, reply) => {
@@ -706,6 +720,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     reply
                         .code(500)
                         .send({ error: { message: "Unknown error" } })
+                    return
                 }
                 const token = issueTokenRes.value
 
@@ -725,82 +740,109 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
     )
 }
 
+type SpaceCreateBody = { name: string }
+
+const spaceCreateBodySchema = {
+    type: "object",
+    properties: {
+        name: { type: "string", minLength: 1 }
+    },
+    required: ["name"],
+    additionalProperties: false
+}
+
 const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
-    fastify.post("/spaces/new", async (request, reply) => {
-        const { name } = request.body
-        await app.transaction(async (models) => {
-            const res = await app.services.spaces.create(models, {
-                name,
-                ownerId: request.token.userId
+    fastify.post<{ Body: SpaceCreateBody }>(
+        "/spaces/new",
+        { schema: { body: spaceCreateBodySchema } },
+        async (request, reply) => {
+            const { name } = request.body
+            await app.transaction(async (models) => {
+                const res = await app.services.spaces.create(models, {
+                    name,
+                    ownerId: request.token.userId
+                })
+                if (!res.isOk) {
+                    reply.code(500).send(res.error)
+                    return
+                }
+                reply.send(res.value)
             })
-            if (!res.isOk) {
-                reply.code(500).send(res.error)
-            }
-            reply.send(res.value)
-        })
-    })
+        }
+    )
 
-    fastify.post("/spaces/:id/delete", async (request, reply) => {
-        const { id } = request.params
-        await app.transaction(async (models) => {
-            const space = await models.spaces.findOne({
-                where: { id },
-                select: { ownerId: true }
+    fastify.post<{ Params: { id: string } }>(
+        "/spaces/:id/delete",
+        async (request, reply) => {
+            const { id } = request.params
+            await app.transaction(async (models) => {
+                const space = await models.spaces.findOne({
+                    where: { id },
+                    select: { ownerId: true }
+                })
+                if (space === null || space.ownerId !== request.token.userId) {
+                    reply.code(500)
+                    return
+                }
+                await app.services.spaces.delete(models, id)
+                reply.send({})
             })
-            if (space === null || space.ownerId !== request.token.userId) {
-                reply.code(500)
-                return
-            }
-            await app.services.spaces.delete(models, id)
-            reply.send({})
-        })
-    })
+        }
+    )
 
-    fastify.post("/spaces/:id/leave", async (request, reply) => {
-        const { id } = request.params
-        await app.transaction(async (models) => {
-            const res = await models.members.delete({
-                spaceId: id,
-                userId: request.token.userId,
-                role: Not(Equal("owner"))
+    fastify.post<{ Params: { id: string } }>(
+        "/spaces/:id/leave",
+        async (request, reply) => {
+            const { id } = request.params
+            await app.transaction(async (models) => {
+                const res = await models.members.delete({
+                    spaceId: id,
+                    userId: request.token.userId,
+                    role: Not(Equal("owner"))
+                })
+                if (res.affected === 0) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Invalid request" } })
+                    return
+                }
+                reply.send({})
             })
-            if (res.affected === 0) {
-                reply.code(500).send({ error: { message: "Invalid request" } })
-                return
-            }
-            reply.send({})
-        })
-    })
+        }
+    )
 
-    fastify.get("/spaces/:id/members", async (request, reply) => {
-        const { id } = request.params
-        await app.transaction(async (models) => {
-            const exist = await app.services.spaces.exists(models, id)
-            if (!exist) {
-                reply.code(500).send()
-                return
-            }
+    fastify.get<{ Params: { id: string } }>(
+        "/spaces/:id/members",
+        async (request, reply) => {
+            const { id } = request.params
+            await app.transaction(async (models) => {
+                const exist = await app.services.spaces.exists(models, id)
+                if (!exist) {
+                    reply.code(500).send()
+                    return
+                }
 
-            // Check if user is member
-            const count = await models.members.count({
-                where: { userId: request.token.userId, spaceId: id }
+                // Check if user is member
+                const count = await models.members.count({
+                    where: { userId: request.token.userId, spaceId: id }
+                })
+                if (count === 0) {
+                    reply.code(500).send()
+                    return
+                }
+
+                const members = await app.services.spaces.getMembers(models, id)
+                reply.send(members)
             })
-            if (count === 0) {
-                reply.code(500).send()
-                return
-            }
-
-            const members = await app.services.spaces.getMembers(models, id)
-            reply.send(members)
-        })
-    })
+        }
+    )
 
     fastify.post("/spaces/:id/members/:member/update", () => {
         // update member of a space (change role)
         // TODO
     })
 
-    fastify.post(
+    fastify.post<{ Params: { spaceId: string; memberId: string } }>(
         "/spaces/:spaceId/members/:memberId/remove",
         async (request, reply) => {
             await app.transaction(async (models) => {
@@ -837,182 +879,248 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     )
 }
 
+type InviteCreateBody = {
+    spaceId: string
+    toName: string
+    role: "readonly" | "editor" | "admin"
+}
+
+const inviteCreateBodySchema = {
+    type: "object",
+    properties: {
+        spaceId: { type: "string", minLength: 1 },
+        toName: { type: "string", minLength: 1 },
+        role: { type: "string", minLength: 1 } // TODO one of
+    },
+    required: ["spaceId", "toName", "role"],
+    additionalProperties: false
+}
+
+type InviteUpdateBody = { role: "readonly" | "editor" | "admin" }
+
+const inviteUpdateBodySchema = {
+    type: "object",
+    properties: {
+        role: { type: "string", minLength: 1 } // TODO one of
+    },
+    required: ["role"],
+    additionalProperties: false
+}
+
 const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
-    fastify.post("/invites/new", async (request, reply) => {
-        const { spaceId, toName, role } = request.body
-        await app.transaction(async (models) => {
-            const res = await app.services.invites.create(models, {
-                fromId: request.token.userId,
-                spaceId,
-                toName,
-                role
+    fastify.post<{ Body: InviteCreateBody }>(
+        "/invites/new",
+        { schema: { body: inviteCreateBodySchema } },
+        async (request, reply) => {
+            const { spaceId, toName, role } = request.body
+            await app.transaction(async (models) => {
+                const res = await app.services.invites.create(models, {
+                    fromId: request.token.userId,
+                    spaceId,
+                    toName,
+                    role
+                })
+                if (!res.isOk) {
+                    reply.code(500).send({ error: res.error })
+                    return
+                }
+                await app.services.users.setUnreadNotifications(
+                    models,
+                    res.value.toId
+                )
+                reply.send(res.value)
             })
-            if (!res.isOk) {
-                reply.code(500).send({ error: res.error })
-                return
-            }
-            await app.services.users.setUnreadNotifications(
-                models,
-                res.value.toId
-            )
-            reply.send(res.value)
-        })
-    })
+        }
+    )
 
-    fastify.post("/invites/:id/update", async (request, reply) => {
-        const { role } = request.body
-        const { id } = request.params
-        await app.transaction(async (models) => {
-            const invite = await models.invites.findOne({
-                where: { id, status: "sent" },
-                select: { spaceId: true }
+    fastify.post<{ Params: { id: string }; Body: InviteUpdateBody }>(
+        "/invites/:id/update",
+        { schema: { body: inviteUpdateBodySchema } },
+        async (request, reply) => {
+            const { role } = request.body
+            const { id } = request.params
+            await app.transaction(async (models) => {
+                const invite = await models.invites.findOne({
+                    where: { id, status: "sent" },
+                    select: { spaceId: true }
+                })
+                if (invite === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Invite not found" } })
+                    return
+                }
+
+                const member = await models.members.findOne({
+                    where: {
+                        spaceId: invite.spaceId,
+                        userId: request.token.userId
+                    },
+                    select: { role: true }
+                })
+                const isPermitted =
+                    member !== null &&
+                    (role === "admin"
+                        ? member.role === "owner"
+                        : ["admin", "owner"].includes(member.role))
+                if (!isPermitted) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
+                    return
+                }
+
+                await models.invites.update({ id }, { role })
+
+                const inviteRes = await app.services.invites.get(models, id)
+                if (!inviteRes.isOk) {
+                    reply.code(500).send()
+                    return
+                }
+                reply.send(inviteRes.value)
             })
-            if (invite === null) {
-                reply.code(500).send({ error: { message: "Invite not found" } })
-                return
-            }
+        }
+    )
 
-            const member = await models.members.findOne({
-                where: {
-                    spaceId: invite.spaceId,
-                    userId: request.token.userId
-                },
-                select: { role: true }
+    fastify.post<{ Params: { id: string } }>(
+        "/invites/:id/accept",
+        async (request, reply) => {
+            const id = request.params.id
+            await app.transaction(async (models) => {
+                const updateRes = await models.invites.update(
+                    { id, status: "sent", toId: request.token.userId },
+                    { status: "accepted" }
+                )
+                if (updateRes.affected === 0) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Invite not found" } })
+                    return
+                }
+
+                const inviteRes = await app.services.invites.get(models, id)
+                if (!inviteRes.isOk) {
+                    reply.code(500).send()
+                    return
+                }
+                const invite = inviteRes.value
+
+                // @ts-expect-error TODO
+                invite.space.membersCount = await models.members.countBy({
+                    spaceId: invite.spaceId
+                })
+
+                await app.services.spaces.addMember(models, {
+                    userId: invite.to.id,
+                    spaceId: invite.space.id,
+                    role: invite.role
+                })
+
+                reply.send(invite)
             })
-            const isPermitted =
-                member !== null &&
-                (role === "admin"
-                    ? member.role === "owner"
-                    : ["admin", "owner"].includes(member.role))
-            if (!isPermitted) {
-                reply.code(500).send({ error: { message: "Not permitted" } })
-                return
-            }
+        }
+    )
 
-            await models.invites.update({ id }, { role })
+    fastify.post<{ Params: { id: string } }>(
+        "/invites/:id/decline",
+        async (request, reply) => {
+            const id = request.params.id
+            await app.transaction(async (models) => {
+                const updateRes = await models.invites.update(
+                    { id, status: "sent", toId: request.token.userId },
+                    { status: "declined" }
+                )
+                if (updateRes.affected === 0) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Invite not found" } })
+                    return
+                }
 
-            const inviteRes = await app.services.invites.get(models, id)
-            if (!inviteRes.isOk) {
-                reply.code(500).send()
-                return
-            }
-            reply.send(inviteRes.value)
-        })
-    })
-
-    fastify.post("/invites/:id/accept", async (request, reply) => {
-        const id = request.params.id
-        await app.transaction(async (models) => {
-            const updateRes = await models.invites.update(
-                { id, status: "sent", toId: request.token.userId },
-                { status: "accepted" }
-            )
-            if (updateRes.affected === 0) {
-                reply.code(500).send({ error: { message: "Invite not found" } })
-                return
-            }
-
-            const inviteRes = await app.services.invites.get(models, id)
-            if (!inviteRes.isOk) {
-                reply.code(500).send()
-                return
-            }
-            const invite = inviteRes.value
-
-            invite.space.membersCount = await models.members.countBy({
-                spaceId: invite.spaceId
+                const inviteRes = await app.services.invites.get(models, id)
+                if (!inviteRes.isOk) {
+                    reply.code(500).send()
+                    return
+                }
+                reply.send(inviteRes.value)
             })
+        }
+    )
 
-            await app.services.spaces.addMember(models, {
-                userId: invite.to.id,
-                spaceId: invite.space.id,
-                role: invite.role
+    fastify.post<{ Params: { id: string } }>(
+        "/invites/:id/cancel",
+        async (request, reply) => {
+            const id = request.params.id
+            await app.transaction(async (models) => {
+                const invite = await models.invites.findOne({
+                    where: { id, status: "sent" },
+                    select: { spaceId: true }
+                })
+                if (invite === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Invite not found" } })
+                    return
+                }
+
+                const member = await models.members.findOne({
+                    where: {
+                        spaceId: invite.spaceId,
+                        userId: request.token.userId
+                    },
+                    select: { role: true }
+                })
+                if (
+                    member === null ||
+                    !["admin", "owner"].includes(member.role)
+                ) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
+                    return
+                }
+
+                await models.invites.update({ id }, { status: "cancelled" })
+
+                const inviteRes = await app.services.invites.get(models, id)
+                if (!inviteRes.isOk) {
+                    reply.code(500).send()
+                    return
+                }
+                reply.send(inviteRes.value)
             })
+        }
+    )
 
-            reply.send(invite)
-        })
-    })
+    fastify.post<{ Params: { id: string } }>(
+        "/invites/:id/hide",
+        async (request, reply) => {
+            const id = request.params.id
+            await app.transaction(async (models) => {
+                const updateRes = await models.invites.update(
+                    {
+                        id,
+                        status: Or(Equal("accepted"), Equal("declined")),
+                        fromId: request.token.userId
+                    },
+                    { isHidden: true }
+                )
+                if (updateRes.affected === 0) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Invite not found" } })
+                    return
+                }
 
-    fastify.post("/invites/:id/decline", async (request, reply) => {
-        const id = request.params.id
-        await app.transaction(async (models) => {
-            const updateRes = await models.invites.update(
-                { id, status: "sent", toId: request.token.userId },
-                { status: "declined" }
-            )
-            if (updateRes.affected === 0) {
-                reply.code(500).send({ error: { message: "Invite not found" } })
-                return
-            }
-
-            const inviteRes = await app.services.invites.get(models, id)
-            if (!inviteRes.isOk) {
-                reply.code(500).send()
-                return
-            }
-            reply.send(inviteRes.value)
-        })
-    })
-
-    fastify.post("/invites/:id/cancel", async (request, reply) => {
-        const id = request.params.id
-        await app.transaction(async (models) => {
-            const invite = await models.invites.findOne({
-                where: { id, status: "sent" },
-                select: { spaceId: true }
+                const inviteRes = await app.services.invites.get(models, id)
+                if (!inviteRes.isOk) {
+                    reply.code(500).send()
+                    return
+                }
+                reply.send(inviteRes.value)
             })
-            if (invite === null) {
-                reply.code(500).send({ error: { message: "Invite not found" } })
-                return
-            }
-
-            const member = await models.members.findOne({
-                where: {
-                    spaceId: invite.spaceId,
-                    userId: request.token.userId
-                },
-                select: { role: true }
-            })
-            if (member === null || !["admin", "owner"].includes(member.role)) {
-                reply.code(500).send({ error: { message: "Not permitted" } })
-                return
-            }
-
-            await models.invites.update({ id }, { status: "cancelled" })
-
-            const inviteRes = await app.services.invites.get(models, id)
-            if (!inviteRes.isOk) {
-                reply.code(500).send()
-                return
-            }
-            reply.send(inviteRes.value)
-        })
-    })
-
-    fastify.post("/invites/:id/hide", async (request, reply) => {
-        const id = request.params.id
-        await app.transaction(async (models) => {
-            const updateRes = await models.invites.update(
-                {
-                    id,
-                    status: Or(Equal("accepted"), Equal("declined")),
-                    fromId: request.token.userId
-                },
-                { isHidden: true }
-            )
-            if (updateRes.affected === 0) {
-                reply.code(500).send({ error: { message: "Invite not found" } })
-                return
-            }
-
-            const inviteRes = await app.services.invites.get(models, id)
-            if (!inviteRes.isOk) {
-                reply.code(500).send()
-                return
-            }
-            reply.send(inviteRes.value)
-        })
-    })
+        }
+    )
 }
 
 const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
@@ -1125,7 +1233,11 @@ class App {
         await this.db.initialize()
     }
 
-    async handleUpgrade(request: IncomingMessage, socket, head) {
+    async handleUpgrade(
+        request: IncomingMessage,
+        socket: Duplex,
+        head: Buffer
+    ) {
         const matchSinkron = request.url!.match(/^\/sinkron\/(.+)$/)
         if (matchSinkron) {
             const token = matchSinkron[1]
