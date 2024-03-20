@@ -200,7 +200,15 @@ class Sinkron {
             select: { ...select, isDeleted: true }
         })) as Document[]
         const documents = documentsRows.map((d) =>
-            d.isDeleted ? ({ id: d.id, data: null } as Document) : d
+            d.isDeleted
+                ? ({
+                      id: d.id,
+                      data: null,
+                      createdAt: d.createdAt,
+                      updatedAt: d.updatedAt,
+                      col: d.col
+                  } as any as Document)
+                : d
         )
         return Result.ok({ ...result, documents })
     }
