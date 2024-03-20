@@ -87,8 +87,7 @@ class UserService {
         if (!validateUsername(name) || !validatePassword(password)) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                message: "Incorrect name or password",
-                details: {}
+                message: "Incorrect name or password"
             })
         }
 
@@ -832,7 +831,9 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 }
 
                 const members = await app.services.spaces.getMembers(models, id)
-                reply.send(members)
+                const invites =
+                    await app.services.invites.getSpaceActiveInvites(models, id)
+                reply.send({ members, invites })
             })
         }
     )
@@ -1254,12 +1255,11 @@ class App {
                         this.sinkronServer.ws.emit("connection", ws, request)
                     }
                 )
-                return
             } else {
                 socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
                 socket.destroy()
-                return
             }
+            return
         }
 
         const matchChannels = request.url!.match(/^\/channels\/(.+)$/)
@@ -1273,17 +1273,15 @@ class App {
                 this.channels.ws.handleUpgrade(request, socket, head, (ws) => {
                     this.channels.ws.emit("connection", ws, request)
                 })
-                return
             } else {
                 socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
                 socket.destroy()
-                return
             }
+            return
         }
 
         socket.write("HTTP/1.1 404 Not Found\r\n\r\n")
         socket.destroy()
-        return
     }
 
     createFastify() {
