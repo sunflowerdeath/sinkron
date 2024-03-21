@@ -6,8 +6,7 @@ COPY . /app
 WORKDIR /app
 RUN rm -rf packages/sinkron-client
 RUN rm -rf packages/front
-RUN pnpm install --frozen-lockfile
-# RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build-app
 WORKDIR /app
 EXPOSE 80
