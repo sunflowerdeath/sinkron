@@ -2,7 +2,7 @@ import * as Automerge from "@automerge/automerge";
 import type { ChangeFn } from "@automerge/automerge";
 import { createNanoEvents } from "nanoevents";
 import { debounce } from "lodash-es";
-import type { SyncCompleteMessage, DocMessage, CreateMessage, ChangeMessage, ModifyMessage } from "sinkron/types/protocol.d.ts";
+import type { SyncErrorMessage, SyncCompleteMessage, DocMessage, CreateMessage, ChangeMessage, ModifyMessage } from "sinkron/types/protocol.d.ts";
 interface Transport {
     open(): void;
     close(): void;
@@ -55,6 +55,7 @@ declare class IndexedDbCollectionStore<T> implements CollectionStore<T> {
         colrev: number;
         items: StoredItem<T>[];
     }>;
+    static clearAll(): Promise<void>;
 }
 export declare enum ItemState {
     Changed = 1,
@@ -75,15 +76,18 @@ export declare enum ConnectionStatus {
     Disconnected = "disconnected",
     Connected = "connected",
     Sync = "sync",
-    Ready = "ready"
+    Ready = "ready",
+    Error = "error"
 }
 interface CollectionProps<T> {
     col: string;
     transport: Transport;
     store?: CollectionStore<T>;
+    errorHandler?: (msg: SyncErrorMessage) => void;
 }
 declare class Collection<T extends object> {
     constructor(props: CollectionProps<T>);
+    errorHandler?: (msg: SyncErrorMessage) => void;
     items: Map<string, Item<T>>;
     store: CollectionStore<T>;
     col: string;
@@ -103,6 +107,7 @@ declare class Collection<T extends object> {
     startSync(): void;
     onMessage(msg: string): void;
     onSyncComplete(msg: SyncCompleteMessage): void;
+    handleSyncError(msg: SyncErrorMessage): void;
     handleChangeMessage(msg: ChangeMessage): void;
     handleDocMessage(msg: DocMessage | CreateMessage): void;
     handleModifyMessage(msg: ModifyMessage): void;

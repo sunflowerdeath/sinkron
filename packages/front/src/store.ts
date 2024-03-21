@@ -138,6 +138,7 @@ class AuthStore {
         this.store?.dispose()
         this.store = undefined
         history.pushState({}, "", "/")
+        IndexedDbCollectionStore.clearAll()
     }
 }
 
@@ -169,7 +170,7 @@ class Store {
                 const space = this.user.spaces.find(
                     (s) => s.id === this.spaceId
                 )!
-                this.space = new SpaceStore(space)
+                this.space = new SpaceStore(space, this)
                 localStorage.setItem("space", space.id)
             },
             { fireImmediately: true }
@@ -282,15 +283,17 @@ const getUpdatedAt = <T>(item: Item<T>) =>
 
 class SpaceStore {
     space: Space
+    store: Store
     collection: Collection<Document>
     categoryId: string | null = null
     documentList: TransformedMap<Item<Document>, DocumentListItemData>
 
-    constructor(space: Space) {
+    constructor(space: Space, store: Store) {
         this.space = space
+        this.store = store
 
         const col = `spaces/${space.id}`
-        const store = new IndexedDbCollectionStore(col)
+        const collectionStore = new IndexedDbCollectionStore(col)
         const token = Cookies.get("token")
         const transport = new WebsocketTransport(
             `${env.wsUrl}/sinkron/${token}`
@@ -298,7 +301,10 @@ class SpaceStore {
         this.collection = new Collection<Document>({
             transport,
             col,
-            store
+            store: collectionStore,
+            errorHandler: () => {
+                this.store.logout()
+            }
         })
 
         this.documentList = new TransformedMap({

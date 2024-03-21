@@ -21,6 +21,7 @@ enum Op {
 }
 
 import type {
+    SyncErrorMessage,
     SyncCompleteMessage,
     DocMessage,
     CreateMessage,
@@ -257,6 +258,26 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
         const items = result.map((item) => this.deserializeItem(item))
         return { colrev, items }
     }
+
+    static async clearAll() {
+        const toRemove = []
+        const len = localStorage.length
+        for (let i = 0; i < len; i++) {
+            const key = localStorage.key(i)!
+            const match = key.match(/^stored_collection\/(.+)/)
+            if (match !== null) toRemove.push(match[1])
+        }
+
+        for (const id of toRemove) {
+            const req = indexedDB.deleteDatabase(id)
+            const deferred = new Deferred<void>()
+            req.onsuccess = () => deferred.resolve()
+            await deferred
+            localStorage.removeItem(`stored_collection/${id}`)
+            console.log(`Deleted local storage for ${id}`)
+        }
+
+    }
 }
 
 export enum ItemState {
@@ -317,13 +338,15 @@ export enum ConnectionStatus {
     Disconnected = "disconnected",
     Connected = "connected",
     Sync = "sync",
-    Ready = "ready"
+    Ready = "ready",
+    Error = "error"
 }
 
 interface CollectionProps<T> {
     col: string
     transport: Transport
     store?: CollectionStore<T>
+    errorHandler?: (msg: SyncErrorMessage) => void
 }
 
 class Collection<T extends object> {
@@ -343,6 +366,7 @@ class Collection<T extends object> {
         this.init()
     }
 
+    errorHandler?: (msg: SyncErrorMessage) => void
     items: Map<string, Item<T>> = new Map()
     store!: CollectionStore<T>
     col!: string
@@ -435,13 +459,13 @@ class Collection<T extends object> {
             this.handleDocMessage(parsed)
         } else if (parsed.kind === "sync_complete") {
             this.onSyncComplete(parsed)
+        } else if (parsed.kind === "sync_error") {
+            this.handleSyncError(parsed)
         } else if (parsed.kind === "change") {
             this.handleChangeMessage(parsed)
         }
-
         // TODO
         // error
-        // sync_error
     }
 
     onSyncComplete(msg: SyncCompleteMessage) {
@@ -450,6 +474,13 @@ class Collection<T extends object> {
         this.status = ConnectionStatus.Ready
         this.initialSyncCompleted = true
         this.backup()
+    }
+
+    handleSyncError(msg: SyncErrorMessage) {
+        console.log("Sync error:", msg)
+        this.status = ConnectionStatus.Error
+        this.stopAutoReconnect?.()
+        this.errorHandler?.(msg)
     }
 
     handleChangeMessage(msg: ChangeMessage) {
