@@ -4,7 +4,8 @@ COPY . /app
 WORKDIR /app
 # RUN rm -rf packages/sinkron
 RUN rm -rf packages/app
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# RUN pnpm install --frozen-lockfile
 RUN pnpm run build-front
 
 FROM nginx:alpine
