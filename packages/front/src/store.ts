@@ -159,7 +159,15 @@ class Store {
         const { user, authStore, spaceId } = props
         this.authStore = authStore
         this.user = user
-        this.spaceId = spaceId || user.spaces[0]?.id
+
+        if (
+            spaceId !== undefined &&
+            user.spaces.some((s) => s.id === spaceId)
+        ) {
+            this.spaceId = spaceId
+        } else {
+            this.spaceId = user.spaces[0]?.id
+        }
 
         makeAutoObservable(this)
 
