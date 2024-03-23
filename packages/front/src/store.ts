@@ -270,6 +270,15 @@ class Store {
             })
         )
     }
+
+    fetchActiveSessions() {
+        return fromPromise(
+            fetchApi({
+                method: "GET",
+                url: `${env.apiUrl}/account/sessions`
+            })
+        )
+    }
 }
 
 const makeInitialDocument = () => ({

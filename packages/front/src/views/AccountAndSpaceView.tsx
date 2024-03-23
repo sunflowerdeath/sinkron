@@ -140,7 +140,9 @@ const AccountAndSpaceView = observer(() => {
                     )}
                     {role === "owner" ? (
                         <>
-                            <Button>Space settings</Button>
+                            <Button as={Link} to="/space/settings">
+                                Space settings
+                            </Button>
                             <Button onClick={() => deleteModal.open()}>
                                 Delete space
                             </Button>

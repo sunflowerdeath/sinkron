@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite"
 import { useMedia } from "react-use"
-import { Route, Switch, Redirect, useLocation } from "wouter"
-import { Col, Row } from "oriente"
+import { Route, Switch, Redirect, useLocation, Link } from "wouter"
+import { Row } from "oriente"
 
 import Container from "../ui/Container"
 import { Button } from "../ui/button"
@@ -12,13 +12,28 @@ import { SpaceContext, useStore } from "../store"
 import DocumentListView from "./DocumentListView"
 import DocumentView from "./DocumentView"
 import CategoriesView from "./CategoriesView"
+import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
+
+import AccountAndSpaceView from "./AccountAndSpaceView"
+import ActiveSessionsView from "./ActiveSessionsView"
+import NotificationsView from "./NotificationsView"
+
 import CreateSpaceView from "./CreateSpaceView"
 import SpaceMembersView from "./SpaceMembersView"
 import SwitchSpaceView from "./SwitchSpaceView"
-import AccountAndSpaceView from "./AccountAndSpaceView"
 import InviteMemberView from "./InviteMemberView"
-import NotificationsView from "./NotificationsView"
-import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
+
+const SpaceSettingsView = observer(() => {
+    const [location, navigate] = useLocation()
+    const store = useStore()
+    return (
+        <Container title="Space settings" onClose={() => navigate("/")}>
+            <Button>Change image</Button>
+            <Button>Change name</Button>
+            <Button>Delete space</Button>
+        </Container>
+    )
+})
 
 const AccountSettingsView = observer(() => {
     const [location, navigate] = useLocation()
@@ -31,6 +46,9 @@ const AccountSettingsView = observer(() => {
             </Row>
             <Button>Change image</Button>
             <Button>Change password</Button>
+            <Button as={Link} to="/account/sessions">
+                Active sessions
+            </Button>
         </Container>
     )
 })
@@ -53,6 +71,10 @@ const SpaceView = observer(() => {
                 children={() => <AccountSettingsView />}
             />
             <Route
+                path={"/account/sessions"}
+                children={() => <ActiveSessionsView />}
+            />
+            <Route
                 path={"/notifications"}
                 children={() => <NotificationsView />}
             />
@@ -63,6 +85,10 @@ const SpaceView = observer(() => {
             <Route
                 path={"/switch-space"}
                 children={() => <SwitchSpaceView />}
+            />
+            <Route
+                path={"/space/settings"}
+                children={() => <SpaceSettingsView />}
             />
             <Route
                 path={"/space/members"}

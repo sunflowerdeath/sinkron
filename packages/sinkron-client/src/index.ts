@@ -144,6 +144,7 @@ export interface CollectionStore<T> {
     save(id: string, item: Item<T>, colrev: number): Promise<void>
     delete(id: string, colrev: number): Promise<void>
     load(): Promise<{ items: StoredItem<T>[]; colrev: number }>
+    dispose(): void
 }
 
 class Deferred<T> {
@@ -186,6 +187,10 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
     key: string
     isReady: Promise<void>
     db?: IDBDatabase
+
+    dispose() {
+        this.db?.close()
+    }
 
     async clear() {
         const store = this.db!.transaction("items", "readwrite").objectStore(
@@ -276,7 +281,6 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
             localStorage.removeItem(`stored_collection/${id}`)
             console.log(`Deleted local storage for ${id}`)
         }
-
     }
 }
 
@@ -387,6 +391,7 @@ class Collection<T extends object> {
     destroy() {
         this.isDestroyed = true
         this.stopAutoReconnect?.()
+        this.store?.dispose()
     }
 
     async init() {

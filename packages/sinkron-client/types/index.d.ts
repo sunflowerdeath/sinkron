@@ -33,6 +33,7 @@ export interface CollectionStore<T> {
         items: StoredItem<T>[];
         colrev: number;
     }>;
+    dispose(): void;
 }
 interface SerializedItem {
     id: string;
@@ -47,6 +48,7 @@ declare class IndexedDbCollectionStore<T> implements CollectionStore<T> {
     key: string;
     isReady: Promise<void>;
     db?: IDBDatabase;
+    dispose(): void;
     clear(): Promise<void>;
     save(id: string, item: Item<T>, colrev: number): Promise<void>;
     delete(id: string, colrev: number): Promise<void>;

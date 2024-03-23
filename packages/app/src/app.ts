@@ -285,6 +285,14 @@ class AuthService {
         }
     }
 
+    async deleteOtherTokens(
+        models: Models,
+        props: { userId: string; token: string }
+    ) {
+        const { token, userId } = props
+        await models.tokens.delete({ token: Not(Equal(token)), userId })
+    }
+
     async verifyAuthToken(
         models: Models,
         token: string
@@ -308,24 +316,30 @@ class AuthService {
         return Result.ok(res)
     }
 
-    async getUserTokens(
+    async getActiveTokens(
         models: Models,
-        user: string
-        // activeOnly: boolean = false
-    ): Promise<ResultType<AuthToken[], RequestError>> {
-        const count = await models.users.countBy({ id: user })
-        if (count === 0) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "User not found",
-                details: { user }
-            })
-        }
+        userId: string
+    ): Promise<AuthToken[]> {
+        await this.deleteExpiredTokens(models, userId)
+        return await models.tokens.findBy({ userId })
+    }
 
-        await this.deleteExpiredTokens(models, user)
-
-        const tokens = await models.tokens.findBy({ userId: user })
-        return Result.ok(tokens)
+    async getActiveSessions(
+        models: Models,
+        props: { userId: string; token: string }
+    ): Promise<Session[]> {
+        const { userId, token } = props
+        const tokens = await this.getActiveTokens(models, userId)
+        const sessions: Session[] = tokens.map((t) => {
+            // const data = JSON.parse(t.client)
+            return {
+                lastActive: t.lastAccess.toISOString(),
+                from: t.from,
+                client: t.client,
+                isCurrent: t.token === token
+            }
+        })
+        return sessions
     }
 }
 
@@ -737,6 +751,48 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
             })
         }
     )
+}
+
+interface Session {
+    isCurrent: boolean
+    lastActive: string
+    from: string
+    client: string
+}
+
+const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
+    fastify.get("/account/sessions", async (request, reply) => {
+        const { userId, token } = request.token
+        await app.transaction(async (models) => {
+            const sessions = await app.services.auth.getActiveSessions(models, {
+                userId,
+                token
+            })
+            reply.send(sessions)
+        })
+    })
+
+    fastify.post(
+        "/account/terminate_other_sessions",
+        async (request, reply) => {
+            const { token, userId } = request.token
+            await app.transaction(async (models) => {
+                await app.services.auth.deleteOtherTokens(models, {
+                    token,
+                    userId
+                })
+                const sessions = await app.services.auth.getActiveSessions(
+                    models,
+                    { userId, token }
+                )
+                reply.send(sessions)
+            })
+        }
+    )
+
+    fastify.post("/account/reset_password", async (request, reply) => {
+        // TODO
+    })
 }
 
 type SpaceCreateBody = { name: string }
@@ -1165,6 +1221,7 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
         })
     })
 
+    fastify.register(accountRoutes(app))
     fastify.register(spacesRoutes(app))
     fastify.register(invitesRoutes(app))
 }
