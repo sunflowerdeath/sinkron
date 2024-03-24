@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { observer } from "mobx-react-lite"
 import { Col } from "oriente"
 import { useLocation } from "wouter"
+import { format, parseISO } from "date-fns"
 
 import { useStore } from "../store"
 import Container from "../ui/Container"
@@ -32,7 +33,7 @@ const SessionListItem = observer((props: SessionListItemProps) => {
             <div>
                 {session.isCurrent
                     ? "Online (This device)"
-                    : session.lastActive}
+                    : format(parseISO(session.lastActive), "d MMM h:mm a")}
             </div>
             <div>{session.client || "Unknown client"}</div>
             <div>{session.from || "Unknown location"}</div>

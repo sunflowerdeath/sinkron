@@ -321,7 +321,10 @@ class AuthService {
         userId: string
     ): Promise<AuthToken[]> {
         await this.deleteExpiredTokens(models, userId)
-        return await models.tokens.findBy({ userId })
+        return await models.tokens.find({
+            where: { userId },
+            order: { lastAccess: "desc" }
+        })
     }
 
     async getActiveSessions(
@@ -666,6 +669,9 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: credentialsSchema } },
         async (request, reply) => {
             const { name, password } = request.body
+            console.log("IP:", request.ip)
+            console.log("IPS:", request.ips)
+            console.log("HEADERS:", request.headers)
             // await timeout(1500)
             await app.transaction(async (models) => {
                 const authRes = await app.services.auth.authorizeWithPassword(
