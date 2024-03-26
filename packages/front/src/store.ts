@@ -279,6 +279,15 @@ class Store {
             })
         )
     }
+
+    terminateSessions() {
+        return fromPromise(
+            fetchApi({
+                method: "POST",
+                url: `${env.apiUrl}/account/sessions/terminate`
+            })
+        )
+    }
 }
 
 const makeInitialDocument = () => ({

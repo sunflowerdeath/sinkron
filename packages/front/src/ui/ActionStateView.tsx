@@ -1,4 +1,4 @@
-import { IPromiseBasedObservable } from "mobx-utils"
+import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
 import { observer, Observer } from "mobx-react-lite"
 
 export type ActionState<T> = IPromiseBasedObservable<T>
@@ -44,5 +44,10 @@ const ActionStateView = observer(<T,>(props: ActionStateViewProps<T>) => {
         </Observer>
     )
 })
+
+export const makeInitialActionState = <T,>() =>
+    fromPromise.resolve({}) as ActionState<T>
+
+export const initialActionState = makeInitialActionState<object>()
 
 export default ActionStateView
