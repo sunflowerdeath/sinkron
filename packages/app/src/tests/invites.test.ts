@@ -1,6 +1,5 @@
 import assert from "node:assert"
 import cookie from "@fastify/cookie"
-import { Sinkron } from "sinkron"
 
 import { App } from "../app"
 import { User } from "../entities"
@@ -28,9 +27,7 @@ describe("Invites", () => {
     let user: User
 
     beforeEach(async () => {
-        const sinkron = new Sinkron({ dbPath: ":memory: " })
-        await sinkron.init()
-        app = new App({ sinkron, dbPath: ":memory:" })
+        app = new App()
         await app.init()
 
         owner = await createUser(app, "owner")

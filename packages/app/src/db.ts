@@ -1,19 +1,24 @@
 import path from "node:path"
 import { DataSource } from "typeorm"
-import { DataSourceOptions } from "typeorm/data-source/DataSourceOptions"
 
 import { entities } from "./entities"
 
-const dbPath = process.env.SINKRON_DB_PATH
-    ? path.join(process.env.SINKRON_DB_PATH, "paper.sqlite")
-    : path.join(__dirname, "../temp/paper.sqlite")
-
-const options: DataSourceOptions = {
-    type: "better-sqlite3",
-    database: dbPath,
-    entities,
-    logging: ["error"],
-    migrations: ["build/migrations/*.js"]
+const createDataSource = () => {
+    const dbDir =
+        process.env.SINKRON_SQLITE_DB_DIR || path.join(__dirname, "../temp")
+    const dbPath =
+        process.env.SINKRON_SQLITE_MEMORY_DB === "1"
+            ? ":memory:"
+            : path.join(dbDir, "paper.sqlite")
+    return new DataSource({
+        type: "better-sqlite3",
+        database: dbPath,
+        synchronize: dbPath === ":memory:",
+        entities,
+        logging: ["error"],
+        migrations: ["build/migrations/*.js"]
+    })
 }
 
-export default new DataSource(options)
+export default createDataSource()
+export { createDataSource }

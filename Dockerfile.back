@@ -10,5 +10,5 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build-app
 WORKDIR /app
 EXPOSE 80
-ENV SINKRON_DB_PATH="/app/mount"
+ENV SINKRON_SQLITE_DB_DIR="/app/mount"
 CMD ["pnpm", "start-app"]

@@ -11,9 +11,7 @@ describe("Spaces", () => {
     let headers: { [key: string]: string }
 
     beforeEach(async () => {
-        const sinkron = new Sinkron({ dbPath: ":memory: " })
-        await sinkron.init()
-        app = new App({ sinkron, dbPath: ":memory:" })
+        app = new App({})
         await app.init()
 
         const res = await app.services.users.create(app.models, {
@@ -55,9 +53,12 @@ describe("Spaces", () => {
             headers
         })
         assert.strictEqual(res2.statusCode, 200, "get members")
-        const members = JSON.parse(res2.payload)
-        assert(Array.isArray(members) && members.length === 1)
-        const memberId = members[0].id
+        const response = JSON.parse(res2.payload)
+        assert(
+            Array.isArray(response.members) && response.members.length === 1,
+            "1 member"
+        )
+        const memberId = response.members[0].id
 
         const res3 = await app.fastify.inject({
             method: "GET",

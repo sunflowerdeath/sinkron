@@ -1,15 +1,12 @@
 import assert from "node:assert"
 import cookie from "@fastify/cookie"
 
-import { Sinkron } from "sinkron"
 import { App } from "../app"
 
 describe("Users", () => {
     let app: App
     beforeEach(async () => {
-        const sinkron = new Sinkron({ dbPath: ":memory: " })
-        await sinkron.init()
-        app = new App({ sinkron, dbPath: ":memory:" })
+        app = new App({})
         await app.init()
     })
 
@@ -101,5 +98,50 @@ describe("Users", () => {
             headers
         })
         assert.strictEqual(res7.statusCode, 401, "profile not ok")
+    })
+
+    it("sessions", async () => {
+        const res = await app.services.users.create(app.models, {
+            name: "test",
+            password: "password"
+        })
+        assert(res.isOk, "user created")
+
+        await app.fastify.inject({
+            method: "POST",
+            url: "/login",
+            payload: { name: "test", password: "password" }
+        })
+
+        const res2 = await app.fastify.inject({
+            method: "POST",
+            url: "/login",
+            payload: { name: "test", password: "password" }
+        })
+        const tokenCookie = res2.cookies.find((c) => c.name === "token")!
+        assert(tokenCookie !== undefined, "set token cookie")
+        const token = tokenCookie.value
+        const headers = { Cookie: cookie.serialize("token", token) }
+
+        const res3 = await app.fastify.inject({
+            method: "GET",
+            url: "/account/sessions",
+            headers
+        })
+        assert.strictEqual(res3.statusCode, 200, "get sessions")
+        const sessions = JSON.parse(res3.payload)
+        assert(Array.isArray(sessions) && sessions.length === 2, "2 sessions")
+
+        const res4 = await app.fastify.inject({
+            method: "POST",
+            url: "/account/sessions/terminate",
+            headers
+        })
+        assert.strictEqual(res3.statusCode, 200, "terminate")
+        const terminated = JSON.parse(res4.payload)
+        assert(
+            Array.isArray(terminated) && terminated.length === 1,
+            "1 session"
+        )
     })
 })

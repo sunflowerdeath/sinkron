@@ -1,3 +1,4 @@
+import path from "node:path"
 import { createServer } from "http"
 import type { IncomingMessage } from "http"
 import { Duplex } from "stream"
@@ -9,7 +10,7 @@ import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 
 import { Result, ResultType } from "./utils/result"
-import db from "./db"
+import { createDataSource } from "./db"
 import {
     User,
     AuthToken,
@@ -635,7 +636,6 @@ class InviteService {
 }
 
 type AppProps = {
-    sinkron: Sinkron
     host?: string
     port?: number
 }
@@ -669,9 +669,6 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: credentialsSchema } },
         async (request, reply) => {
             const { name, password } = request.body
-            console.log("IP:", request.ip)
-            console.log("IPS:", request.ips)
-            console.log("HEADERS:", request.headers)
             // await timeout(1500)
             await app.transaction(async (models) => {
                 const authRes = await app.services.auth.authorizeWithPassword(
@@ -779,7 +776,7 @@ const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 
     fastify.post(
-        "/account/terminate_other_sessions",
+        "/account/sessions/terminate",
         async (request, reply) => {
             const { token, userId } = request.token
             await app.transaction(async (models) => {
@@ -1251,11 +1248,11 @@ class App {
     services: Services
 
     constructor(props: AppProps) {
-        const { sinkron, host, port } = { ...defaultAppProps, ...props }
+        const { host, port } = { ...defaultAppProps, ...props }
         this.host = host
         this.port = port
 
-        this.db = db
+        this.db = createDataSource()
 
         this.services = {
             users: new UserService(this),
@@ -1272,8 +1269,14 @@ class App {
             invites: this.db.getRepository<Invite>("invite")
         }
 
-        this.sinkron = sinkron
-        this.sinkronServer = new SinkronServer({ sinkron })
+        const dbDir =
+            process.env.SINKRON_SQLITE_DB_DIR || path.join(__dirname, "../temp")
+        const dbPath =
+            process.env.SINKRON_SQLITE_MEMORY_DB === "1"
+                ? ":memory:"
+                : path.join(dbDir, "sinkron.sqlite")
+        this.sinkron = new Sinkron({ dbPath })
+        this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
 
         this.channels = new ChannelServer({})
 
@@ -1294,6 +1297,7 @@ class App {
     }
 
     async init() {
+        await this.sinkron.init()
         await this.db.initialize()
     }
 
