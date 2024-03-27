@@ -2,12 +2,13 @@ import path from "node:path"
 import { createServer } from "http"
 import type { IncomingMessage } from "http"
 import { Duplex } from "stream"
-import Fastify, { FastifyInstance } from "fastify"
+import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
 import fastifyCookie from "@fastify/cookie"
 import { DataSource, Raw, In, Or, Equal, Not, Repository } from "typeorm"
 import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
+import * as Bowser from "bowser"
 
 import { Result, ResultType } from "./utils/result"
 import { createDataSource } from "./db"
@@ -230,7 +231,7 @@ class AuthService {
         models: Models,
         props: AuthTokenProps
     ): Promise<ResultType<AuthToken, RequestError>> {
-        const { userId } = props // TODO client, expiration
+        const { userId, client } = props // TODO expiration
 
         const count = await models.users.countBy({ id: userId })
         if (count === 0) {
@@ -241,7 +242,7 @@ class AuthService {
             })
         }
 
-        const res = await models.tokens.insert({ userId })
+        const res = await models.tokens.insert({ userId, client })
         const token = { userId, ...res.generatedMaps[0] } as AuthToken
 
         this.deleteExpiredTokens(models, userId)
@@ -252,8 +253,9 @@ class AuthService {
 
     async authorizeWithPassword(
         models: Models,
-        credentials: Credentials
+        props: { client: string; credentials: Credentials }
     ): Promise<ResultType<AuthToken, RequestError>> {
+        const { credentials, client } = props
         const { name, password } = credentials
         const user = await models.users.findOne({
             where: { name, isDisabled: false },
@@ -266,7 +268,10 @@ class AuthService {
                 details: { name }
             })
         }
-        const res = await this.issueAuthToken(models, { userId: user.id })
+        const res = await this.issueAuthToken(models, {
+            userId: user.id,
+            client
+        })
         return res
     }
 
@@ -663,6 +668,23 @@ interface LoginRouteBody {
     password: string
 }
 
+const parseClient = (request: FastifyRequest) => {
+    const userAgent = request.headers["user-agent"]
+    if (userAgent === undefined || Array.isArray(userAgent)) {
+        return "Unknown client"
+    }
+    const data = Bowser.parse(userAgent)
+    const browser =
+        data.browser.name === ""
+            ? "Unknown browser"
+            : `${data.browser.name} ${data.browser.version}`
+    const os =
+        data.os.name === undefined
+            ? "Unknown os"
+            : `${data.os.name} ${data.os.version}`
+    return `${browser} / ${os}`
+}
+
 const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Body: LoginRouteBody }>(
         "/login",
@@ -673,7 +695,10 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
             await app.transaction(async (models) => {
                 const authRes = await app.services.auth.authorizeWithPassword(
                     models,
-                    { name, password }
+                    {
+                        credentials: { name, password },
+                        client: parseClient(request)
+                    }
                 )
                 if (!authRes.isOk) {
                     reply
@@ -775,23 +800,20 @@ const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
         })
     })
 
-    fastify.post(
-        "/account/sessions/terminate",
-        async (request, reply) => {
-            const { token, userId } = request.token
-            await app.transaction(async (models) => {
-                await app.services.auth.deleteOtherTokens(models, {
-                    token,
-                    userId
-                })
-                const sessions = await app.services.auth.getActiveSessions(
-                    models,
-                    { userId, token }
-                )
-                reply.send(sessions)
+    fastify.post("/account/sessions/terminate", async (request, reply) => {
+        const { token, userId } = request.token
+        await app.transaction(async (models) => {
+            await app.services.auth.deleteOtherTokens(models, {
+                token,
+                userId
             })
-        }
-    )
+            const sessions = await app.services.auth.getActiveSessions(models, {
+                userId,
+                token
+            })
+            reply.send(sessions)
+        })
+    })
 
     fastify.post("/account/reset_password", async (request, reply) => {
         // TODO
