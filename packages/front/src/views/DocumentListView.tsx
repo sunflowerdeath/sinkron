@@ -1,17 +1,21 @@
+import { useMemo } from "react"
 import { observer } from "mobx-react-lite"
+import { fromPromise } from "mobx-utils"
+import { reaction } from "mobx"
 import { useLocation, useRoute, Link } from "wouter"
 import { Col, Row } from "oriente"
+import { ItemState } from "sinkron-client"
 
 import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
 import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
 import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
+import { useStore, useSpace, DocumentListItemData } from "../store"
 import { Avatar } from "../ui/avatar"
 import { Button } from "../ui/button"
 import { Icon } from "../ui/icon"
-import { useStore, useSpace, DocumentListItemData } from "../store"
-import { ItemState } from "sinkron-client"
+import ActionStateView from "../ui/ActionStateView"
 
 interface DocumentListItemProps {
     data: DocumentListItemData
@@ -70,19 +74,44 @@ const DocumentList = observer(() => {
     const [match, params] = useRoute("/documents/:id")
     const selectedId = match ? params.id : undefined
 
-    let content
-    if (space.documentList.map.size > 0) {
-        content = space.sortedDocumentList.map((item) => (
-            <DocumentListItem
-                key={item.id}
-                data={item}
-                isSelected={item.id === selectedId}
-                onSelect={() => navigate(`/documents/${item.id}`)}
-            />
-        ))
-    }
+    const state = useMemo(() => {
+        return fromPromise(
+            new Promise<void>((resolve) => {
+                reaction(
+                    () => space.collection.isLoaded,
+                    (value) => {
+                        if (value) resolve()
+                    }
+                )
+            })
+        )
+    }, [])
 
-    return <div style={{ flexGrow: 1, overflow: "auto" }}>{content}</div>
+    return (
+        <div style={{ flexGrow: 1, overflow: "auto" }}>
+            <ActionStateView state={state}>
+                {() => {
+                    let content
+                    if (
+                        space.collection.isLoaded &&
+                        space.documentList.map.size > 0
+                    ) {
+                        content = space.sortedDocumentList.map((item) => (
+                            <DocumentListItem
+                                key={item.id}
+                                data={item}
+                                isSelected={item.id === selectedId}
+                                onSelect={() =>
+                                    navigate(`/documents/${item.id}`)
+                                }
+                            />
+                        ))
+                    }
+                    return content
+                }}
+            </ActionStateView>
+        </div>
+    )
 })
 
 const DocumentListView = observer(() => {

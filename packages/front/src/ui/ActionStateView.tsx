@@ -10,7 +10,19 @@ interface ActionStateViewProps<T> {
     children: React.ReactNode | ((value: T) => React.ReactNode)
 }
 
-const PendingComponent = () => <>Loading...</>
+const PendingComponent = () => (
+    <div
+        style={{
+            color: "var(--color-secondary)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 120,
+        }} className="fadeInDelay"
+    >
+        Loading...
+    </div>
+)
 
 const ErrorComponent = (props) => (
     <div style={{ color: "var(--color-error)" }}>Error: {props.children}</div>

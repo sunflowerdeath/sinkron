@@ -319,7 +319,7 @@ class SpaceStore {
         this.store = store
 
         const col = `spaces/${space.id}`
-        const collectionStore = new IndexedDbCollectionStore(col)
+        const collectionStore = new IndexedDbCollectionStore<Document>(col)
         const token = Cookies.get("token")
         const transport = new WebsocketTransport(
             `${env.wsUrl}/sinkron/${token}`
