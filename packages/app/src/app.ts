@@ -925,17 +925,19 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 
     fastify.post<{ Params: { spaceId: string; memberId: string } }>(
-        "/spaces/:spaceId/members/:memberId/remove",
+        "/spaces/:spaceId/members/:userId/remove",
         async (request, reply) => {
             await app.transaction(async (models) => {
-                const { spaceId, memberId } = request.params
+                const { spaceId, userId } = request.params
 
                 const member = await models.members.findOne({
-                    where: { id: memberId, spaceId },
-                    select: { userId: true, role: true }
+                    where: { userId, spaceId },
+                    select: { id: true, role: true }
                 })
                 if (member === null) {
-                    reply.code(500).send()
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Member not found" } })
                     return
                 }
 
@@ -950,11 +952,13 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                         ? currentUserMember.role === "owner"
                         : ["admin", "owner"].includes(currentUserMember.role))
                 if (!isPermitted) {
-                    reply.code(500).send()
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
                     return
                 }
 
-                await models.members.delete({ id: memberId })
+                await models.members.delete({ id: member.id })
                 reply.send({})
             })
         }

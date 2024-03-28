@@ -1,19 +1,21 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { observer } from "mobx-react-lite"
+import { makeAutoObservable } from "mobx"
 import { useLocation, Link } from "wouter"
 import { partition } from "lodash-es"
 import { Col, Row } from "oriente"
 
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore, useSpace, SpaceRole } from "../store"
+import { useStore, useSpace, SpaceStore, SpaceRole } from "../store"
 
 import { Avatar } from "../ui/avatar"
 import Container from "../ui/Container"
 import { Button } from "../ui/button"
 import { Icon } from "../ui/icon"
 import { Menu, MenuItem } from "../ui/menu"
-import ActionStateView from "../ui/ActionStateView"
+import ActionStateView, { initialActionState } from "../ui/ActionStateView"
+import { Toast, useToast } from "../ui/toast"
 
 type SpaceMember = {
     role: string
@@ -25,16 +27,22 @@ type SpaceMemberListItemProps = {
     member: SpaceMember
     currentUserId: string
     currentUserRole: SpaceRole
+    store: SpaceMembersStore
 }
 
 const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
-    const { member, currentUserRole, currentUserId } = props
+    const { member, currentUserRole, currentUserId, store } = props
+
+    const [removeState, setRemoveState] = useState(initialActionState)
+    const remove = () => {
+        setRemoveState(store.removeMember(member))
+    }
 
     const menu = () => {
         return (
             <>
                 <MenuItem>Change role</MenuItem>
-                <MenuItem>Remove from space</MenuItem>
+                <MenuItem onSelect={remove}>Remove from space</MenuItem>
             </>
         )
     }
@@ -50,7 +58,11 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
     const actionsButton = showActions && (
         <Menu menu={menu} placement={{ align: "end", offset: 8 }}>
             {(ref, { open }) => (
-                <Button ref={ref} onClick={open}>
+                <Button
+                    ref={ref}
+                    onClick={open}
+                    isDisabled={removeState.state === "pending"}
+                >
                     <Icon svg={expandMoreSvg} />
                 </Button>
             )}
@@ -121,13 +133,63 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
     )
 })
 
+type SpaceMembersStoreProps = {
+    space: SpaceStore
+    toast: ReturnType<typeof useToast>
+}
+
+class SpaceMembersStore {
+    space: SpaceStore
+    members: SpaceMember[] = []
+    invites: Invite[] = []
+    fetchState = initialActionState
+    toast: ReturnType<typeof useToast>
+
+    constructor(props: SpaceMembersStoreProps) {
+        const { space, toast } = props
+        this.space = space
+        this.toast = toast
+
+        makeAutoObservable(this)
+
+        this.fetchState = space.fetchMembers()
+        this.fetchState.then(({ members, invites }) => {
+            this.members = members
+            this.invites = invites
+        })
+    }
+
+    removeMember(member: SpaceMember) {
+        const { id, name } = member
+        const state = this.space.removeMember(member.id)
+        state
+            .then(() => {
+                const idx = this.members.findIndex((m) => m.id === id)
+                this.members.splice(idx, 1)
+                this.toast.show({
+                    children: <Toast>Member @{name} is removed from space</Toast>
+                })
+            })
+            .catch((error) => {
+                this.toast.show({
+                    children: (
+                        <Toast variant="error">
+                            Can't remove member: {error.message}
+                        </Toast>
+                    )
+                })
+            })
+        return state
+    }
+}
+
 interface SpaceMemberListProps {
-    members: SpaceMember[]
-    invites: Invite[]
+    store: SpaceMembersStore
 }
 
 const SpaceMemberList = observer((props: SpaceMemberListProps) => {
-    const { members, invites } = props
+    const membersStore = props.store
+    const { members, invites } = membersStore
 
     const store = useStore()
     const space = useSpace()
@@ -143,6 +205,7 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
                     member={m}
                     currentUserRole={role}
                     currentUserId={store.user.id}
+                    store={membersStore}
                 />
             ))}
             {invites.map((i) => (
@@ -158,6 +221,7 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
                     member={m}
                     currentUserRole={role}
                     currentUserId={store.user.id}
+                    store={membersStore}
                 />
             ))}
             {/*<Row gap={8} style={{ alignSelf: "stretch" }} align="center">
@@ -193,7 +257,11 @@ const SpaceMembersView = observer(() => {
     const space = useSpace()
     const [location, navigate] = useLocation()
 
-    const fetchMembersState = useMemo(() => space.fetchMembers(), [])
+    const toast = useToast()
+    const membersStore = useMemo(
+        () => new SpaceMembersStore({ space, toast }),
+        []
+    )
 
     const role = space.space.role
     const canInvite = ["admin", "owner"].includes(role)
@@ -205,10 +273,8 @@ const SpaceMembersView = observer(() => {
                     Invite
                 </Button>
             )}
-            <ActionStateView state={fetchMembersState}>
-                {({ members, invites }) => (
-                    <SpaceMemberList members={members} invites={invites} />
-                )}
+            <ActionStateView state={membersStore.fetchState}>
+                {() => <SpaceMemberList store={membersStore} />}
             </ActionStateView>
         </Container>
     )

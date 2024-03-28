@@ -469,6 +469,15 @@ class SpaceStore {
             })
         )
     }
+
+    removeMember(memberId: string) {
+        return fromPromise(
+            fetchApi({
+                method: "POST",
+                url: `${env.apiUrl}/spaces/${this.space.id}/members/${memberId}/remove`
+            })
+        )
+    }
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -485,4 +494,12 @@ const useSpace = () => {
     return space
 }
 
-export { AuthStore, Store, useStore, useSpace, StoreContext, SpaceContext }
+export {
+    AuthStore,
+    Store,
+    SpaceStore,
+    useStore,
+    useSpace,
+    StoreContext,
+    SpaceContext
+}
