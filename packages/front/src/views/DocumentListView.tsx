@@ -1,7 +1,4 @@
-import { useMemo } from "react"
 import { observer } from "mobx-react-lite"
-import { fromPromise } from "mobx-utils"
-import { reaction } from "mobx"
 import { useLocation, useRoute, Link } from "wouter"
 import { Col, Row } from "oriente"
 import { ItemState } from "sinkron-client"
@@ -74,22 +71,9 @@ const DocumentList = observer(() => {
     const [match, params] = useRoute("/documents/:id")
     const selectedId = match ? params.id : undefined
 
-    const state = useMemo(() => {
-        return fromPromise(
-            new Promise<void>((resolve) => {
-                reaction(
-                    () => space.collection.isLoaded,
-                    (value) => {
-                        if (value) resolve()
-                    }
-                )
-            })
-        )
-    }, [])
-
     return (
         <div style={{ flexGrow: 1, overflow: "auto" }}>
-            <ActionStateView state={state}>
+            <ActionStateView state={space.loadedState}>
                 {() => {
                     let content
                     if (

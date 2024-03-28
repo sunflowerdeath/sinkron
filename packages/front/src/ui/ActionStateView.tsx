@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
 import { observer, Observer } from "mobx-react-lite"
 
@@ -17,8 +18,9 @@ const PendingComponent = () => (
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            minHeight: 120,
-        }} className="fadeInDelay"
+            minHeight: 120
+        }}
+        className="fadeInDelay"
     >
         Loading...
     </div>
@@ -38,6 +40,7 @@ const ActionStateView = observer(<T,>(props: ActionStateViewProps<T>) => {
         ...actionStateViewDefaultProps,
         ...props
     }
+    const wasInitiallyFulfilled = useMemo(() => state.state === "fulfilled", [])
     if (state.state === "pending") {
         return <PendingComponent />
     }
@@ -47,7 +50,7 @@ const ActionStateView = observer(<T,>(props: ActionStateViewProps<T>) => {
     return (
         <Observer>
             {() => (
-                <div className="fadeIn">
+                <div className={wasInitiallyFulfilled ? "" : "fadeIn"}>
                     {(typeof children === "function"
                         ? children(state.value)
                         : children) || null}

@@ -6,7 +6,7 @@ import {
     computed,
     observable
 } from "mobx"
-import { fromPromise } from "mobx-utils"
+import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import Cookies from "js-cookie"
 import { v4 as uuidv4 } from "uuid"
 import { without } from "lodash-es"
@@ -311,6 +311,7 @@ class SpaceStore {
     space: Space
     store: Store
     collection: Collection<Document>
+    loadedState: IPromiseBasedObservable<void>
     categoryId: string | null = null
     documentList: TransformedMap<Item<Document>, DocumentListItemData>
 
@@ -332,6 +333,16 @@ class SpaceStore {
                 this.store.logout()
             }
         })
+        this.loadedState = fromPromise(
+            new Promise<void>((resolve) => {
+                reaction(
+                    () => this.collection.isLoaded,
+                    (value) => {
+                        if (value) resolve()
+                    }
+                )
+            })
+        )
 
         this.documentList = new TransformedMap({
             source: this.collection.items,
