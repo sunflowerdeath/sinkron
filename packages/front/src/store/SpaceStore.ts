@@ -248,6 +248,15 @@ class SpaceStore {
             })
         )
     }
+
+    cancelInvite(inviteId: string) {
+        return fromPromise(
+            fetchApi({
+                method: "POST",
+                url: `${env.apiUrl}/invites/${inviteId}/cancel`
+            })
+        )
+    }
 }
 
 export default SpaceStore

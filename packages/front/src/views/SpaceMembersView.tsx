@@ -78,7 +78,7 @@ class SpaceMembersStore {
                 this.toast.show({
                     children: (
                         <Toast>
-                            The invite for user @{invite.to.name} has beed
+                            Invite for user @{invite.to.name} has beed
                             cancelled
                         </Toast>
                     )
@@ -161,18 +161,24 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
 type SpaceInviteItemProps = {
     invite: Invite
     currentUserRole: SpaceRole
+    store: SpaceMembersStore
 }
 
 const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
-    const { invite, currentUserRole } = props
+    const { invite, store, currentUserRole } = props
 
     const showActions = ["owner", "admin"].includes(currentUserRole)
+
+    const [cancesState, setCancelState] = useState(initialActionState)
+    const cancel = () => {
+        setCancelState(store.cancelInvite(invite))
+    }
 
     const menu = () => {
         return (
             <>
                 <MenuItem>Change role</MenuItem>
-                <MenuItem>Cancel invite</MenuItem>
+                <MenuItem onSelect={cancel}>Cancel invite</MenuItem>
             </>
         )
     }
@@ -231,6 +237,7 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
                     key={i.id}
                     invite={i}
                     currentUserRole={role}
+                    store={membersStore}
                 />
             ))}
             {restMembers.map((m) => (
