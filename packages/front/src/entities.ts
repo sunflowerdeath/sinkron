@@ -8,12 +8,37 @@ export interface Space {
     role: SpaceRole
 }
 
-export type SpaceRole = "readonly" | "editor" | "admin"
+export type SpaceRole = "readonly" | "editor" | "admin" | "owner"
 
-export interface User {
+export type InviteStatus = "sent" | "cancelled" | "accepted" | "declined" | "rejected"
+
+export type Invite = {
+    id: string
+    createAt: string
+    updatedAt: string
+    status: InviteStatus
+    to: { id: string; name: string }
+    from: { id: string; name: string }
+    space: { id: string; name: string }
+    role: SpaceRole
+}
+
+export type SpaceMember = {
+    role: string
+    name: string
+    id: string
+}
+
+export type Credentials = {
+    name: string
+    password: string
+}
+
+export type User = {
     id: string
     name: string
     spaces: Space[]
+    hasUnreadNotifications: boolean
 }
 
 export type Category = {
@@ -27,7 +52,7 @@ export type Metadata = {
     categories: { [key: string]: Category }
 }
 
-export interface Document {
+export type Document = {
     content: AutomergeNode
     categories: string[]
 }

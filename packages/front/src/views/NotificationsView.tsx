@@ -2,37 +2,21 @@ import { useMemo, useState } from "react"
 import { remove } from "mobx"
 import { observer, useLocalObservable } from "mobx-react-lite"
 import { useLocation } from "wouter"
-import { Col, Row } from "oriente"
+import { Col } from "oriente"
+
+import type { Invite } from "../entities"
 
 import { Button } from "../ui/button"
 import ButtonsGrid from "../ui/ButtonsGrid"
 import { useStore } from "../store"
-import ActionStateView, { ActionState } from "../ui/ActionStateView"
+import ActionStateView, { initialActionState } from "../ui/ActionStateView"
 import Container from "../ui/Container"
 import { useToast, Toast } from "../ui/toast"
-
-type InviteStatus = "sent" | "cancelled" | "accepted" | "declined" | "rejected"
-
-type SpaceRole = "owner" | "admin" | "editor" | "readonly"
-
-type Invite = {
-    id: string
-    createAt: string
-    updatedAt: string
-    status: InviteStatus
-    to: { id: string; name: string }
-    from: { id: string; name: string }
-    space: { id: string; name: string }
-    role: SpaceRole
-}
 
 type InviteListItemProps = {
     invite: Invite
     onRemoveFromList: () => void
 }
-
-const initialActionState = <T = object,>(): ActionState<T> =>
-    Promise.resolve() as any as ActionState<T>
 
 const InviteListItem = observer((props: InviteListItemProps) => {
     const { invite, onRemoveFromList } = props

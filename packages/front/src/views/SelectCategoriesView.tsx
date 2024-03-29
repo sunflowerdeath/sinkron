@@ -10,7 +10,8 @@ import CategoriesList from "../components/CategoriesList"
 import checkBoxSvg from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutlineSvg from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
-import { Category, TreeNode } from "../store"
+import type { Category } from "../entities"
+import type { TreeNode } from "../utils/listToTree"
 
 interface CategoriesTreeItemProps {
     value: string[]

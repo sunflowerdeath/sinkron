@@ -68,7 +68,7 @@ const fetchJson = async <T extends object = object>(
         headers["Content-type"] = "application/json;charset=UTF-8"
     }
 
-    let request = fetch(url, {
+    const request = fetch(url, {
         method,
         body: data ? JSON.stringify(data) : undefined,
         credentials: "include",

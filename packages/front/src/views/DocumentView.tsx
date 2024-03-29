@@ -4,7 +4,7 @@ import { useLocation, Redirect, Link } from "wouter"
 import { useMedia } from "react-use"
 import { createEditor, Node, Transforms } from "slate"
 import { withReact, ReactEditor, Slate, Editable } from "slate-react"
-import { Col, Row } from "oriente"
+import { Row } from "oriente"
 import { without } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 
@@ -12,7 +12,8 @@ import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
-import { useSpace, Document } from "../store"
+import { useSpace } from "../store"
+import type { Document } from "../entities"
 import { fromAutomerge, applySlateOps } from "../slate"
 
 import SelectCategoriesView from "../views/SelectCategoriesView"
@@ -102,7 +103,6 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const isMobile = useMedia("(max-width: 1023px)")
 
-    const [location, navigate] = useLocation()
     const forceUpdate = useForceUpdate()
 
     const editor = useMemo(

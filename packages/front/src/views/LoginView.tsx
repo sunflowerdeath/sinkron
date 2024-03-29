@@ -19,7 +19,6 @@ interface LoginViewProps {
 }
 
 const LoginView = observer((props: LoginViewProps) => {
-    const isMobile = useMedia("(max-width: 1023px)")
     const [login, setLogin] = useState("")
     const [password, setPassword] = useState("")
 

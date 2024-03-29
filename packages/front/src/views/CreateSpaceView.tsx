@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react"
+import type { IPromiseBasedObservable } from "mobx-utils"
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { FormStore, useShowError } from "shadowform"
@@ -6,8 +7,9 @@ import { FormStore, useShowError } from "shadowform"
 import { Col } from "oriente"
 
 import { FetchError } from "../fetchJson"
-import { useStore, Space } from "../store"
-import { Result, ResultType } from "../../utils/result"
+import { useStore } from "../store"
+import type { Space } from "../entities"
+import { ResultType } from "../../utils/result"
 
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"

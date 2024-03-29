@@ -7,7 +7,8 @@ import { Col, Row } from "oriente"
 
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore, useSpace, SpaceStore, SpaceRole } from "../store"
+import { useStore, useSpace, SpaceStore } from "../store"
+import { SpaceRole, SpaceMember, Invite } from "../entities"
 
 import { Avatar } from "../ui/avatar"
 import Container from "../ui/Container"
@@ -17,10 +18,83 @@ import { Menu, MenuItem } from "../ui/menu"
 import ActionStateView, { initialActionState } from "../ui/ActionStateView"
 import { Toast, useToast } from "../ui/toast"
 
-type SpaceMember = {
-    role: string
-    name: string
-    id: string
+type SpaceMembersStoreProps = {
+    space: SpaceStore
+    toast: ReturnType<typeof useToast>
+}
+
+class SpaceMembersStore {
+    space: SpaceStore
+    members: SpaceMember[] = []
+    invites: Invite[] = []
+    fetchState = initialActionState
+    toast: ReturnType<typeof useToast>
+
+    constructor(props: SpaceMembersStoreProps) {
+        const { space, toast } = props
+        this.space = space
+        this.toast = toast
+
+        makeAutoObservable(this)
+
+        this.fetchState = space.fetchMembers()
+        this.fetchState.then(({ members, invites }) => {
+            this.members = members
+            this.invites = invites
+        })
+    }
+
+    removeMember(member: SpaceMember) {
+        const { id, name } = member
+        const state = this.space.removeMember(member.id)
+        state
+            .then(() => {
+                const idx = this.members.findIndex((m) => m.id === id)
+                this.members.splice(idx, 1)
+                this.toast.show({
+                    children: (
+                        <Toast>Member @{name} is removed from space</Toast>
+                    )
+                })
+            })
+            .catch((error) => {
+                this.toast.show({
+                    children: (
+                        <Toast variant="error">
+                            Can't remove member: {error.message}
+                        </Toast>
+                    )
+                })
+            })
+        return state
+    }
+
+    cancelInvite(invite: Invite) {
+        const state = this.space.cancelInvite(invite.id)
+        state
+            .then(() => {
+                const idx = this.invites.findIndex((i) => i.id === invite.id)
+                this.invites.splice(idx, 1)
+                this.toast.show({
+                    children: (
+                        <Toast>
+                            The invite for user @{invite.to.name} has beed
+                            cancelled
+                        </Toast>
+                    )
+                })
+            })
+            .catch((error) => {
+                this.toast.show({
+                    children: (
+                        <Toast variant="error">
+                            Couldn't cancel the invite: {error.message}
+                        </Toast>
+                    )
+                })
+            })
+        return state
+    }
 }
 
 type SpaceMemberListItemProps = {
@@ -84,12 +158,6 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
     )
 })
 
-interface Invite {
-    id: string
-    to: { id: string; name: string }
-    role: SpaceRole
-}
-
 type SpaceInviteItemProps = {
     invite: Invite
     currentUserRole: SpaceRole
@@ -132,56 +200,6 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
         </Row>
     )
 })
-
-type SpaceMembersStoreProps = {
-    space: SpaceStore
-    toast: ReturnType<typeof useToast>
-}
-
-class SpaceMembersStore {
-    space: SpaceStore
-    members: SpaceMember[] = []
-    invites: Invite[] = []
-    fetchState = initialActionState
-    toast: ReturnType<typeof useToast>
-
-    constructor(props: SpaceMembersStoreProps) {
-        const { space, toast } = props
-        this.space = space
-        this.toast = toast
-
-        makeAutoObservable(this)
-
-        this.fetchState = space.fetchMembers()
-        this.fetchState.then(({ members, invites }) => {
-            this.members = members
-            this.invites = invites
-        })
-    }
-
-    removeMember(member: SpaceMember) {
-        const { id, name } = member
-        const state = this.space.removeMember(member.id)
-        state
-            .then(() => {
-                const idx = this.members.findIndex((m) => m.id === id)
-                this.members.splice(idx, 1)
-                this.toast.show({
-                    children: <Toast>Member @{name} is removed from space</Toast>
-                })
-            })
-            .catch((error) => {
-                this.toast.show({
-                    children: (
-                        <Toast variant="error">
-                            Can't remove member: {error.message}
-                        </Toast>
-                    )
-                })
-            })
-        return state
-    }
-}
 
 interface SpaceMemberListProps {
     store: SpaceMembersStore

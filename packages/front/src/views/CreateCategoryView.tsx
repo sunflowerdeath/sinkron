@@ -8,7 +8,8 @@ import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useSpace } from "../store"
-import type { Category, Tree } from "../store"
+import type { Category } from "../entities"
+import type { Tree } from "../utils/listToTree"
 
 import { Input } from "../ui/input"
 import { Button } from "../ui/button"

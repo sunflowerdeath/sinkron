@@ -9,7 +9,8 @@ import { Button } from "../ui/button"
 import { Icon } from "../ui/icon"
 import Container from "../ui/Container"
 
-import { useSpace, Category } from "../store"
+import { useSpace } from "../store"
+import { Category } from "../entities"
 import type { TreeNode } from "../utils/listToTree"
 
 type CategoriesListItemProps = {
@@ -119,7 +120,6 @@ const CategoryList = (props: CategoryListProps) => {
 }
 
 const CategoriesView = observer(() => {
-    // const store = useStore()
     const space = useSpace()
 
     const [location, navigate] = useLocation()
