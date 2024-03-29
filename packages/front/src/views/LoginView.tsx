@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { useMedia } from "react-use"
 import { observer } from "mobx-react-lite"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { Col } from "oriente"

@@ -2,37 +2,33 @@ import { useState, useMemo } from "react"
 import type { IPromiseBasedObservable } from "mobx-utils"
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
-import { FormStore, useShowError } from "shadowform"
-
 import { Col } from "oriente"
 
+import {
+    FormStore,
+    FieldStore,
+    useShowError,
+    ShowErrorMode
+} from "../utils/forms"
 import { FetchError } from "../fetchJson"
 import { useStore } from "../store"
 import type { Space } from "../entities"
-import { ResultType } from "../../utils/result"
+import { ResultType } from "../utils/result"
 
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import Container from "../ui/Container"
 
-interface InputProps<T = string> {
-    value: T
-    onChange: (value: T) => void
-    onFocus: () => void
-    onBlur: () => void
-    hasError: boolean
-}
-
 interface FieldProps {
-    field: any
-    showRequiredError?: any
-    showValidationErrors?: any
+    field: FieldStore<any, any>
+    showRequiredError?: ShowErrorMode
+    showValidationErrors?: ShowErrorMode | { [key: string]: ShowErrorMode }
     children: ({
         inputProps,
         error
     }: {
         inputProps: any
-        error?: string
+        error?: React.ReactNode
     }) => React.ReactNode
 }
 
@@ -57,31 +53,31 @@ const Field = observer((props: FieldProps) => {
     }
     return children({
         inputProps,
-        error: showError ? field.error.value : undefined
+        error: showError ? field.error!.message : undefined
     })
 })
+
+type FormShape = { name: string }
 
 const CreateSpaceView = observer(() => {
     const store = useStore()
 
     const form = useMemo(
         () =>
-            new FormStore({
+            new FormStore<FormShape>({
                 fields: {
-                    name: {
+                    name: new FieldStore({
+                        initialValue: "",
                         isRequired: true,
-                        requiredError: "Name should not be empty",
+                        requiredErrorMessage: "Name should not be empty",
                         validations: {
-                            spaces: {
-                                validate: (val: string) =>
-                                    !val.match(/(^\s+)|(\s+$)/g),
-                                error: "Name can't start or end with a space"
-                            }
+                            noSpaces: (val: string) =>
+                                !val.match(/(^\s+)|(\s+$)/g)
+                        },
+                        errorMessages: {
+                            noSpaces: "Name can't start or end with a space"
                         }
-                    }
-                },
-                initialValues: {
-                    name: ""
+                    })
                 }
             }),
         []
@@ -93,7 +89,7 @@ const CreateSpaceView = observer(() => {
         ResultType<object, FetchError>
     > | null>(null)
     const create = async () => {
-        const state = store.createSpace(form.values.name)
+        const state = store.createSpace(form.values.name!)
         setCreateState(state)
         const res = await state
         if (res.isOk) {
@@ -103,6 +99,7 @@ const CreateSpaceView = observer(() => {
             navigate("/")
         } else {
             alert(res.error)
+            // TODO toast
         }
     }
 
@@ -111,16 +108,16 @@ const CreateSpaceView = observer(() => {
             <Field
                 field={form.fields.name}
                 showValidationErrors="onChange"
-                showRequiredError="never"
+                showRequiredError="off"
             >
                 {({ inputProps, error }) => (
-                    <Col gap={8} style={{ alignSelf: "stretch" }}>
+                    <Col
+                        gap={8}
+                        align="normal"
+                        style={{ alignSelf: "stretch" }}
+                    >
                         Name
-                        <Input
-                            style={{ width: 400 }}
-                            autoFocus
-                            {...inputProps}
-                        />
+                        <Input autoFocus {...inputProps} />
                         {error && (
                             <div style={{ color: "var(--color-error)" }}>
                                 {error}

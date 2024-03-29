@@ -14,6 +14,8 @@ module.exports = [
             }
         },
         files: ["src/**/*.{ts,tsx}"],
-        rules: {}
+        rules: {
+            "@typescript-eslint/no-explicit-any": "off"
+        }
     }
 ]
