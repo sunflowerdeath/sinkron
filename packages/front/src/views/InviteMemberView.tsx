@@ -1,19 +1,22 @@
 import { useState } from "react"
-import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
+import { Col, Row } from "oriente"
 
 import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useSpace } from "../store"
-import { Col, Row } from "oriente"
 import Container from "../ui/Container"
-import { Button } from "../ui/button"
-import { Input } from "../ui/input"
-import { Menu, MenuItem } from "../ui/menu"
-import { Icon } from "../ui/icon"
-import { Toast, useToast } from "../ui/toast"
+import {
+    Button,
+    Input,
+    Menu,
+    MenuItem,
+    Icon,
+    useActionState,
+    useStateToast
+} from "../ui"
 
 interface SelectOption {
     value: string
@@ -95,36 +98,29 @@ const Select = (props: SelectProps) => {
 
 const InviteMemberView = observer(() => {
     const [location, navigate] = useLocation()
-    const toast = useToast()
-
+    const toast = useStateToast()
     const space = useSpace()
 
-    const [role, setRole] = useState<string | undefined>()
     const [name, setName] = useState("")
+    const [role, setRole] = useState<string | undefined>()
 
-    const [sendInviteState, setSendInviteState] = useState<
-        IPromiseBasedObservable<any>
-    >(fromPromise.resolve())
-
+    const [sendInviteState, setSendInviteState] = useActionState()
     const sendInvite = () => {
         const state = space.sendInvite(name, role!)
-        setSendInviteState(space.sendInvite(name, role!))
-        state
-            .then(() => {
+        setSendInviteState(state)
+        state.then(
+            () => {
                 navigate("/")
-                toast.show({
-                    children: (
-                        <Toast>
-                            You have sent an invite to the user @{name}
-                        </Toast>
-                    )
-                })
-            })
-            .catch(() => {})
+                toast.success(<>You have sent an invite to the user "{name}"</>)
+            },
+            (e) => {
+                toast.error(<>Couldn't send invite: {e.message}</>)
+            }
+        )
     }
 
     const options = [
-        { value: "readonly", label: "Read Only" },
+        { value: "readonly", label: "Read-only" },
         { value: "editor", label: "Editor" }
     ]
     if (space.space.role === "owner") {
@@ -132,11 +128,6 @@ const InviteMemberView = observer(() => {
     }
 
     const isValid = name.length > 0 && role !== undefined
-
-    let error: React.ReactNode
-    if (sendInviteState.state === "rejected") {
-        error = "Couldn't send invite: " + sendInviteState.value.message
-    }
 
     return (
         <Container title="Invite member" onClose={() => navigate("/")}>
@@ -153,12 +144,12 @@ const InviteMemberView = observer(() => {
                     placeholder="Select role"
                 />
             </Col>
-            <Button isDisabled={!isValid} onClick={sendInvite}>
+            <Button
+                isDisabled={!isValid || sendInviteState.state === "pending"}
+                onClick={sendInvite}
+            >
                 Send invite
             </Button>
-            {error && (
-                <div style={{ color: "var(--color-error)" }}>{error}</div>
-            )}
         </Container>
     )
 })

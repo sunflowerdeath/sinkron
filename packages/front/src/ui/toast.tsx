@@ -18,7 +18,9 @@ const toastStyles = (props: ToastPropsWithDefaults): StyleMap => {
             color: "white",
             background: props.variant === "default" ? "#777" : "#a33",
             padding: "12px 32px 12px 16px",
-            marginBottom: 16
+            marginBottom: 16,
+            maxWidth: 400,
+            boxSizing: "border-box"
         }
     }
 }
@@ -29,4 +31,20 @@ const Toast = (inProps: ToastProps) => {
     return <div style={styles.root}>{props.children}</div>
 }
 
-export { useToast, Toast }
+const useStateToast = () => {
+    const toast = useToast()
+    return {
+        success: (children: React.ReactNode) => {
+            toast.show({
+                children: <Toast>{children}</Toast>
+            })
+        },
+        error: (children: React.ReactNode) => {
+            toast.show({
+                children: <Toast variant="error">{children}</Toast>
+            })
+        }
+    }
+}
+
+export { Toast, useToast, useStateToast }

@@ -10,10 +10,7 @@ import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirecto
 
 import { useStore, useSpace } from "../store"
 import type { DocumentListItemData } from "../store/SpaceStore"
-import { Avatar } from "../ui/avatar"
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
-import ActionStateView from "../ui/ActionStateView"
+import { Avatar, Button, Icon, ActionStateView } from "../ui"
 
 interface DocumentListItemProps {
     data: DocumentListItemData

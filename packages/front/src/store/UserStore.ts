@@ -4,7 +4,7 @@ import Cookies from "js-cookie"
 import { ChannelClient } from "sinkron-client"
 
 import env from "../env"
-import { User } from "../entities"
+import { User, Space } from "../entities"
 import { fetchJson } from "../fetchJson"
 import { fetchApi } from "../fetchJson2"
 
@@ -97,14 +97,13 @@ class UserStore {
     }
 
     async createSpace(name: string) {
-        const state = fromPromise(
-            fetchJson({
-                method: "POST",
-                url: `${env.apiUrl}/spaces/new`,
-                data: { name }
-            })
-        )
-        return state
+        const space: Space = await fetchApi({
+            method: "POST",
+            url: `${env.apiUrl}/spaces/new`,
+            data: { name }
+        })
+        this.user.spaces.push(space)
+        this.changeSpace(space.id)
     }
 
     changeSpace(spaceId: string) {

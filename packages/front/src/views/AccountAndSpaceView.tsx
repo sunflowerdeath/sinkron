@@ -1,17 +1,19 @@
-import { useState } from "react"
 import { observer } from "mobx-react-lite"
 import { useLocation, Link } from "wouter"
 import { fromPromise } from "mobx-utils"
 import { ConnectionStatus } from "sinkron-client"
 import { Col, Row, useModal } from "oriente"
 
-import { Modal } from "../ui/modal"
-import { Heading } from "../ui/heading"
+import {
+    Modal,
+    Heading,
+    Avatar,
+    Button,
+    useActionState,
+    useStateToast
+} from "../ui"
 import ButtonsGrid from "../ui/ButtonsGrid"
-import { Avatar } from "../ui/avatar"
-import { Button } from "../ui/button"
 import Container from "../ui/Container"
-import { Toast, useToast } from "../ui/toast"
 
 import { useStore, useSpace } from "../store"
 
@@ -33,29 +35,22 @@ const AccountAndSpaceView = observer(() => {
     const store = useStore()
     const space = useSpace()
     const [location, navigate] = useLocation()
-    const toast = useToast()
+    const toast = useStateToast()
 
-    const [leaveState, setLeaveState] = useState()
+    const [leaveState, setLeaveState] = useActionState<void>()
     const leave = () => {
         const state = fromPromise(store.leaveSpace())
         const name = space.space.name
         setLeaveState(state)
-        state
-            .then(() => {
-                toast.show({
-                    children: <Toast>You have left the space "{name}"</Toast>
-                })
+        state.then(
+            () => {
+                toast.success(<>You have left the space "{name}"</>)
                 navigate("/")
-            })
-            .catch(() => {
-                toast.show({
-                    children: (
-                        <Toast variant="error">
-                            Couldn't perform an operation
-                        </Toast>
-                    )
-                })
-            })
+            },
+            (e) => {
+                toast.error(<>Couldn't perform an operation: {e.message}</>)
+            }
+        )
     }
 
     const leaveModal = useModal({
@@ -69,7 +64,12 @@ const AccountAndSpaceView = observer(() => {
                     Are you sure you want to leave space "{space.space.name}"?
                     <ButtonsGrid>
                         <Button onClick={close}>Cancel</Button>
-                        <Button onClick={leave}>Leave</Button>
+                        <Button
+                            onClick={leave}
+                            isDisabled={leaveState.state === "pending"}
+                        >
+                            Leave
+                        </Button>
                     </ButtonsGrid>
                 </Col>
             )

@@ -6,8 +6,7 @@ import { format, parseISO } from "date-fns"
 
 import { useStore } from "../store"
 import Container from "../ui/Container"
-import { Button } from "../ui/button"
-import ActionStateView, { initialActionState } from "../ui/ActionStateView"
+import { Button, ActionStateView, useActionState } from "../ui"
 
 interface Session {
     isCurrent: boolean
@@ -48,14 +47,20 @@ const ActiveSessionsView = observer(() => {
     const [sessions, setSessions] = useState<Session[]>([])
     const fetchState = useMemo(() => {
         const state = store.fetchActiveSessions()
-        state.then((value) => setSessions(value as Session[])).catch(() => {})
+        state.then(
+            (value) => setSessions(value as Session[]),
+            () => {}
+        )
         return state
     }, [])
 
-    const [terminateState, setTerminateState] = useState(initialActionState)
+    const [terminateState, setTerminateState] = useActionState()
     const terminate = () => {
         const state = store.terminateSessions()
-        state.then((value) => setSessions(value as Session[])).catch(() => {})
+        state.then(
+            (value) => setSessions(value as Session[]),
+            () => {}
+        )
         setTerminateState(state)
     }
 

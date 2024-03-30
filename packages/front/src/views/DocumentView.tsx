@@ -15,12 +15,9 @@ import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 import { useSpace } from "../store"
 import type { Document } from "../entities"
 import { fromAutomerge, applySlateOps } from "../slate"
-
 import SelectCategoriesView from "../views/SelectCategoriesView"
 import CategoriesList from "../components/CategoriesList"
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
-import { Menu, MenuItem } from "../ui/menu"
+import { Button, Icon, Menu, MenuItem } from "../ui"
 
 const useForceUpdate = () => {
     const [state, setState] = useState({})

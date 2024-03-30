@@ -10,12 +10,8 @@ import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 import { useSpace } from "../store"
 import type { Category } from "../entities"
 import type { Tree } from "../utils/listToTree"
-
-import { Input } from "../ui/input"
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
+import { Input, Button, Icon, Menu, MenuItem } from "../ui"
 import Container from "../ui/Container"
-import { Menu, MenuItem } from "../ui/menu"
 
 const renderItems = (props: CategorySelectProps) => {
     const { categoryTree, disabledItems, onChange } = props

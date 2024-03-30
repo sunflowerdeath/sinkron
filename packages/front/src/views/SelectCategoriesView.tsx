@@ -2,14 +2,12 @@ import { Link } from "wouter"
 import { Col, Row } from "oriente"
 import { without } from "lodash-es"
 
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
-import Container from "../ui/Container"
-import CategoriesList from "../components/CategoriesList"
-
 import checkBoxSvg from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutlineSvg from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
+import { Button, Icon } from "../ui"
+import Container from "../ui/Container"
+import CategoriesList from "../components/CategoriesList"
 import type { Category } from "../entities"
 import type { TreeNode } from "../utils/listToTree"
 

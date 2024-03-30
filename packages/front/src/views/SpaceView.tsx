@@ -4,8 +4,7 @@ import { Route, Switch, Redirect, useLocation, Link } from "wouter"
 import { Row } from "oriente"
 
 import Container from "../ui/Container"
-import { Button } from "../ui/button"
-import { Avatar } from "../ui/avatar"
+import { Button, Avatar } from "../ui"
 
 import { SpaceContext, useStore } from "../store"
 

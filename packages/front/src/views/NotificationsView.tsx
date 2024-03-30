@@ -5,13 +5,10 @@ import { useLocation } from "wouter"
 import { Col } from "oriente"
 
 import type { Invite } from "../entities"
-
-import { Button } from "../ui/button"
-import ButtonsGrid from "../ui/ButtonsGrid"
 import { useStore } from "../store"
-import ActionStateView, { initialActionState } from "../ui/ActionStateView"
+import { Button, useStateToast, useActionState, ActionStateView } from "../ui"
+import ButtonsGrid from "../ui/ButtonsGrid"
 import Container from "../ui/Container"
-import { useToast, Toast } from "../ui/toast"
 
 type InviteListItemProps = {
     invite: Invite
@@ -22,28 +19,23 @@ const InviteListItem = observer((props: InviteListItemProps) => {
     const { invite, onRemoveFromList } = props
 
     const [location, navigate] = useLocation()
-
-    const toast = useToast()
+    const toast = useStateToast()
     const store = useStore()
 
-    const [actionState, setActionState] = useState(initialActionState)
+    const [actionState, setActionState] = useActionState<Invite>()
     const runAction = (action: "cancel" | "hide" | "accept" | "decline") => {
         const state = store.inviteAction(invite.id, action)
         setActionState(state)
-        state
-            .then((invite: Invite) => {
+        state.then(
+            (invite: Invite) => {
                 if (action === "cancel") {
-                    toast.show({ children: <Toast>Invite cancelled</Toast> })
+                    toast.success(<>Invite cancelled</>)
                 } else if (action === "decline") {
-                    toast.show({ children: <Toast>Invite declined</Toast> })
+                    toast.success(<>Invite declined</>)
                 } else if (action === "accept") {
-                    toast.show({
-                        children: (
-                            <Toast>
-                                You have joined the space "{invite.space.name}"
-                            </Toast>
-                        )
-                    })
+                    toast.success(
+                        <>You have joined the space "{invite.space.name}"</>
+                    )
                     store.user.spaces.push({
                         ...invite.space,
                         role: invite.role
@@ -52,16 +44,15 @@ const InviteListItem = observer((props: InviteListItemProps) => {
                     navigate("/")
                 }
                 onRemoveFromList()
-            })
-            .catch((e) => {
-                toast.show({
-                    children: (
-                        <Toast variant="error">
-                            Couldn't {action} invite: {e.message}
-                        </Toast>
-                    )
-                })
-            })
+            },
+            (e) => {
+                toast.error(
+                    <>
+                        Couldn't {action} invite: {e.message}
+                    </>
+                )
+            }
+        )
     }
 
     let content: React.ReactNode

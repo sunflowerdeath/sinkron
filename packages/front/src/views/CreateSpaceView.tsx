@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react"
-import type { IPromiseBasedObservable } from "mobx-utils"
+import { useMemo } from "react"
+import { fromPromise } from "mobx-utils"
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col } from "oriente"
@@ -10,13 +10,8 @@ import {
     useShowError,
     ShowErrorMode
 } from "../utils/forms"
-import { FetchError } from "../fetchJson"
 import { useStore } from "../store"
-import type { Space } from "../entities"
-import { ResultType } from "../utils/result"
-
-import { Button } from "../ui/button"
-import { Input } from "../ui/input"
+import { Button, Input, useStateToast, useActionState } from "../ui"
 import Container from "../ui/Container"
 
 interface FieldProps {
@@ -84,23 +79,20 @@ const CreateSpaceView = observer(() => {
     )
 
     const [location, navigate] = useLocation()
+    const toast = useStateToast()
 
-    const [createState, setCreateState] = useState<IPromiseBasedObservable<
-        ResultType<object, FetchError>
-    > | null>(null)
+    const [createState, setCreateState] = useActionState<void>()
     const create = async () => {
-        const state = store.createSpace(form.values.name!)
+        const state = fromPromise(store.createSpace(form.values.name!))
+        state.then(
+            () => {
+                navigate("/")
+            },
+            (e) => {
+                toast.error(<>Couldn't create space: {e.message}</>)
+            }
+        )
         setCreateState(state)
-        const res = await state
-        if (res.isOk) {
-            const space = res.value as Space
-            store.user.spaces.push(space)
-            store.changeSpace(space.id)
-            navigate("/")
-        } else {
-            alert(res.error)
-            // TODO toast
-        }
     }
 
     return (
@@ -117,7 +109,7 @@ const CreateSpaceView = observer(() => {
                         style={{ alignSelf: "stretch" }}
                     >
                         Name
-                        <Input autoFocus {...inputProps} />
+                        <Input autoFocus {...inputProps} maxLength={25} />
                         {error && (
                             <div style={{ color: "var(--color-error)" }}>
                                 {error}
@@ -128,7 +120,7 @@ const CreateSpaceView = observer(() => {
             </Field>
             <Button
                 onClick={create}
-                isDisabled={!form.isValid || createState?.state === "pending"}
+                isDisabled={!form.isValid || createState.state === "pending"}
                 style={{ alignSelf: "stretch" }}
             >
                 Create

@@ -4,9 +4,7 @@ import { Link, useLocation } from "wouter"
 
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
-import { Menu, MenuItem } from "../ui/menu"
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
+import { Menu, MenuItem, Button, Icon } from "../ui"
 import Container from "../ui/Container"
 
 import { useSpace } from "../store"
@@ -121,7 +119,6 @@ const CategoryList = (props: CategoryListProps) => {
 
 const CategoriesView = observer(() => {
     const space = useSpace()
-
     const [location, navigate] = useLocation()
 
     const onDelete = (id: string) => {

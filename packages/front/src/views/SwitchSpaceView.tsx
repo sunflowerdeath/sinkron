@@ -4,8 +4,7 @@ import { Col, Row } from "oriente"
 
 import type { Space } from "../entities"
 import { useStore } from "../store"
-import { Button } from "../ui/button"
-import { Avatar } from "../ui/avatar"
+import { Button, Avatar } from "../ui"
 import Container from "../ui/Container"
 
 const SwitchSpaceView = observer(() => {

@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
 import { observer, Observer } from "mobx-react-lite"
 
@@ -60,9 +60,14 @@ const ActionStateView = observer(<T,>(props: ActionStateViewProps<T>) => {
     )
 })
 
-export const makeInitialActionState = <T,>() =>
+const makeInitialActionState = <T,>() =>
     fromPromise.resolve({}) as ActionState<T>
 
-export const initialActionState = makeInitialActionState<object>()
+const initialActionState = makeInitialActionState<object>()
+
+const useActionState = <T = object,>(initialValue: T = null) => {
+    return useState<ActionState<T>>(fromPromise.resolve({}) as ActionState<T>)
+}
 
 export default ActionStateView
+export { makeInitialActionState, initialActionState, useActionState }

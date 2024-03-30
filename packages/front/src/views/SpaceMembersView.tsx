@@ -9,18 +9,22 @@ import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useStore, useSpace, SpaceStore } from "../store"
 import { SpaceRole, SpaceMember, Invite } from "../entities"
-
-import { Avatar } from "../ui/avatar"
+import {
+    Avatar,
+    Button,
+    Icon,
+    Menu,
+    MenuItem,
+    ActionStateView,
+    initialActionState,
+    useActionState,
+    useStateToast
+} from "../ui"
 import Container from "../ui/Container"
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
-import { Menu, MenuItem } from "../ui/menu"
-import ActionStateView, { initialActionState } from "../ui/ActionStateView"
-import { Toast, useToast } from "../ui/toast"
 
 type SpaceMembersStoreProps = {
     space: SpaceStore
-    toast: ReturnType<typeof useToast>
+    toast: ReturnType<typeof useStateToast>
 }
 
 class SpaceMembersStore {
@@ -28,7 +32,7 @@ class SpaceMembersStore {
     members: SpaceMember[] = []
     invites: Invite[] = []
     fetchState = initialActionState
-    toast: ReturnType<typeof useToast>
+    toast: ReturnType<typeof useStateToast>
 
     constructor(props: SpaceMembersStoreProps) {
         const { space, toast } = props
@@ -47,52 +51,35 @@ class SpaceMembersStore {
     removeMember(member: SpaceMember) {
         const { id, name } = member
         const state = this.space.removeMember(member.id)
-        state
-            .then(() => {
+        state.then(
+            () => {
                 const idx = this.members.findIndex((m) => m.id === id)
                 this.members.splice(idx, 1)
-                this.toast.show({
-                    children: (
-                        <Toast>Member @{name} is removed from space</Toast>
-                    )
-                })
-            })
-            .catch((error) => {
-                this.toast.show({
-                    children: (
-                        <Toast variant="error">
-                            Can't remove member: {error.message}
-                        </Toast>
-                    )
-                })
-            })
+                this.toast.success(<>Member @{name} is removed from space</>)
+            },
+            (error) => {
+                this.toast.error(<>Can't remove member: {error.message}</>)
+            }
+        )
         return state
     }
 
     cancelInvite(invite: Invite) {
         const state = this.space.cancelInvite(invite.id)
-        state
-            .then(() => {
+        state.then(
+            () => {
                 const idx = this.invites.findIndex((i) => i.id === invite.id)
                 this.invites.splice(idx, 1)
-                this.toast.show({
-                    children: (
-                        <Toast>
-                            Invite for user @{invite.to.name} has beed
-                            cancelled
-                        </Toast>
-                    )
-                })
-            })
-            .catch((error) => {
-                this.toast.show({
-                    children: (
-                        <Toast variant="error">
-                            Couldn't cancel the invite: {error.message}
-                        </Toast>
-                    )
-                })
-            })
+                this.toast.success(
+                    <>Invite for user @{invite.to.name} has beed cancelled</>
+                )
+            },
+            (error) => {
+                this.toast.error(
+                    <>Couldn't cancel the invite: {error.message}</>
+                )
+            }
+        )
         return state
     }
 }
@@ -107,7 +94,7 @@ type SpaceMemberListItemProps = {
 const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
     const { member, currentUserRole, currentUserId, store } = props
 
-    const [removeState, setRemoveState] = useState(initialActionState)
+    const [removeState, setRemoveState] = useActionState()
     const remove = () => {
         setRemoveState(store.removeMember(member))
     }
@@ -169,7 +156,7 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
 
     const showActions = ["owner", "admin"].includes(currentUserRole)
 
-    const [cancesState, setCancelState] = useState(initialActionState)
+    const [cancelState, setCancelState] = useActionState()
     const cancel = () => {
         setCancelState(store.cancelInvite(invite))
     }
@@ -282,7 +269,7 @@ const SpaceMembersView = observer(() => {
     const space = useSpace()
     const [location, navigate] = useLocation()
 
-    const toast = useToast()
+    const toast = useStateToast()
     const membersStore = useMemo(
         () => new SpaceMembersStore({ space, toast }),
         []

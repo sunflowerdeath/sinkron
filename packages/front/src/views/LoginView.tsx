@@ -5,12 +5,7 @@ import { Col } from "oriente"
 import { Link } from "wouter"
 
 import { AuthStore } from "../store"
-
-import { Button } from "../ui/button"
-import { Input } from "../ui/input"
-import { Icon } from "../ui/icon"
-import { Heading } from "../ui/heading"
-
+import { Button, Input, Icon, Heading } from "../ui"
 import logoSvg from "../logo.svg"
 
 interface LoginViewProps {
