@@ -601,18 +601,27 @@ class Collection<T extends object> {
     }
 
     async backup() {
-        console.log(
-            `Backup to local store, changed ${this.backupQueue.size} items`
-        )
-        for (const key of this.backupQueue) {
+        if (this.backupQueue.size === 0) {
+            console.log("Backup is skipped, no items changed")
+            return
+        }
+
+        const clonedQueue = new Set<string>()
+        for (const key of this.backupQueue) clonedQueue.add(key)
+        this.backupQueue.clear()
+        const colrev = this.colrev
+
+        for (const key of clonedQueue) {
             const item = this.items.get(key)
             if (item) {
-                await this.store!.save(key, item, this.colrev)
+                await this.store!.save(key, item, colrev)
             } else {
-                await this.store!.delete(key, this.colrev)
+                await this.store!.delete(key, colrev)
             }
         }
-        this.backupQueue.clear()
+        console.log(
+            `Completed backup to local store, stored ${clonedQueue.size} items`
+        )
     }
 
     flush() {
