@@ -2,11 +2,14 @@ import { useState, useCallback, useMemo } from "react"
 import { observer } from "mobx-react-lite"
 import { useLocation, Redirect, Link } from "wouter"
 import { useMedia } from "react-use"
-import { createEditor, Node, Transforms } from "slate"
+import { createEditor, Node, Transforms, Editor, Point } from "slate"
 import { withReact, ReactEditor, Slate, Editable } from "slate-react"
 import { Row } from "oriente"
 import { without } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
+
+window.Editor = Editor
+window.Transforms = Transforms
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
@@ -87,6 +90,7 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
         }
         normalizeNode(entry)
     }
+    window.editor = editor
     return editor
 }
 
@@ -111,11 +115,25 @@ const EditorView = observer((props: EditorViewProps) => {
         []
     )
     const value = useMemo(
-        () => (fromAutomerge(doc.content) as any).children,
+        () => {
+            // 
+            return (fromAutomerge(doc.content) as any).children
+        },
         [doc]
     )
     useMemo(() => {
         editor.children = value
+
+        // if (editor.selection !== null) {
+            // const end = Editor.end(editor, [])
+            // const { anchor, focus } = editor.selection
+            // const selection = {
+                // anchor: Point.isAfter(anchor, end) ? end : anchor,
+                // focus: Point.isAfter(focus, end) ? end : focus
+            // }
+            // editor.selection = selection
+        // }
+
         forceUpdate()
     }, [value])
 
@@ -188,7 +206,6 @@ const DocumentView = observer((props: DocumentViewProps) => {
             (op) => op.type !== "set_selection"
         )
         if (ops.length > 0) {
-            console.log(ops)
             space.collection.change(id, (doc) =>
                 applySlateOps(doc.content, ops)
             )

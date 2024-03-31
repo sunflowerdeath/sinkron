@@ -6,7 +6,6 @@ import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import { Menu, MenuItem, Button, Icon } from "../ui"
 import Container from "../ui/Container"
-
 import { useSpace } from "../store"
 import { Category } from "../entities"
 import type { TreeNode } from "../utils/listToTree"

@@ -5,8 +5,7 @@ import { ChannelClient } from "sinkron-client"
 
 import env from "../env"
 import { User, Space } from "../entities"
-import { fetchJson } from "../fetchJson"
-import { fetchApi } from "../fetchJson2"
+import { fetchApi } from "../utils/fetchJson"
 
 import AuthStore from "./AuthStore"
 import SpaceStore from "./SpaceStore"
@@ -72,17 +71,22 @@ class UserStore {
 
     async fetchUser() {
         console.log("Fetching user...")
-        const res = await fetchJson<User>({ url: `${env.apiUrl}/profile` })
-        if (res.isOk) {
-            this.updateUser(res.value)
-            console.log("Fetch user success")
-        } else {
-            if (res.error.kind === "http") {
-                // TODO if session expired / terminated
-                console.log("Fetch user error")
-                this.logout()
-            }
+        let user
+        try {
+            user = await fetchApi<User>({
+                method: "GET",
+                url: `${env.apiUrl}/profile`
+            })
+        } catch (e) {
+            // if (e.kind === "http") {
+            // TODO if session expired / terminated
+            console.log("Fetch user error")
+            this.logout()
+            // }
+            return
         }
+        this.updateUser(user)
+        console.log("Fetch user success")
     }
 
     updateUser(user: User) {

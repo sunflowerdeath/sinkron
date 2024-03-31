@@ -11,7 +11,7 @@ import {
     RemoveNodeOperation,
     SplitNodeOperation,
     InsertTextOperation,
-    RemoveTextOperation,
+    RemoveTextOperation
 } from "slate"
 
 export type AutomergeNodeWithChildren = {
@@ -34,7 +34,7 @@ const toAutomerge = (node: Node): AutomergeNode => {
     return node
 }
 
-const fromAutomerge = (node: AutomergeNode) : Node => {
+const fromAutomerge = (node: AutomergeNode): Node => {
     if ("children" in node) {
         return { ...node, children: node.children.map(fromAutomerge) }
     } else if ("text" in node) {
@@ -193,7 +193,7 @@ const ops = {
     merge_node: mergeNode,
     split_node: splitNode,
     insert_text: insertText,
-    remove_text: removeText,
+    remove_text: removeText
 }
 
 const applyOperation = (root: AutomergeNode, op: Operation) => {
@@ -205,12 +205,6 @@ const applyOperation = (root: AutomergeNode, op: Operation) => {
 // Editor state has to match state of the automerge document.
 const applySlateOps = (root: AutomergeNode, ops: Operation[]) => {
     ops.forEach((op) => applyOperation(root, op))
-}
-
-// Applies Automerge changes as Slate operations.
-// Editor state has to match state of the automerge document.
-const applyAutomergeToSlate = () => {
-    // TODO
 }
 
 export { applyOperation, applySlateOps, toAutomerge, fromAutomerge }

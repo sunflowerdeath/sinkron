@@ -3,7 +3,7 @@ import { IndexedDbCollectionStore } from "sinkron-client"
 
 import env from "../env"
 import { Credentials, User } from "../entities"
-import { fetchApi } from "../fetchJson2"
+import { fetchApi } from "../utils/fetchJson"
 
 import UserStore from "./UserStore"
 

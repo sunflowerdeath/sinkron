@@ -5,7 +5,6 @@ import { Row } from "oriente"
 
 import Container from "../ui/Container"
 import { Button, Avatar } from "../ui"
-
 import { SpaceContext, useStore } from "../store"
 
 import DocumentListView from "./DocumentListView"

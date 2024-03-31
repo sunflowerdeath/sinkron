@@ -6,7 +6,6 @@ import { Router, Switch, Route, Redirect } from 'wouter'
 import { OrienteProvider } from 'oriente'
 
 import { AuthStore, StoreContext } from './store'
-
 import SpaceView from './views/SpaceView'
 import { LoginView, SignupView } from './views/LoginView'
 

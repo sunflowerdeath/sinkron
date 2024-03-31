@@ -131,4 +131,4 @@ const fetchApi = async <T extends object = object>(
     })
 }
 
-export { fetchJson, fetchApi }
+export { fetchJson, fetchApi, FetchError }

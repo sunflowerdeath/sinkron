@@ -17,60 +17,60 @@ const root = {
                     type: "paragraph",
                     children: [
                         { type: "B", text: "One" },
-                        { type: "A", text: "Two" },
-                    ],
+                        { type: "A", text: "Two" }
+                    ]
                 },
-                { type: "paragraph", children: [{ text: "Three" }] },
-            ],
-        },
-    ],
+                { type: "paragraph", children: [{ text: "Three" }] }
+            ]
+        }
+    ]
 }
 
 const testOps: { [key: string]: Operation } = {
     insert_node: {
         type: "insert_node",
         path: [2, 2],
-        node: { type: "paragraph", children: [{ text: "Three" }] },
+        node: { type: "paragraph", children: [{ text: "Three" }] }
     },
     remove_node: {
         type: "remove_node",
         path: [2, 0],
-        node: { type: "paragraph", children: [{ text: "One" }] },
+        node: { type: "paragraph", children: [{ text: "One" }] }
     },
     move_node: {
         type: "move_node",
         path: [2, 0],
-        newPath: [1],
+        newPath: [1]
     },
     set_node: {
         type: "set_node",
         path: [1],
-        newProperties: { key: "value" },
+        newProperties: { key: "value" }
     },
     merge_node: {
         type: "merge_node",
         path: [2, 1],
         position: 1,
-        properties: {},
+        properties: {}
     },
     split_node: {
         type: "split_node",
         path: [2, 0],
         position: 1,
-        properties: { type: "paragraph" },
+        properties: { type: "paragraph" }
     },
     insert_text: {
         type: "insert_text",
         path: [0, 0],
         offset: 5,
-        text: ", world!",
+        text: ", world!"
     },
     remove_text: {
         type: "remove_text",
         path: [0, 0],
         offset: 2,
-        text: "llo",
-    },
+        text: "llo"
+    }
 }
 
 const logObject = (obj: Object) => {
@@ -142,21 +142,21 @@ describe("applySlateOps", () => {
 })
 
 const getChange = (cb: any) => {
-        const doc = Automerge.from(toAutomerge(root))
-        const changed = Automerge.change(doc, cb)
-        const change = Automerge.getLastLocalChange(changed)!
-        return Automerge.decodeChange(change)
+    const doc = Automerge.from(toAutomerge(root))
+    const changed = Automerge.change(doc, cb)
+    const change = Automerge.getLastLocalChange(changed)!
+    return Automerge.decodeChange(change)
 }
 
-describe("applyAutomergeToSlate", () => {
-    it("test", () => {
-        for (let key in testOps) {
+describe("slateToAutomerge", () => {
+    it("hz", () => {
+        for (const key in testOps) {
             const op = testOps[key]
-            const change = getChange(doc => {
+            const change = getChange((doc) => {
                 applySlateOps(doc, [op])
             })
-            // console.log("OP: ", op)
-            // logObject(change)
+            console.log("OP: ", op)
+            logObject(change)
         }
     })
 })

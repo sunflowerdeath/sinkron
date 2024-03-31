@@ -6,7 +6,8 @@
     "scripts": {
         "lint": "eslint src/index.tsx",
         "start": "webpack serve --config webpack.config.js",
-        "build": "NODE_ENV=production webpack --config webpack.config.js"
+        "build": "NODE_ENV=production webpack --config webpack.config.js",
+        "test": "webpack --config webpack.test.config.js && mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
