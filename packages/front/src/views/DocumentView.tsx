@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react"
 import { observer } from "mobx-react-lite"
 import { useLocation, Redirect, Link } from "wouter"
 import { useMedia } from "react-use"
-import { createEditor, Node, Transforms, Editor, Point } from "slate"
+import { createEditor, Node, Transforms, Editor, Point, Path } from "slate"
 import { withReact, ReactEditor, Slate, Editable } from "slate-react"
 import { Row } from "oriente"
 import { without } from "lodash-es"
@@ -99,6 +99,39 @@ interface EditorViewProps {
     onChange: (editor: ReactEditor) => void
 }
 
+const checkSelection = (editor: Editor, point: Point) => {
+    const nodes = Editor.nodes(editor, { at: point })
+
+    let node: Node = editor
+    let path: Path = []
+    let error = false
+    while (true) {
+        let res
+        try {
+            res = nodes.next()
+        } catch (e) {
+            error = true
+            break
+        }
+        if (res.value === undefined) break
+        node = res.value[0]
+        path = res.value[1]
+    }
+
+    if (error) {
+        return Editor.start(editor, path)
+    }
+
+    // TODO later check how it works with nested blocks
+    // and voids
+
+    if (!("text" in node)) {
+        return Editor.start(editor, path)
+    }
+
+    return { path, offset: Math.min(node.text.length, point.offset) }
+}
+
 const EditorView = observer((props: EditorViewProps) => {
     const { doc, onChange } = props
 
@@ -114,25 +147,19 @@ const EditorView = observer((props: EditorViewProps) => {
             }),
         []
     )
-    const value = useMemo(
-        () => {
-            // 
-            return (fromAutomerge(doc.content) as any).children
-        },
-        [doc]
-    )
+    const value = useMemo(() => {
+        //
+        return (fromAutomerge(doc.content) as any).children
+    }, [doc])
     useMemo(() => {
         editor.children = value
 
-        // if (editor.selection !== null) {
-            // const end = Editor.end(editor, [])
-            // const { anchor, focus } = editor.selection
-            // const selection = {
-                // anchor: Point.isAfter(anchor, end) ? end : anchor,
-                // focus: Point.isAfter(focus, end) ? end : focus
-            // }
-            // editor.selection = selection
-        // }
+        if (editor.selection !== null) {
+            editor.selection = {
+                anchor: checkSelection(editor, editor.selection.anchor),
+                focus: checkSelection(editor, editor.selection.focus)
+            }
+        }
 
         forceUpdate()
     }, [value])
