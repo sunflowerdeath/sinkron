@@ -1,4 +1,5 @@
 import { forwardRef, createElement } from "react"
+import { Link } from "wouter"
 
 import {
     useTaply,
@@ -14,14 +15,14 @@ interface ButtonProps extends StyleProps<[ButtonProps, TapState]> {
     children: React.ReactNode
     kind?: "solid" | "transparent" | "faint"
     size?: "s" | "m"
-    onClick: () => void
+    onClick?: () => void
     isDisabled?: boolean
     onChangeTapState?: (tapState: TapState) => void
 }
 
 const buttonStyles = (
     props: ButtonProps,
-    { isFocused, isHovered, isPressed }: TapState
+    { isFocused, isHovered }: TapState
 ): StyleMap => {
     const size = props.size === "s" ? 45 : 60
     return {
@@ -79,4 +80,13 @@ const Button = forwardRef((props: ButtonProps, ref) => {
     })
 })
 
-export { Button }
+interface LinkButtonProps extends Omit<ButtonProps, "as"> {
+    to: string
+}
+
+const LinkButton = forwardRef((props: LinkButtonProps) => {
+    const { to, ...rest } = props
+    return <Button as={Link} to={to} {...rest} />
+})
+
+export { Button, LinkButton }

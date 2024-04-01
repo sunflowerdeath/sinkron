@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite"
-import { useLocation, Link } from "wouter"
+import { useLocation } from "wouter"
 import { fromPromise } from "mobx-utils"
 import { ConnectionStatus } from "sinkron-client"
 import { Col, Row, useModal } from "oriente"
@@ -8,6 +8,7 @@ import {
     Modal,
     Heading,
     Avatar,
+    LinkButton,
     Button,
     useActionState,
     useStateToast
@@ -34,7 +35,7 @@ const roleMap = {
 const AccountAndSpaceView = observer(() => {
     const store = useStore()
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const toast = useStateToast()
 
     const [leaveState, setLeaveState] = useActionState<void>()
@@ -76,23 +77,6 @@ const AccountAndSpaceView = observer(() => {
         }
     })
 
-    const deleteModal = useModal({
-        Component: Modal,
-        width: 440,
-        isCentered: true,
-        children: (close) => {
-            return (
-                <Col gap={20}>
-                    Are you sure you want to delete space "name"?
-                    <ButtonsGrid>
-                        <Button onClick={close}>Cancel</Button>
-                        <Button>DELETE</Button>
-                    </ButtonsGrid>
-                </Col>
-            )
-        }
-    })
-
     const role = space.space.role
     const canInvite = role === "admin" || role === "owner"
 
@@ -111,9 +95,9 @@ const AccountAndSpaceView = observer(() => {
                     <div>{store.user!.name}</div>
                 </Row>
                 <ButtonsGrid>
-                    <Button as={Link} to="/account/settings">
+                    <LinkButton to="/account/settings">
                         Account settings
-                    </Button>
+                    </LinkButton>
                     <Button onClick={() => store.logout()}>Log out</Button>
                 </ButtonsGrid>
             </Col>
@@ -130,22 +114,15 @@ const AccountAndSpaceView = observer(() => {
                     </Col>
                 </Row>
                 <ButtonsGrid>
-                    <Button as={Link} to="/space/members">
-                        Members
-                    </Button>
+                    <LinkButton to="/space/members">Members</LinkButton>
                     {canInvite && (
-                        <Button as={Link} to="/space/invite">
-                            Invite
-                        </Button>
+                        <LinkButton to="/space/invite">Invite</LinkButton>
                     )}
                     {role === "owner" ? (
                         <>
-                            <Button as={Link} to="/space/settings">
+                            <LinkButton to="/space/settings">
                                 Space settings
-                            </Button>
-                            <Button onClick={() => deleteModal.open()}>
-                                Delete space
-                            </Button>
+                            </LinkButton>
                         </>
                     ) : (
                         <Button onClick={() => leaveModal.open()}>
@@ -155,12 +132,8 @@ const AccountAndSpaceView = observer(() => {
                 </ButtonsGrid>
             </Col>
             <ButtonsGrid>
-                <Button as={Link} to="/switch-space">
-                    Switch space
-                </Button>
-                <Button as={Link} to="/create-space">
-                    Create space
-                </Button>
+                <LinkButton to="/switch-space">Switch space</LinkButton>
+                <LinkButton to="/create-space">Create space</LinkButton>
             </ButtonsGrid>
         </Col>
     )
@@ -170,7 +143,6 @@ const AccountAndSpaceView = observer(() => {
             {content}
             {status}
             {leaveModal.render()}
-            {deleteModal.render()}
         </Container>
     )
 })

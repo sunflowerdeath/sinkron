@@ -1,15 +1,15 @@
 import { observer } from "mobx-react-lite"
-import { useLocation, Link } from "wouter"
+import { useLocation } from "wouter"
 import { Col, Row } from "oriente"
 
 import type { Space } from "../entities"
 import { useStore } from "../store"
-import { Button, Avatar } from "../ui"
+import { Button, LinkButton, Avatar } from "../ui"
 import Container from "../ui/Container"
 
 const SwitchSpaceView = observer(() => {
     const store = useStore()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
 
     const select = (s: Space) => {
         store.changeSpace(s.id)
@@ -37,9 +37,7 @@ const SwitchSpaceView = observer(() => {
                     </Button>
                 ))}
             </Col>
-            <Button as={Link} to="/create-space">
-                Create new space
-            </Button>
+            <LinkButton to="/create-space">Create new space</LinkButton>
         </Container>
     )
 })

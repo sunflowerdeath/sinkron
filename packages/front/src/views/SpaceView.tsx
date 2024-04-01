@@ -1,55 +1,22 @@
 import { observer } from "mobx-react-lite"
 import { useMedia } from "react-use"
-import { Route, Switch, Redirect, useLocation, Link } from "wouter"
-import { Row } from "oriente"
+import { Route, Switch, Redirect } from "wouter"
 
-import Container from "../ui/Container"
-import { Button, Avatar } from "../ui"
 import { SpaceContext, useStore } from "../store"
 
 import DocumentListView from "./DocumentListView"
 import DocumentView from "./DocumentView"
 import CategoriesView from "./CategoriesView"
 import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
-
 import AccountAndSpaceView from "./AccountAndSpaceView"
+import AccountSettingsView from "./AccountSettingsView"
 import ActiveSessionsView from "./ActiveSessionsView"
 import NotificationsView from "./NotificationsView"
-
-import CreateSpaceView from "./CreateSpaceView"
+import SpaceSettingsView from "./SpaceSettingsView"
 import SpaceMembersView from "./SpaceMembersView"
-import SwitchSpaceView from "./SwitchSpaceView"
 import InviteMemberView from "./InviteMemberView"
-
-const SpaceSettingsView = observer(() => {
-    const [location, navigate] = useLocation()
-    const store = useStore()
-    return (
-        <Container title="Space settings" onClose={() => navigate("/")}>
-            <Button>Change image</Button>
-            <Button>Change name</Button>
-            <Button>Delete space</Button>
-        </Container>
-    )
-})
-
-const AccountSettingsView = observer(() => {
-    const [location, navigate] = useLocation()
-    const store = useStore()
-    return (
-        <Container title="Account settings" onClose={() => navigate("/")}>
-            <Row gap={8} align="center">
-                <Avatar name={store.user!.name} />
-                <div>{store.user!.name}</div>
-            </Row>
-            <Button>Change image</Button>
-            <Button>Change password</Button>
-            <Button as={Link} to="/account/sessions">
-                Active sessions
-            </Button>
-        </Container>
-    )
-})
+import CreateSpaceView from "./CreateSpaceView"
+import SwitchSpaceView from "./SwitchSpaceView"
 
 const SpaceView = observer(() => {
     const store = useStore()

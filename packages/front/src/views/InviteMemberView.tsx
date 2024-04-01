@@ -97,7 +97,7 @@ const Select = (props: SelectProps) => {
 }
 
 const InviteMemberView = observer(() => {
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const toast = useStateToast()
     const space = useSpace()
 

@@ -1,11 +1,10 @@
-import { Link } from "wouter"
 import { Col, Row } from "oriente"
 import { without } from "lodash-es"
 
 import checkBoxSvg from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutlineSvg from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
-import { Button, Icon } from "../ui"
+import { LinkButton, Button, Icon } from "../ui"
 import Container from "../ui/Container"
 import CategoriesList from "../components/CategoriesList"
 import type { Category } from "../entities"
@@ -128,9 +127,7 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
             onClose={onClose}
             styles={{ content: { paddingBottom: 0 } }}
         >
-            <Button as={Link} to="/categories">
-                Manage categories
-            </Button>
+            <LinkButton to="/categories">Manage categories</LinkButton>
             <div style={{ flexGrow: 1 }}>{treeElem}</div>
             <div
                 style={{

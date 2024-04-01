@@ -4,7 +4,7 @@ export {
     default as ActionStateView
 } from "./ActionStateView"
 export { Avatar } from "./avatar"
-export { Button } from "./button"
+export { Button, LinkButton } from "./button"
 export { Heading } from "./heading"
 export { Icon } from "./icon"
 export { Input } from "./input"

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { remove } from "mobx"
 import { observer, useLocalObservable } from "mobx-react-lite"
 import { useLocation } from "wouter"
@@ -18,7 +18,7 @@ type InviteListItemProps = {
 const InviteListItem = observer((props: InviteListItemProps) => {
     const { invite, onRemoveFromList } = props
 
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const toast = useStateToast()
     const store = useStore()
 
@@ -141,7 +141,7 @@ const InviteList = observer((props: InviteListProps) => {
 })
 
 const NotificationsView = observer(() => {
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const store = useStore()
 
     const fetchState = useMemo(() => store.fetchNotifications(), [])

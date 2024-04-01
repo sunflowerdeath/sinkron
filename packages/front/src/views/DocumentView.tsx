@@ -1,15 +1,12 @@
 import { useState, useCallback, useMemo } from "react"
 import { observer } from "mobx-react-lite"
-import { useLocation, Redirect, Link } from "wouter"
+import { useLocation, Redirect } from "wouter"
 import { useMedia } from "react-use"
 import { createEditor, Node, Transforms, Editor, Point, Path } from "slate"
 import { withReact, ReactEditor, Slate, Editable } from "slate-react"
 import { Row } from "oriente"
 import { without } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
-
-window.Editor = Editor
-window.Transforms = Transforms
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
@@ -20,10 +17,10 @@ import type { Document } from "../entities"
 import { fromAutomerge, applySlateOps } from "../slate"
 import SelectCategoriesView from "../views/SelectCategoriesView"
 import CategoriesList from "../components/CategoriesList"
-import { Button, Icon, Menu, MenuItem } from "../ui"
+import { Button, LinkButton, Icon, Menu, MenuItem } from "../ui"
 
 const useForceUpdate = () => {
-    const [state, setState] = useState({})
+    const [_state, setState] = useState({})
     const forceUpdate = useCallback(() => {
         setState(() => ({}))
     }, [])
@@ -136,7 +133,6 @@ const EditorView = observer((props: EditorViewProps) => {
     const { doc, onChange } = props
 
     const isMobile = useMedia("(max-width: 1023px)")
-
     const forceUpdate = useForceUpdate()
 
     const editor = useMemo(
@@ -218,7 +214,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
     const { id } = props
 
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const isMobile = useMedia("(max-width: 1023px)")
 
     const item = space.collection.items.get(id)
@@ -340,9 +336,9 @@ const DocumentView = observer((props: DocumentViewProps) => {
                 }}
             >
                 <Row justify="space-between">
-                    <Button as={Link} to="/">
+                    <LinkButton to="/">
                         <Icon svg={arrowBackSvg} />
-                    </Button>
+                    </LinkButton>
                     {menuButton}
                 </Row>
                 <div style={{ flexGrow: 1 }}>{editor}</div>

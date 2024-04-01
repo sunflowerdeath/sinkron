@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite"
-import { useLocation, useRoute, Link } from "wouter"
+import { useLocation, useRoute } from "wouter"
 import { Col, Row } from "oriente"
 import { ItemState } from "sinkron-client"
 
@@ -10,7 +10,7 @@ import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirecto
 
 import { useStore, useSpace } from "../store"
 import type { DocumentListItemData } from "../store/SpaceStore"
-import { Avatar, Button, Icon, ActionStateView } from "../ui"
+import { Avatar, Button, LinkButton, Icon, ActionStateView } from "../ui"
 
 interface DocumentListItemProps {
     data: DocumentListItemData
@@ -65,7 +65,7 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
 
 const DocumentList = observer(() => {
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const [match, params] = useRoute("/documents/:id")
     const selectedId = match ? params.id : undefined
 
@@ -99,7 +99,7 @@ const DocumentList = observer(() => {
 const DocumentListView = observer(() => {
     const store = useStore()
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
 
     const createDocument = () => {
         const id = space.createDocument()
@@ -123,13 +123,12 @@ const DocumentListView = observer(() => {
                     />
                 </Button>
             )}
-            <Button
+            <LinkButton
                 style={{ flexGrow: 1, justifyContent: "start" }}
-                as={Link}
                 to="/categories"
             >
                 {space.category?.name || "All documents"}
-            </Button>
+            </LinkButton>
             <Button onClick={createDocument}>
                 <Icon svg={addSvg} />
             </Button>
@@ -152,24 +151,22 @@ const DocumentListView = observer(() => {
 
     const bottomBar = (
         <Row gap={8}>
-            <Button
+            <LinkButton
                 style={{ justifyContent: "start", flexGrow: 1 }}
-                as={Link}
                 to="/account"
             >
                 <Row gap={8} align="center">
                     <Avatar name={space.space.name} />
                     <div style={{ flexGrow: 1 }}>{space.space.name}</div>
                 </Row>
-            </Button>
-            <Button
-                as={Link}
+            </LinkButton>
+            <LinkButton
                 to="/notifications"
                 style={{ position: "relative" }}
             >
                 <Icon svg={notificationsSvg} />
                 {unreadMarker}
-            </Button>
+            </LinkButton>
         </Row>
     )
 

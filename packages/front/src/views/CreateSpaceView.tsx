@@ -78,7 +78,7 @@ const CreateSpaceView = observer(() => {
         []
     )
 
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const toast = useStateToast()
 
     const [createState, setCreateState] = useActionState<void>()

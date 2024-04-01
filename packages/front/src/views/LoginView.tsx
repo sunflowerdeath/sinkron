@@ -2,11 +2,10 @@ import { useState } from "react"
 import { observer } from "mobx-react-lite"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { Col } from "oriente"
-import { Link } from "wouter"
 
-import { AuthStore } from "../store"
-import { Button, Input, Icon, Heading } from "../ui"
 import logoSvg from "../logo.svg"
+import { AuthStore } from "../store"
+import { Button, LinkButton, Input, Icon, Heading } from "../ui"
 
 interface LoginViewProps {
     store: AuthStore
@@ -84,9 +83,9 @@ const LoginView = observer((props: LoginViewProps) => {
             >
                 Log in
             </Button>
-            <Button kind="transparent" as={Link} to="/signup">
+            <LinkButton kind="transparent" to="/signup">
                 Create account
-            </Button>
+            </LinkButton>
         </Col>
     )
 })
@@ -150,9 +149,9 @@ const SignupView = observer((props: LoginViewProps) => {
             >
                 Create account
             </Button>
-            <Button kind="transparent" as={Link} to="/">
+            <LinkButton kind="transparent" to="/">
                 Log in to existing account
-            </Button>
+            </LinkButton>
         </Col>
     )
 })

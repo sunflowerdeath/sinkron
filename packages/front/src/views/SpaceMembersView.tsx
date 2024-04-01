@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { observer } from "mobx-react-lite"
 import { makeAutoObservable } from "mobx"
-import { useLocation, Link } from "wouter"
+import { useLocation } from "wouter"
 import { partition } from "lodash-es"
 import { Col, Row } from "oriente"
 
@@ -12,6 +12,7 @@ import { SpaceRole, SpaceMember, Invite } from "../entities"
 import {
     Avatar,
     Button,
+    LinkButton,
     Icon,
     Menu,
     MenuItem,
@@ -267,7 +268,7 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
 
 const SpaceMembersView = observer(() => {
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
 
     const toast = useStateToast()
     const membersStore = useMemo(
@@ -280,11 +281,7 @@ const SpaceMembersView = observer(() => {
 
     return (
         <Container title="Space members" onClose={() => navigate("/")}>
-            {canInvite && (
-                <Button as={Link} to="/space/invite">
-                    Invite
-                </Button>
-            )}
+            {canInvite && <LinkButton to="/space/invite">Invite</LinkButton>}
             <ActionStateView state={membersStore.fetchState}>
                 {() => <SpaceMemberList store={membersStore} />}
             </ActionStateView>
