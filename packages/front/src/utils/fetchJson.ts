@@ -90,18 +90,18 @@ const fetchJson = async <T extends object = object>(
     }
 
     let json: object | undefined
-    const contentType = response.headers.get("content-type")
-    if (contentType && contentType.indexOf("application/json") !== -1) {
-        try {
-            json = await response.json()
-        } catch (e) {
-            throw new FetchError({
-                kind: "invalid_json",
-                originalError: e,
-                response
-            })
-        }
+    // const contentType = response.headers.get("content-type")
+    // if (contentType && contentType.indexOf("application/json") !== -1) {
+    try {
+        json = await response.json()
+    } catch (e) {
+        throw new FetchError({
+            kind: "invalid_json",
+            originalError: e,
+            response
+        })
     }
+    // }
     if (!response.ok) {
         throw new FetchError({ kind: "http", data: json, response })
     }

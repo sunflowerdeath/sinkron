@@ -4,9 +4,13 @@
     "version": "0.0.1",
     "description": "",
     "scripts": {
-        "lint": "eslint src/index.tsx",
         "start": "webpack serve --config webpack.config.js",
         "build": "NODE_ENV=production webpack --config webpack.config.js",
+
+        "tauri-dev": "pnpm tauri dev",
+        "tauri-build": "pnpm tauri build",
+
+        "lint": "eslint src/index.tsx",
         "test": "webpack --config webpack.test.config.js && mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
@@ -27,7 +31,8 @@
         "webpack": "^5.74.0",
         "webpack-bundle-analyzer": "^4.10.1",
         "webpack-cli": "^4.10.0",
-        "webpack-dev-server": "^4.11.1"
+        "webpack-dev-server": "^4.11.1",
+        "@tauri-apps/cli": "^1.5.11"
     },
     "dependencies": {
         "@automerge/automerge": "^2.1.10",

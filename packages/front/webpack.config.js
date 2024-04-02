@@ -1,9 +1,12 @@
 const path = require("path")
+const { DefinePlugin } = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 const { EsbuildPlugin } = require("esbuild-loader")
 
 const isProduction = process.env.NODE_ENV === "production"
+const isTauriApp = process.env.TAURI === "1"
+
 const src = path.resolve(__dirname, "src")
 
 const rules = [
@@ -40,6 +43,10 @@ const rules = [
 ]
 
 const plugins = [
+    new DefinePlugin({
+        "IS_PRODUCTION": isProduction,
+        "IS_TAURI": isTauriApp
+    }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
         favicon: "src/favicon.ico"
@@ -56,7 +63,7 @@ module.exports = {
     },
     output: {
         path: path.resolve(__dirname, "./build"),
-        publicPath: isProduction ? "/static/" : "/",
+        publicPath: isTauriApp ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[hash].js"
     },
     mode: isProduction ? "production" : "development",

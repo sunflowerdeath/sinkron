@@ -9,6 +9,7 @@ import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 import * as Bowser from "bowser"
+import cors from "@fastify/cors"
 
 import { Result, ResultType } from "./utils/result"
 import { createDataSource } from "./db"
@@ -1408,6 +1409,10 @@ class App {
         fastify.register(fastifyCookie)
         fastify.register(loginRoutes(this))
         fastify.register(appRoutes(this))
+        fastify.register(cors, {
+            origin: "tauri://localhost",
+            credentials: true
+        })
 
         return fastify
     }

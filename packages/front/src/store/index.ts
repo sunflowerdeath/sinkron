@@ -1,23 +1,4 @@
 import { createContext, useContext } from "react"
-import {
-    makeAutoObservable,
-    reaction,
-    makeObservable,
-    computed,
-    observable
-} from "mobx"
-import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
-import Cookies from "js-cookie"
-import { v4 as uuidv4 } from "uuid"
-import { without } from "lodash-es"
-import {
-    Collection,
-    Item,
-    ItemState,
-    WebsocketTransport,
-    IndexedDbCollectionStore,
-    ChannelClient
-} from "sinkron-client"
 import AuthStore from "./AuthStore"
 import UserStore from "./UserStore"
 import SpaceStore from "./SpaceStore"
