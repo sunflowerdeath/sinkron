@@ -1,6 +1,5 @@
 import * as Automerge from "@automerge/automerge"
 import {
-    Editor,
     Path,
     Node,
     Operation,
@@ -75,13 +74,14 @@ const moveNode = (
     const fromIdx = op.path.at(-1) as number
     const fromParent = findNode(root, fromPath)
     if (!("children" in fromParent)) throw new Error("Invalid path")
-    const [node] = fromParent.children.splice(fromIdx, 1)
 
     const toPath = op.newPath.slice(0, -1)
     const toIdx = op.newPath.at(-1) as number
     const toParent = findNode(root, toPath)
     if (!("children" in toParent)) throw new Error("Invalid path")
-    toParent.children.splice(toIdx, 0, toJS(node))
+
+    const [node] = fromParent.children.splice(fromIdx, 1)
+    toParent.children.splice(toIdx, 0, cloneNode(node))
 
     return root
 }

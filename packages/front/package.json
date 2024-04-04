@@ -6,16 +6,15 @@
     "scripts": {
         "start": "webpack serve --config webpack.config.js",
         "build": "NODE_ENV=production webpack --config webpack.config.js",
-
         "tauri-dev": "pnpm tauri dev",
         "tauri-build": "pnpm tauri build",
-
         "lint": "eslint src/index.tsx",
         "test": "webpack --config webpack.test.config.js && mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
+        "@tauri-apps/cli": "^1.5.11",
         "@types/js-cookie": "^3.0.6",
         "@types/lodash-es": "^4.17.6",
         "@types/react": "^18.0.24",
@@ -31,8 +30,7 @@
         "webpack": "^5.74.0",
         "webpack-bundle-analyzer": "^4.10.1",
         "webpack-cli": "^4.10.0",
-        "webpack-dev-server": "^4.11.1",
-        "@tauri-apps/cli": "^1.5.11"
+        "webpack-dev-server": "^4.11.1"
     },
     "dependencies": {
         "@automerge/automerge": "^2.1.10",
@@ -53,6 +51,7 @@
         "query-string": "^9.0.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-error-boundary": "^4.0.13",
         "react-use": "^17.4.0",
         "shadowform": "^0.3.2",
         "sinkron-client": "0.0.1",

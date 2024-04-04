@@ -1,9 +1,19 @@
 import { useState, useCallback, useMemo } from "react"
+import { ErrorBoundary } from "react-error-boundary"
 import { observer } from "mobx-react-lite"
 import { useLocation, Redirect } from "wouter"
 import { useMedia } from "react-use"
-import { createEditor, Node, Transforms, Editor, Point, Path } from "slate"
-import { withReact, ReactEditor, Slate, Editable } from "slate-react"
+import {
+    createEditor,
+    Node,
+    Transforms,
+    Editor,
+    Point,
+    Path,
+    Element,
+    Text
+} from "slate"
+import { useSlate, withReact, ReactEditor, Slate, Editable } from "slate-react"
 import { Row } from "oriente"
 import { without } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
@@ -27,6 +37,18 @@ const useForceUpdate = () => {
     return forceUpdate
 }
 
+interface Paragraph {
+    type: "paragraph"
+}
+
+interface Title {
+    type: "title"
+}
+
+interface List {
+    type: "list"
+}
+
 const renderElement = (props) => {
     switch (props.element.type) {
         case "paragraph":
@@ -40,8 +62,56 @@ const renderElement = (props) => {
                     {props.children}
                 </div>
             )
+        case "heading":
+            return <h3 {...props.attributes}>{props.children}</h3>
+        case "code":
+            return (
+                <pre
+                    style={{ padding: 8, border: "2px solid #555" }}
+                    {...props.attributes}
+                >
+                    {props.children}
+                </pre>
+            )
+        case "list":
+            return <ul {...props.attributes}>{props.children}</ul>
+        case "ordered-list":
+            return <ol {...props.attributes}>{props.children}</ol>
+        case "list-item":
+            return <li {...props.attributes}>{props.children}</li>
     }
     return <span {...props.attributes}>{props.children}</span>
+}
+
+const isNodeActive = (editor: Editor, type: string) => {
+    const { selection } = editor
+    if (!selection) return false
+    const nodes = Array.from(
+        Editor.nodes(editor, { match: (n) => n.type === type })
+    )
+    return nodes.length > 0
+}
+
+type Block = "heading" | "list" | "ordered-list" | "check-list" | "code"
+
+const listTypes: Block[] = ["list", "ordered-list", "check-list"]
+
+const toggleBlock = (editor: Editor, type: Block) => {
+    const isActive = isNodeActive(editor, type)
+    Transforms.unwrapNodes(editor, {
+        match: (n) => listTypes.includes(n.type),
+        split: true
+    })
+    if (isActive) {
+        Transforms.setNodes(editor, { type: "paragraph" })
+    } else {
+        if (listTypes.includes(type)) {
+            Transforms.setNodes(editor, { type: "list-item" })
+            Transforms.wrapNodes(editor, { type })
+        } else {
+            Transforms.setNodes(editor, { type })
+        }
+    }
 }
 
 const createDocumentEditor = (onChange: any): ReactEditor => {
@@ -51,19 +121,6 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
     editor.normalizeNode = (entry) => {
         const [node, path] = entry
         if (path.length === 0) {
-            /*if (
-                    editor.children.length <= 1 &&
-                    Editor.string(editor, [0, 0]) === ''
-                ) {
-                    const title: TitleElement = {
-                        type: 'title',
-                        children: [{ text: '' }]
-                    }
-                    Transforms.insertNodes(editor, title, {
-                        at: path.concat(0),
-                        select: true
-                    })
-                }*/
             for (const [child, childPath] of Node.children(editor, path)) {
                 const index = childPath[0]
                 if (index === 0) {
@@ -73,6 +130,7 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
                             { type: "title" },
                             { at: childPath }
                         )
+                        return
                     }
                 } else {
                     if (child.type === "title") {
@@ -81,10 +139,51 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
                             { type: "paragraph" },
                             { at: childPath }
                         )
+                        return
                     }
                 }
             }
         }
+
+        const elementsWithInlineChildren = [
+            "paragraph",
+            "list-item",
+            "heading",
+            "title"
+        ]
+        if (
+            Element.isElement(node) &&
+            elementsWithInlineChildren.includes(node.type)
+        ) {
+            for (const [child, childPath] of Node.children(editor, path)) {
+                if (Element.isElement(child) && !editor.isInline(child)) {
+                    Transforms.unwrapNodes(editor, { at: childPath })
+                    return
+                }
+            }
+        }
+
+        if (Element.isElement(node) && node.type === "list") {
+            for (const [child, childPath] of Node.children(editor, path)) {
+                if (Text.isText(child)) {
+                    Transforms.wrapNodes(
+                        editor,
+                        { type: "list-item" },
+                        { at: childPath }
+                    )
+                    return
+                }
+                if (Element.isElement(child) && child.type !== "list-item") {
+                    Transforms.setNodes(
+                        editor,
+                        { type: "list-item" },
+                        { at: childPath }
+                    )
+                    return
+                }
+            }
+        }
+
         normalizeNode(entry)
     }
     window.editor = editor
@@ -129,6 +228,28 @@ const checkSelection = (editor: Editor, point: Point) => {
     return { path, offset: Math.min(node.text.length, point.offset) }
 }
 
+const Toolbar = () => {
+    const editor = useSlate()
+    const nodes = [
+        { type: "heading", label: "H" },
+        { type: "list", label: "-" },
+        { type: "ordered-list", label: "1." },
+        { type: "code", label: "<>" }
+    ]
+    return (
+        <Row gap={4}>
+            {nodes.map(({ type, label }) => (
+                <Button
+                    kind={isNodeActive(editor, type) ? "solid" : "transparent"}
+                    onClick={() => toggleBlock(editor, type)}
+                >
+                    {label}
+                </Button>
+            ))}
+        </Row>
+    )
+}
+
 const EditorView = observer((props: EditorViewProps) => {
     const { doc, onChange } = props
 
@@ -148,6 +269,7 @@ const EditorView = observer((props: EditorViewProps) => {
         return (fromAutomerge(doc.content) as any).children
     }, [doc])
     useMemo(() => {
+        console.log(value)
         editor.children = value
 
         if (editor.selection !== null) {
@@ -161,48 +283,51 @@ const EditorView = observer((props: EditorViewProps) => {
     }, [value])
 
     return (
-        <Slate
-            initialValue={value}
-            editor={editor}
-            onChange={(a) => {
-                // Prevent bug firing twice on Android
-                if (!editor.operations.fired) {
-                    onChange?.(editor)
-                    editor.operations.fired = true
-                }
-            }}
-        >
-            <Editable
-                renderElement={renderElement}
-                style={{
-                    padding: isMobile ? 10 : 40,
-                    paddingTop: 20,
-                    paddingBottom: isMobile ? 0 : 60,
-                    outline: "none",
-                    flexGrow: 1
-                    // overflow: "auto"
+        <>
+            <Slate
+                initialValue={value}
+                editor={editor}
+                onChange={(a) => {
+                    // Prevent bug firing twice on Android
+                    if (!editor.operations.fired) {
+                        onChange?.(editor)
+                        editor.operations.fired = true
+                    }
                 }}
-                autoFocus
-                placeholder="Empty document"
-                renderPlaceholder={({ children, attributes }) => {
-                    return (
-                        <div
-                            {...attributes}
-                            style={{
-                                opacity: 0.4,
-                                position: "absolute",
-                                top: 20,
-                                left: isMobile ? 10 : 40,
-                                pointerEvents: "none",
-                                userSelect: "none"
-                            }}
-                        >
-                            {children}
-                        </div>
-                    )
-                }}
-            />
-        </Slate>
+            >
+                <Toolbar />
+                <Editable
+                    renderElement={renderElement}
+                    style={{
+                        padding: isMobile ? 10 : 40,
+                        paddingTop: 20,
+                        paddingBottom: isMobile ? 0 : 60,
+                        outline: "none",
+                        flexGrow: 1
+                        // overflow: "auto"
+                    }}
+                    autoFocus
+                    placeholder="Empty document"
+                    renderPlaceholder={({ children, attributes }) => {
+                        return (
+                            <div
+                                {...attributes}
+                                style={{
+                                    opacity: 0.4,
+                                    position: "absolute",
+                                    top: 20,
+                                    left: isMobile ? 10 : 40,
+                                    pointerEvents: "none",
+                                    userSelect: "none"
+                                }}
+                            >
+                                {children}
+                            </div>
+                        )
+                    }}
+                />
+            </Slate>
+        </>
     )
 })
 
@@ -229,9 +354,10 @@ const DocumentView = observer((props: DocumentViewProps) => {
             (op) => op.type !== "set_selection"
         )
         if (ops.length > 0) {
-            space.collection.change(id, (doc) =>
+            space.collection.change(id, (doc) => {
+                console.log(ops)
                 applySlateOps(doc.content, ops)
-            )
+            })
         }
     }
 
@@ -323,7 +449,11 @@ const DocumentView = observer((props: DocumentViewProps) => {
         </Menu>
     )
 
-    const editor = <EditorView doc={item.local} onChange={onChange} />
+    const editor = (
+        <ErrorBoundary fallback={<p>Something went wrong</p>}>
+            <EditorView doc={item.local} onChange={onChange} />
+        </ErrorBoundary>
+    )
 
     if (isMobile) {
         return (

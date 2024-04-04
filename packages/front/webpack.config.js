@@ -62,6 +62,7 @@ module.exports = {
         main: "./src/index.tsx"
     },
     output: {
+        clean: true,
         path: path.resolve(__dirname, "./build"),
         publicPath: isTauriApp ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[hash].js"
