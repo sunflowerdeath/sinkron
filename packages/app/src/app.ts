@@ -1410,7 +1410,7 @@ class App {
         fastify.register(loginRoutes(this))
         fastify.register(appRoutes(this))
         fastify.register(cors, {
-            origin: "tauri://localhost",
+            origin: ["tauri://localhost", "http://localhost:1337"],
             credentials: true
         })
 
