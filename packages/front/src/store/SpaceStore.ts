@@ -15,7 +15,7 @@ import { compareDesc } from "date-fns"
 import env from "../env"
 import { Space, Document, Category, Metadata } from "../entities"
 import { toAutomerge } from "../slate"
-import { fetchApi } from "../utils/fetchJson"
+import { Api } from "../api"
 import { TransformedMap } from "../utils/transformedMap"
 import listToTree from "../utils/listToTree"
 import type { Tree } from "../utils/listToTree"
@@ -73,14 +73,16 @@ class SpaceStore {
     loadedState: IPromiseBasedObservable<void>
     categoryId: string | null = null
     documentList: TransformedMap<Item<Document>, DocumentListItemData>
+    api: Api
 
     constructor(space: Space, store: UserStore) {
+        this.api = store.api
         this.space = space
         this.store = store
 
         const col = `spaces/${space.id}`
         const collectionStore = new IndexedDbCollectionStore<Document>(col)
-        const token = Cookies.get("token")
+        const token = this.store.user.token
         const transport = new WebsocketTransport(
             `${env.wsUrl}/sinkron/${token}`
         )
@@ -223,18 +225,18 @@ class SpaceStore {
 
     fetchMembers() {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "GET",
-                url: `${env.apiUrl}/spaces/${this.space.id}/members`
+                url: `/spaces/${this.space.id}/members`
             })
         )
     }
 
     sendInvite(toName: string, role: string) {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "POST",
-                url: `${env.apiUrl}/invites/new`,
+                url: "/invites/new",
                 data: { spaceId: this.space.id, toName, role }
             })
         )
@@ -242,18 +244,18 @@ class SpaceStore {
 
     removeMember(memberId: string) {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "POST",
-                url: `${env.apiUrl}/spaces/${this.space.id}/members/${memberId}/remove`
+                url: `/spaces/${this.space.id}/members/${memberId}/remove`
             })
         )
     }
 
     cancelInvite(inviteId: string) {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "POST",
-                url: `${env.apiUrl}/invites/${inviteId}/cancel`
+                url: `/invites/${inviteId}/cancel`
             })
         )
     }

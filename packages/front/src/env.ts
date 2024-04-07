@@ -5,8 +5,9 @@ const wsUrl = isProductionEnv
     ? "wss://api.sinkron.xyz"
     : `ws://${window.location.hostname}:80`
 
-const apiUrl =
-    isTauri && isProductionEnv ? "https://api.sinkron.xyz" : "/api"
+const apiUrl = isProductionEnv
+    ? "https://api.sinkron.xyz"
+    : "http://localhost:80"
 
 const env = {
     isProductionEnv,

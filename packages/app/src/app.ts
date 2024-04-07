@@ -23,6 +23,8 @@ import {
     SpaceRole
 } from "./entities"
 
+const authTokenHeader = "x-sinkron-auth-token"
+
 // Except for "loginRoutes"
 declare module "fastify" {
     interface FastifyRequest {
@@ -702,10 +704,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     }
                 )
                 if (!authRes.isOk) {
-                    reply
-                        .clearCookie("token", { path: "/" })
-                        .code(500)
-                        .send({ error: authRes.error })
+                    reply.code(500).send({ error: authRes.error })
                     return
                 }
 
@@ -716,25 +715,26 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 )
                 if (!profileRes.isOk) {
                     reply
-                        .clearCookie("token", { path: "/" })
                         .code(500)
                         .send({ error: { message: "Couldn't authorize" } })
                     return
                 }
 
-                reply
-                    .setCookie("token", token.token, { path: "/" })
-                    .send(profileRes.value)
+                reply.send({ ...profileRes.value, token: token.token })
             })
         }
     )
 
     fastify.post("/logout", async (request, reply) => {
-        const token = request.cookies["token"]
-        if (token !== undefined && token.length > 1) {
+        const token = request.headers[authTokenHeader]
+        if (
+            token !== undefined &&
+            typeof token == "string" &&
+            token.length > 1
+        ) {
             await app.services.auth.deleteAuthToken(app.models, token)
         }
-        reply.clearCookie("token").send()
+        reply.send()
     })
 
     fastify.post<{ Body: LoginRouteBody }>(
@@ -1212,8 +1212,8 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
 const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.addHook("preValidation", async (request, reply) => {
-        const token = request.cookies["token"]
-        if (token) {
+        const token = request.headers[authTokenHeader]
+        if (token && typeof token === "string") {
             const res = await app.services.auth.verifyAuthToken(
                 app.models,
                 token

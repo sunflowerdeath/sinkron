@@ -1,38 +1,25 @@
-import { fetchJson, FetchError, FetchParams } from "./utils/fetchJson"
-
-const authTokenHeader = "x-sinkron-auth-token"
+import { fetchJson, FetchParams, FetchError } from "./utils/fetchJson.ts"
 
 export interface ApiError {
     error: { message: string } & object
 }
 
+const authTokenHeader = "x-sinkron-token"
+
 const isApiError = (data: object | undefined): data is ApiError =>
     data !== undefined && "error" in data && typeof data.error === "object"
 
-export interface ApiProps {
-    baseUrl?: string
-    getToken: () => string | undefined
-    unauthorizedCallback?: () => void
-}
-
 class Api {
-    baseUrl = ""
-    getToken!: () => string | undefined
-    unauthorizedCallback?: () => void
+    constructor() {}
 
-    constructor(props: ApiProps) {
-        Object.assign(this, props)
-    }
+    baseUrl: string = ""
 
-    fetch<T extends object>(params: FetchParams) {
+    fetch<T>(params: FetchParams) {
         const { url, headers, ...rest } = params
-        const token = this.getToken()
         const fetchParams = {
-            ...rest,
-            url: this.baseUrl + url,
-            headers: token
-                ? { ...headers, [authTokenHeader]: token }
-                : headers
+            url: `${this.baseUrl}${url}`,
+            headers: { ...headers, [authTokenHeader]: "token" },
+            ...rest
         }
         return fetchJson<T>(fetchParams).catch((error: FetchError) => {
             // TODO handle http 401
@@ -48,4 +35,4 @@ class Api {
     }
 }
 
-export { Api }
+export default Api

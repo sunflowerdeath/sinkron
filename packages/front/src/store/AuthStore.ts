@@ -3,14 +3,20 @@ import { IndexedDbCollectionStore } from "sinkron-client"
 
 import env from "../env"
 import { Credentials, User } from "../entities"
-import { fetchApi } from "../utils/fetchJson"
+import { Api } from "../api"
 
 import UserStore from "./UserStore"
 
 class AuthStore {
     store?: UserStore = undefined
+    api: Api
 
     constructor() {
+        this.api = new Api({
+            baseUrl: env.apiUrl,
+            getToken: () => this.store?.user.token
+        })
+
         const user = localStorage.getItem("user")
         if (user !== null) {
             const spaceId = localStorage.getItem("space")
@@ -25,9 +31,9 @@ class AuthStore {
     }
 
     async login(credentials: Credentials) {
-        const user = await fetchApi<User>({
+        const user = await this.api.fetch<User>({
             method: "POST",
-            url: `${env.apiUrl}/login`,
+            url: "/login",
             data: credentials
         })
         localStorage.setItem("user", JSON.stringify(user))
@@ -36,9 +42,9 @@ class AuthStore {
     }
 
     async signup(credentials: Credentials) {
-        const user = await fetchApi<User>({
+        const user = await this.api.fetch<User>({
             method: "POST",
-            url: `${env.apiUrl}/signup`,
+            url: "/signup",
             data: credentials
         })
         localStorage.setItem("user", JSON.stringify(user))

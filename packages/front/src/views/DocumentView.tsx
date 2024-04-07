@@ -14,13 +14,18 @@ import {
     Text
 } from "slate"
 import { useSlate, withReact, ReactEditor, Slate, Editable } from "slate-react"
-import { Row } from "oriente"
-import { without } from "lodash-es"
+import { Row, Col } from "oriente"
+import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
+
+import formatBoldSvg from "@material-design-icons/svg/outlined/format_bold.svg"
+import formatItalicSvg from "@material-design-icons/svg/outlined/format_italic.svg"
+import formatUnderlinedSvg from "@material-design-icons/svg/outlined/format_underlined.svg"
+import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_strikethrough.svg"
 
 import { useSpace } from "../store"
 import type { Document } from "../entities"
@@ -56,14 +61,21 @@ const renderElement = (props) => {
         case "title":
             return (
                 <div
-                    style={{ fontSize: 24, marginBottom: 30, fontWeight: 650 }}
+                    style={{ fontSize: 28, marginBottom: 30, fontWeight: 650 }}
                     {...props.attributes}
                 >
                     {props.children}
                 </div>
             )
         case "heading":
-            return <h3 {...props.attributes}>{props.children}</h3>
+            return (
+                <h3
+                    style={{ fontSize: 23, fontWeight: 650 }}
+                    {...props.attributes}
+                >
+                    {props.children}
+                </h3>
+            )
         case "code":
             return (
                 <pre
@@ -193,9 +205,10 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
 interface EditorViewProps {
     doc: Automerge.Doc<Document>
     onChange: (editor: ReactEditor) => void
+    showToolbar: boolean
 }
 
-const checkSelection = (editor: Editor, point: Point) => {
+const checkSelectionPoint = (editor: Editor, point: Point) => {
     const nodes = Editor.nodes(editor, { at: point })
 
     let node: Node = editor
@@ -231,27 +244,80 @@ const checkSelection = (editor: Editor, point: Point) => {
 const Toolbar = () => {
     const editor = useSlate()
     const nodes = [
-        { type: "heading", label: "H" },
-        { type: "list", label: "-" },
-        { type: "ordered-list", label: "1." },
-        { type: "code", label: "<>" }
+        { type: "heading", label: "Heading" },
+        { type: "image", label: "Image" },
+        { type: "link", label: "Link" },
+        { type: "code", label: "Code" },
+        { type: "list", label: "List" },
+        { type: "ordered-list", label: "Num.list" },
+        { type: "check-list", label: "Checklist" }
     ]
+    const textNodes = [
+        { type: "b", label: <Icon svg={formatBoldSvg} /> },
+        { type: "i", label: <Icon svg={formatItalicSvg} /> },
+        { type: "u", label: <Icon svg={formatUnderlinedSvg} /> },
+        { type: "s", label: <Icon svg={formatStrikethroughSvg} /> }
+    ]
+    //
     return (
-        <Row gap={4}>
-            {nodes.map(({ type, label }) => (
-                <Button
-                    kind={isNodeActive(editor, type) ? "solid" : "transparent"}
-                    onClick={() => toggleBlock(editor, type)}
-                >
-                    {label}
-                </Button>
-            ))}
-        </Row>
+        <Col gap={8} align="normal">
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                        "repeat(auto-fill, minmax(85px, 1fr))",
+                    gap: 8
+                }}
+            >
+                {nodes.map(({ type, label }) => (
+                    <Button
+                        style={{
+                            width: "100%",
+                            boxShadow: isNodeActive(editor, type)
+                                ? "0 0 0 2px #dfdfdf inset"
+                                : "none"
+                        }}
+                        onClick={(e) => {
+                            toggleBlock(editor, type)
+                            // e.preventDefault()
+                        }}
+                        size="s"
+                    >
+                        {label}
+                    </Button>
+                ))}
+            </div>
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, minmax(60px, 1fr))",
+                    gap: 8
+                }}
+            >
+                {textNodes.map(({ type, label }) => (
+                    <Button
+                        style={{
+                            width: "100%",
+                            boxShadow: isNodeActive(editor, type)
+                                ? "0 0 0 2px #dfdfdf inset"
+                                : "none"
+                        }}
+                        onClick={(e) => {
+                            toggleBlock(editor, type)
+                            // e.preventDefault()
+                        }}
+                        size="s"
+                    >
+                        {label}
+                    </Button>
+                ))}
+            </div>
+        </Col>
     )
 }
 
 const EditorView = observer((props: EditorViewProps) => {
-    const { doc, onChange } = props
+    const { doc, onChange, showToolbar } = props
 
     const isMobile = useMedia("(max-width: 1023px)")
     const forceUpdate = useForceUpdate()
@@ -265,22 +331,40 @@ const EditorView = observer((props: EditorViewProps) => {
         []
     )
     const value = useMemo(() => {
-        //
         return (fromAutomerge(doc.content) as any).children
     }, [doc])
     useMemo(() => {
-        console.log(value)
-        editor.children = value
-
-        if (editor.selection !== null) {
-            editor.selection = {
-                anchor: checkSelection(editor, editor.selection.anchor),
-                focus: checkSelection(editor, editor.selection.focus)
+        if (!isEqual(editor.children, value)) {
+            editor.children = value
+            if (editor.selection !== null) {
+                const { anchor, focus } = editor.selection
+                const selection = {
+                    anchor: checkSelectionPoint(editor, anchor),
+                    focus: checkSelectionPoint(editor, focus)
+                }
+                if (!isEqual(editor.selection, selection)) {
+                    editor.selection = selection
+                }
             }
+            forceUpdate()
         }
-
-        forceUpdate()
     }, [value])
+
+    const toolbar = showToolbar && (
+        <div
+            style={{
+                position: "absolute",
+                padding: isMobile ? 8 : "8px 40px",
+                bottom: 0,
+                width: "100%",
+                boxSizing: "border-box",
+                background: "var(--color-background)",
+                borderTop: "2px solid #555"
+            }}
+        >
+            <Toolbar />
+        </div>
+    )
 
     return (
         <>
@@ -295,15 +379,16 @@ const EditorView = observer((props: EditorViewProps) => {
                     }
                 }}
             >
-                <Toolbar />
                 <Editable
                     renderElement={renderElement}
                     style={{
                         padding: isMobile ? 10 : 40,
                         paddingTop: 20,
-                        paddingBottom: isMobile ? 0 : 60,
+                        paddingBottom: 10,
                         outline: "none",
-                        flexGrow: 1
+                        flexGrow: 1,
+                        maxWidth: 800,
+                        boxSizing: "border-box"
                         // overflow: "auto"
                     }}
                     autoFocus
@@ -326,6 +411,7 @@ const EditorView = observer((props: EditorViewProps) => {
                         )
                     }}
                 />
+                {toolbar}
             </Slate>
         </>
     )
@@ -342,6 +428,8 @@ const DocumentView = observer((props: DocumentViewProps) => {
     const [_location, navigate] = useLocation()
     const isMobile = useMedia("(max-width: 1023px)")
 
+    const [showToolbar, setShowToolbar] = useState(false)
+
     const item = space.collection.items.get(id)
     if (item === undefined || item.local === null) {
         return <Redirect to="/" />
@@ -355,7 +443,6 @@ const DocumentView = observer((props: DocumentViewProps) => {
         )
         if (ops.length > 0) {
             space.collection.change(id, (doc) => {
-                console.log(ops)
                 applySlateOps(doc.content, ops)
             })
         }
@@ -451,7 +538,11 @@ const DocumentView = observer((props: DocumentViewProps) => {
 
     const editor = (
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
-            <EditorView doc={item.local} onChange={onChange} />
+            <EditorView
+                doc={item.local}
+                onChange={onChange}
+                showToolbar={showToolbar}
+            />
         </ErrorBoundary>
     )
 
@@ -469,7 +560,12 @@ const DocumentView = observer((props: DocumentViewProps) => {
                     <LinkButton to="/">
                         <Icon svg={arrowBackSvg} />
                     </LinkButton>
-                    {menuButton}
+                    <Row gap={8}>
+                        <Button onClick={() => setShowToolbar((v) => !v)}>
+                            Aa
+                        </Button>
+                        {menuButton}
+                    </Row>
                 </Row>
                 <div style={{ flexGrow: 1 }}>{editor}</div>
                 <Row
@@ -489,28 +585,32 @@ const DocumentView = observer((props: DocumentViewProps) => {
     }
 
     return (
-        <div style={{ height: "100dvh", position: "relative" }}>
-            <div style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}>
+        <Col align="stretch" style={{ height: "100dvh", position: "relative" }}>
+            <Row
+                gap={8}
+                style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}
+            >
+                <Button onClick={() => setShowToolbar((v) => !v)}>Aa</Button>
+                <Button>+</Button>
                 {menuButton}
-            </div>
-            <div style={{ height: "100%", overflow: "scroll" }}>{editor}</div>
+            </Row>
+            <div style={{ flexGrow: 1, overflow: "auto" }}>{editor}</div>
             <Row
                 style={{
                     background: "var(--color-background)",
-                    position: "absolute",
-                    bottom: 0,
-                    width: "100%",
                     height: 60,
                     padding: "0 40px",
                     boxSizing: "border-box",
-                    overflow: "auto"
+                    overflowX: "auto",
+                    flexShrink: 0,
+                    borderTop: "2px solid #555"
                 }}
                 align="center"
             >
                 {categoriesList}
             </Row>
             {selectCategories}
-        </div>
+        </Col>
     )
 })
 

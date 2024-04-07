@@ -41,7 +41,7 @@ const SessionListItem = observer((props: SessionListItemProps) => {
 })
 
 const ActiveSessionsView = observer(() => {
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
     const store = useStore()
 
     const [sessions, setSessions] = useState<Session[]>([])

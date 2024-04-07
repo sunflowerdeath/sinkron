@@ -6,6 +6,7 @@ export interface FetchParams {
     url: string
     data?: { [key: string]: any }
     signal?: AbortSignal
+    headers?: { [key: string]: string }
 }
 
 const defaultFetchParams = {
@@ -61,18 +62,24 @@ class FetchError extends Error {
 const fetchJson = async <T extends object = object>(
     params: FetchParams
 ): Promise<T> => {
-    const { url, method, data, signal } = { ...defaultFetchParams, ...params }
+    const { url, method, data, headers, signal } = {
+        ...defaultFetchParams,
+        ...params
+    }
 
-    const headers: { [key: string]: string } = { Accept: "application/json" }
+    const reqHeaders: { [key: string]: string } = {
+        ...headers,
+        Accept: "application/json"
+    }
     if (data !== undefined) {
-        headers["Content-type"] = "application/json;charset=UTF-8"
+        reqHeaders["Content-type"] = "application/json;charset=UTF-8"
     }
 
     const request = fetch(url, {
         method,
         body: data ? JSON.stringify(data) : undefined,
         credentials: "include",
-        headers
+        headers: reqHeaders
     })
 
     let response: Response | undefined = undefined
@@ -108,27 +115,4 @@ const fetchJson = async <T extends object = object>(
     return json as T
 }
 
-interface ApiError {
-    error: { message: string } & object
-}
-
-const isApiError = (data: object | undefined): data is ApiError =>
-    data !== undefined && "error" in data && typeof data.error === "object"
-
-const fetchApi = async <T extends object = object>(
-    params: FetchParams
-): Promise<T> => {
-    return fetchJson<T>(params).catch((error: FetchError) => {
-        // TODO handle http 401
-        if (error.kind === "http" && isApiError(error.data)) {
-            throw new FetchError({
-                kind: "application",
-                message: error.data.error.message,
-                data: error.data.error
-            })
-        }
-        throw error
-    })
-}
-
-export { fetchJson, fetchApi, FetchError }
+export { fetchJson, FetchError }

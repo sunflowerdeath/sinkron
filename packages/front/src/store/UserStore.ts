@@ -1,11 +1,10 @@
 import { makeAutoObservable, reaction } from "mobx"
 import { fromPromise } from "mobx-utils"
-import Cookies from "js-cookie"
 import { ChannelClient } from "sinkron-client"
 
 import env from "../env"
 import { User, Space } from "../entities"
-import { fetchApi } from "../utils/fetchJson"
+import { Api } from "../api"
 
 import AuthStore from "./AuthStore"
 import SpaceStore from "./SpaceStore"
@@ -22,10 +21,12 @@ class UserStore {
     spaceId?: string = undefined
     space?: SpaceStore = undefined
     channel: ChannelClient
+    api: Api
 
     constructor(props: StoreProps) {
         const { user, authStore, spaceId } = props
         this.authStore = authStore
+        this.api = authStore.api
         this.user = user
 
         if (
@@ -52,7 +53,7 @@ class UserStore {
             { fireImmediately: true }
         )
 
-        const token = Cookies.get("token")
+        const token = user.token
         this.channel = new ChannelClient({
             url: `${env.wsUrl}/channels/${token}`,
             channel: `users/${user.id}`,
@@ -73,9 +74,9 @@ class UserStore {
         console.log("Fetching user...")
         let user
         try {
-            user = await fetchApi<User>({
+            user = await this.api.fetch<User>({
                 method: "GET",
-                url: `${env.apiUrl}/profile`
+                url: "/profile"
             })
         } catch (e) {
             // if (e.kind === "http") {
@@ -101,9 +102,9 @@ class UserStore {
     }
 
     async createSpace(name: string) {
-        const space: Space = await fetchApi({
+        const space: Space = await this.api.fetch({
             method: "POST",
-            url: `${env.apiUrl}/spaces/new`,
+            url: "/spaces/new",
             data: { name }
         })
         this.user.spaces.push(space)
@@ -118,9 +119,9 @@ class UserStore {
 
     async leaveSpace() {
         if (!this.spaceId) return
-        await fetchApi({
+        await this.api.fetch({
             method: "POST",
-            url: `${env.apiUrl}/spaces/${this.spaceId}/leave`
+            url: "/spaces/${this.spaceId}/leave"
         })
         const idx = this.user.spaces.findIndex((s) => s.id === this.spaceId)
         this.user.spaces.splice(idx, 1)
@@ -130,33 +131,33 @@ class UserStore {
     fetchNotifications() {
         this.user.hasUnreadNotifications = false
         return fromPromise(
-            fetchApi({ method: "GET", url: `${env.apiUrl}/notifications` })
+            this.api.fetch({ method: "GET", url: "/notifications" })
         )
     }
 
     inviteAction(id: string, action: "accept" | "decline" | "cancel" | "hide") {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "POST",
-                url: `${env.apiUrl}/invites/${id}/${action}`
+                url: `/invites/${id}/${action}`
             })
         )
     }
 
     fetchActiveSessions() {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "GET",
-                url: `${env.apiUrl}/account/sessions`
+                url: "/account/sessions"
             })
         )
     }
 
     terminateSessions() {
         return fromPromise(
-            fetchApi({
+            this.api.fetch({
                 method: "POST",
-                url: `${env.apiUrl}/account/sessions/terminate`
+                url: "/account/sessions/terminate"
             })
         )
     }
