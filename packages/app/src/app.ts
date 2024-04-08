@@ -1410,7 +1410,11 @@ class App {
         fastify.register(loginRoutes(this))
         fastify.register(appRoutes(this))
         fastify.register(cors, {
-            origin: ["tauri://localhost", "https://sinkron.xyz"],
+            origin: [
+                "tauri://localhost",
+                "https://sinkron.xyz",
+                "http://localhost:1337"
+            ],
             credentials: true
         })
 

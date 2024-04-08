@@ -243,7 +243,9 @@ const checkSelectionPoint = (editor: Editor, point: Point) => {
 
 const Toolbar = () => {
     const editor = useSlate()
-    const nodes = [
+    const isMobile = useMedia("(max-width: 1023px)")
+
+    const blockNodes = [
         { type: "heading", label: "Heading" },
         { type: "image", label: "Image" },
         { type: "link", label: "Link" },
@@ -258,62 +260,90 @@ const Toolbar = () => {
         { type: "u", label: <Icon svg={formatUnderlinedSvg} /> },
         { type: "s", label: <Icon svg={formatStrikethroughSvg} /> }
     ]
-    //
-    return (
-        <Col gap={8} align="normal">
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                        "repeat(auto-fill, minmax(85px, 1fr))",
-                    gap: 8
-                }}
-            >
-                {nodes.map(({ type, label }) => (
-                    <Button
-                        style={{
-                            width: "100%",
-                            boxShadow: isNodeActive(editor, type)
-                                ? "0 0 0 2px #dfdfdf inset"
-                                : "none"
-                        }}
-                        onClick={(e) => {
-                            toggleBlock(editor, type)
-                            // e.preventDefault()
-                        }}
-                        size="s"
-                    >
-                        {label}
-                    </Button>
-                ))}
-            </div>
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, minmax(60px, 1fr))",
-                    gap: 8
-                }}
-            >
-                {textNodes.map(({ type, label }) => (
-                    <Button
-                        style={{
-                            width: "100%",
-                            boxShadow: isNodeActive(editor, type)
-                                ? "0 0 0 2px #dfdfdf inset"
-                                : "none"
-                        }}
-                        onClick={(e) => {
-                            toggleBlock(editor, type)
-                            // e.preventDefault()
-                        }}
-                        size="s"
-                    >
-                        {label}
-                    </Button>
-                ))}
-            </div>
-        </Col>
-    )
+
+    const blockButtons = blockNodes.map(({ type, label }) => (
+        <Button
+            style={{
+                width: "100%",
+                boxShadow: isNodeActive(editor, type)
+                    ? "0 0 0 2px #dfdfdf inset"
+                    : "none"
+            }}
+            onClick={(e) => {
+                toggleBlock(editor, type)
+                // e.preventDefault()
+            }}
+            size="s"
+        >
+            {label}
+        </Button>
+    ))
+
+    const textButtons = textNodes.map(({ type, label }) => (
+        <Button
+            style={{
+                width: isMobile ? "100%" : 60,
+                boxShadow: isNodeActive(editor, type)
+                    ? "0 0 0 2px #dfdfdf inset"
+                    : "none"
+            }}
+            onClick={(e) => {
+                toggleBlock(editor, type)
+                // e.preventDefault()
+            }}
+            size="s"
+        >
+            {label}
+        </Button>
+    ))
+
+    if (isMobile) {
+        return (
+            <Col gap={8} align="normal">
+                <div
+                    style={{
+                        flexGrow: 1,
+                        display: "grid",
+                        gridTemplateColumns:
+                            "repeat(auto-fill, minmax(75px, 1fr))",
+                            gap: 8
+                    }}
+                >
+                    {blockButtons}
+                </div>
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(4, 1fr)",
+                        gap: 8
+                    }}
+                >
+                    {textButtons}
+                </div>
+            </Col>
+        )
+    } else {
+        return (
+            <Row gap={24} align="normal" style={{ maxWidth: 800 }}>
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(4, 90px)",
+                        gap: 8
+                    }}
+                >
+                    {blockButtons}
+                </div>
+                <Row
+                    gap={8}
+                    wrap={true}
+                    style={{ width: 128, flexShrink: 0, alignSelf: "start" }}
+                >
+                    {textButtons}
+                </Row>
+            </Row>
+        )
+    }
 }
 
 const EditorView = observer((props: EditorViewProps) => {
