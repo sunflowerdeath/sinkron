@@ -126,7 +126,7 @@ const toggleBlock = (editor: Editor, type: Block) => {
     }
 }
 
-const createDocumentEditor = (onChange: any): ReactEditor => {
+const createDocumentEditor = (): ReactEditor => {
     const editor = withReact(createEditor())
     const { normalizeNode } = editor
     // editor.onChange = onChange
@@ -202,12 +202,6 @@ const createDocumentEditor = (onChange: any): ReactEditor => {
     return editor
 }
 
-interface EditorViewProps {
-    doc: Automerge.Doc<Document>
-    onChange: (editor: ReactEditor) => void
-    showToolbar: boolean
-}
-
 const checkSelectionPoint = (editor: Editor, point: Point) => {
     const nodes = Editor.nodes(editor, { at: point })
 
@@ -231,8 +225,7 @@ const checkSelectionPoint = (editor: Editor, point: Point) => {
         return Editor.start(editor, path)
     }
 
-    // TODO later check how it works with nested blocks
-    // and voids
+    // TODO check how it works with nested blocks and voids
 
     if (!("text" in node)) {
         return Editor.start(editor, path)
@@ -252,7 +245,10 @@ const Toolbar = () => {
         { type: "code", label: "Code" },
         { type: "list", label: "List" },
         { type: "ordered-list", label: "Num.list" },
-        { type: "check-list", label: "Checklist" }
+        {
+            type: "check-list",
+            label: <span style={{ fontSize: ".87rem" }}>Checklist</span>
+        }
     ]
     const textNodes = [
         { type: "b", label: <Icon svg={formatBoldSvg} /> },
@@ -306,7 +302,7 @@ const Toolbar = () => {
                         display: "grid",
                         gridTemplateColumns:
                             "repeat(auto-fill, minmax(75px, 1fr))",
-                            gap: 8
+                        gap: 8
                     }}
                 >
                     {blockButtons}
@@ -324,9 +320,10 @@ const Toolbar = () => {
         )
     } else {
         return (
-            <Row gap={24} align="normal" style={{ maxWidth: 800 }}>
+            <Row gap={24} align="space-between" style={{ maxWidth: 800 }}>
                 <div
                     style={{
+                        flexGrow: 1,
                         display: "grid",
                         gridTemplateColumns: "repeat(4, 90px)",
                         gap: 8
@@ -346,20 +343,20 @@ const Toolbar = () => {
     }
 }
 
+type EditorViewProps = {
+    id: string
+    doc: Automerge.Doc<Document>
+    onChange: (editor: ReactEditor) => void
+    onDelete: () => void
+}
+
 const EditorView = observer((props: EditorViewProps) => {
-    const { doc, onChange, showToolbar } = props
+    const { id, doc, onChange, onDelete } = props
 
-    const isMobile = useMedia("(max-width: 1023px)")
+    const space = useSpace()
+
     const forceUpdate = useForceUpdate()
-
-    const editor = useMemo(
-        () =>
-            createDocumentEditor((hz) => {
-                // console.log("onchange", operation)
-                // onChange?.(editor)
-            }),
-        []
-    )
+    const editor = useMemo(() => createDocumentEditor(), [])
     const value = useMemo(() => {
         return (fromAutomerge(doc.content) as any).children
     }, [doc])
@@ -380,107 +377,73 @@ const EditorView = observer((props: EditorViewProps) => {
         }
     }, [value])
 
-    const toolbar = showToolbar && (
-        <div
-            style={{
-                position: "absolute",
-                padding: isMobile ? 8 : "8px 40px",
-                bottom: 0,
-                width: "100%",
-                boxSizing: "border-box",
-                background: "var(--color-background)",
-                borderTop: "2px solid #555"
-            }}
-        >
-            <Toolbar />
-        </div>
-    )
-
-    return (
-        <>
-            <Slate
-                initialValue={value}
-                editor={editor}
-                onChange={(a) => {
-                    // Prevent bug firing twice on Android
-                    if (!editor.operations.fired) {
-                        onChange?.(editor)
-                        editor.operations.fired = true
-                    }
-                }}
-            >
-                <Editable
-                    renderElement={renderElement}
-                    style={{
-                        padding: isMobile ? 10 : 40,
-                        paddingTop: 20,
-                        paddingBottom: 10,
-                        outline: "none",
-                        flexGrow: 1,
-                        maxWidth: 800,
-                        boxSizing: "border-box"
-                        // overflow: "auto"
-                    }}
-                    autoFocus
-                    placeholder="Empty document"
-                    renderPlaceholder={({ children, attributes }) => {
-                        return (
-                            <div
-                                {...attributes}
-                                style={{
-                                    opacity: 0.4,
-                                    position: "absolute",
-                                    top: 20,
-                                    left: isMobile ? 10 : 40,
-                                    pointerEvents: "none",
-                                    userSelect: "none"
-                                }}
-                            >
-                                {children}
-                            </div>
-                        )
-                    }}
-                />
-                {toolbar}
-            </Slate>
-        </>
-    )
-})
-
-interface DocumentViewProps {
-    id: string
-}
-
-const DocumentView = observer((props: DocumentViewProps) => {
-    const { id } = props
-
-    const space = useSpace()
-    const [_location, navigate] = useLocation()
     const isMobile = useMedia("(max-width: 1023px)")
 
     const [showToolbar, setShowToolbar] = useState(false)
-
-    const item = space.collection.items.get(id)
-    if (item === undefined || item.local === null) {
-        return <Redirect to="/" />
-    }
-
-    const doc = item.local
-
-    const onChange = (editor: ReactEditor) => {
-        const ops = editor.operations.filter(
-            (op) => op.type !== "set_selection"
+    let bottomElem
+    if (showToolbar) {
+        bottomElem = (
+            <div
+                style={{
+                    padding: isMobile ? 8 : "8px 40px",
+                    boxSizing: "border-box",
+                    background: "var(--color-background)",
+                    borderTop: "2px solid #555"
+                }}
+            >
+                <Toolbar />
+            </div>
         )
-        if (ops.length > 0) {
-            space.collection.change(id, (doc) => {
-                applySlateOps(doc.content, ops)
-            })
+    } else {
+        let categoriesList
+        if (doc.categories.length > 0) {
+            categoriesList = (
+                <Row gap={8} align="center" style={{ width: "100%" }}>
+                    <div style={{ overflow: "scroll" }}>
+                        <CategoriesList
+                            items={doc.categories.map(
+                                (id) => space.meta.categories[id]!
+                            )}
+                            onRemove={(c) => {
+                                space.collection.change(id, (doc) => {
+                                    doc.categories = without(doc.categories, c)
+                                })
+                            }}
+                        />
+                    </div>
+                    <Button size="s" onClick={() => setShowSelect(true)}>
+                        <Icon svg={expandLessSvg} />
+                    </Button>
+                </Row>
+            )
+        } else {
+            categoriesList = (
+                <Button
+                    kind="faint"
+                    size="s"
+                    onClick={() => setShowSelect(true)}
+                >
+                    Select categories
+                </Button>
+            )
         }
-    }
 
-    const onDelete = () => {
-        space.collection.delete(id)
-        navigate("/")
+        bottomElem = (
+            <Row
+                style={{
+                    background: "var(--color-background)",
+                    height: 60,
+                    padding: isMobile ? "0 10px" : "0 40px",
+                    boxSizing: "border-box",
+                    overflowX: "auto",
+                    flexShrink: 0,
+                    borderTop: "2px solid #555"
+                }}
+                align="center"
+            >
+                {categoriesList}
+            </Row>
+        )
     }
 
     const menu = () => (
@@ -492,34 +455,57 @@ const DocumentView = observer((props: DocumentViewProps) => {
         </>
     )
 
-    let categoriesList
-    if (doc.categories.length > 0) {
-        categoriesList = (
-            <Row gap={8} align="center" style={{ width: "100%" }}>
-                <div style={{ overflow: "scroll" }}>
-                    <CategoriesList
-                        items={doc.categories.map(
-                            (id) => space.meta.categories[id]!
-                        )}
-                        onRemove={(c) => {
-                            space.collection.change(id, (doc) => {
-                                doc.categories = without(doc.categories, c)
-                            })
-                        }}
-                    />
-                </div>
-                <Button size="s" onClick={() => setShowSelect(true)}>
-                    <Icon svg={expandLessSvg} />
+    const menuButton = (
+        <Menu
+            menu={menu}
+            styles={{ list: { background: "#555" } }}
+            placement={{ padding: 0, offset: 8, align: "end" }}
+            autoSelectFirstItem={false}
+        >
+            {(ref, { open }) => (
+                <Button onClick={open} ref={ref}>
+                    <Icon svg={moreHorizSvg} />
                 </Button>
-            </Row>
-        )
-    } else {
-        categoriesList = (
-            <Button kind="faint" size="s" onClick={() => setShowSelect(true)}>
-                Select categories
-            </Button>
-        )
-    }
+            )}
+        </Menu>
+    )
+
+    const editorElem = (
+        <ErrorBoundary fallback={<p>Something went wrong</p>}>
+            <Editable
+                renderElement={renderElement}
+                style={{
+                    padding: isMobile ? 10 : 40,
+                    paddingTop: 20,
+                    paddingBottom: 10,
+                    outline: "none",
+                    flexGrow: 1,
+                    maxWidth: 800,
+                    boxSizing: "border-box"
+                    // overflow: "auto"
+                }}
+                autoFocus
+                placeholder="Empty document"
+                renderPlaceholder={({ children, attributes }) => {
+                    return (
+                        <div
+                            {...attributes}
+                            style={{
+                                opacity: 0.4,
+                                position: "absolute",
+                                top: 20,
+                                left: isMobile ? 10 : 40,
+                                pointerEvents: "none",
+                                userSelect: "none"
+                            }}
+                        >
+                            {children}
+                        </div>
+                    )
+                }}
+            />
+        </ErrorBoundary>
+    )
 
     let selectCategories: React.ReactNode
     const [showSelect, setShowSelect] = useState(false)
@@ -551,96 +537,87 @@ const DocumentView = observer((props: DocumentViewProps) => {
         )
     }
 
-    const menuButton = (
-        <Menu
-            menu={menu}
-            styles={{ list: { background: "#555" } }}
-            placement={{ padding: 0, offset: 8, align: "end" }}
-            autoSelectFirstItem={false}
+    const topBar = isMobile ? (
+        <Row justify="space-between" style={{ borderBottom: "2px solid #555" }}>
+            <LinkButton to="/">
+                <Icon svg={arrowBackSvg} />
+            </LinkButton>
+            <Row gap={8}>
+                <Button onClick={() => setShowToolbar((v) => !v)}>Aa</Button>
+                {menuButton}
+            </Row>
+        </Row>
+    ) : (
+        <Row gap={8} justify="end">
+            <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
+            {menuButton}
+        </Row>
+    )
+
+    const content = (
+        <Col align="stretch" style={{ height: "100dvh", position: "relative" }}>
+            {topBar}
+            <div style={{ flexGrow: 1, overflow: "auto" }}>{editorElem}</div>
+            {bottomElem}
+            {selectCategories}
+        </Col>
+    )
+
+    return (
+        <Slate
+            initialValue={value}
+            editor={editor}
+            onChange={(a) => {
+                // Prevent bug firing twice on Android
+                if (!editor.operations.fired) {
+                    onChange?.(editor)
+                    editor.operations.fired = true
+                }
+            }}
         >
-            {(ref, { open }) => (
-                <Button onClick={open} ref={ref}>
-                    <Icon svg={moreHorizSvg} />
-                </Button>
-            )}
-        </Menu>
+            {content}
+        </Slate>
     )
+})
 
-    const editor = (
-        <ErrorBoundary fallback={<p>Something went wrong</p>}>
-            <EditorView
-                doc={item.local}
-                onChange={onChange}
-                showToolbar={showToolbar}
-            />
-        </ErrorBoundary>
-    )
+interface DocumentViewProps {
+    id: string
+}
 
-    if (isMobile) {
-        return (
-            <div
-                style={{
-                    height: "100dvh",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "scroll"
-                }}
-            >
-                <Row justify="space-between">
-                    <LinkButton to="/">
-                        <Icon svg={arrowBackSvg} />
-                    </LinkButton>
-                    <Row gap={8}>
-                        <Button onClick={() => setShowToolbar((v) => !v)}>
-                            Aa
-                        </Button>
-                        {menuButton}
-                    </Row>
-                </Row>
-                <div style={{ flexGrow: 1 }}>{editor}</div>
-                <Row
-                    style={{
-                        height: 60,
-                        flexShrink: 0,
-                        padding: "0 10px",
-                        overflow: "auto"
-                    }}
-                    align="center"
-                >
-                    {categoriesList}
-                </Row>
-                {selectCategories}
-            </div>
+const DocumentView = observer((props: DocumentViewProps) => {
+    const { id } = props
+
+    const space = useSpace()
+    const [_location, navigate] = useLocation()
+
+    const item = space.collection.items.get(id)
+    if (item === undefined || item.local === null) {
+        return <Redirect to="/" />
+    }
+
+    const onChange = (editor: ReactEditor) => {
+        const ops = editor.operations.filter(
+            (op) => op.type !== "set_selection"
         )
+        if (ops.length > 0) {
+            space.collection.change(id, (doc) => {
+                applySlateOps(doc.content, ops)
+            })
+        }
+    }
+
+    const onDelete = () => {
+        space.collection.delete(id)
+        navigate("/")
     }
 
     return (
-        <Col align="stretch" style={{ height: "100dvh", position: "relative" }}>
-            <Row
-                gap={8}
-                style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}
-            >
-                <Button onClick={() => setShowToolbar((v) => !v)}>Aa</Button>
-                <Button>+</Button>
-                {menuButton}
-            </Row>
-            <div style={{ flexGrow: 1, overflow: "auto" }}>{editor}</div>
-            <Row
-                style={{
-                    background: "var(--color-background)",
-                    height: 60,
-                    padding: "0 40px",
-                    boxSizing: "border-box",
-                    overflowX: "auto",
-                    flexShrink: 0,
-                    borderTop: "2px solid #555"
-                }}
-                align="center"
-            >
-                {categoriesList}
-            </Row>
-            {selectCategories}
-        </Col>
+        <EditorView
+            id={id}
+            doc={item.local}
+            onChange={onChange}
+            onDelete={onDelete}
+        />
     )
 })
 
