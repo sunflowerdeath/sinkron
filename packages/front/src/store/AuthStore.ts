@@ -22,7 +22,7 @@ class AuthStore {
             getToken: () => this.token
         })
 
-        if (this.token !== null) {
+        if (this.token !== undefined) {
             const user = localStorage.getItem("user")
             if (user !== null) {
                 const spaceId = localStorage.getItem("space")

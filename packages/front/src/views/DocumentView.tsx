@@ -70,6 +70,22 @@ const Title = (props) => {
     )
 }
 
+const Heading = (props) => {
+    return (
+        <h3
+            style={{
+                fontSize: 22.5,
+                fontWeight: 650,
+                lineHeight: "135%",
+                margin: "1rem 0"
+            }}
+            {...props.attributes}
+        >
+            {props.children}
+        </h3>
+    )
+}
+
 const renderElement = (props) => {
     switch (props.element.type) {
         case "paragraph":
@@ -77,14 +93,7 @@ const renderElement = (props) => {
         case "title":
             return <Title {...props} />
         case "heading":
-            return (
-                <h3
-                    style={{ fontSize: 23, fontWeight: 650 }}
-                    {...props.attributes}
-                >
-                    {props.children}
-                </h3>
-            )
+            return <Heading {...props} />
         case "code":
             return (
                 <pre
@@ -95,11 +104,19 @@ const renderElement = (props) => {
                 </pre>
             )
         case "list":
-            return <ul {...props.attributes}>{props.children}</ul>
+            return (
+                <ul style={{ margin: 0 }} {...props.attributes}>
+                    {props.children}
+                </ul>
+            )
         case "ordered-list":
             return <ol {...props.attributes}>{props.children}</ol>
         case "list-item":
-            return <li {...props.attributes}>{props.children}</li>
+            return (
+                <li style={{ margin: ".5rem 0" }} {...props.attributes}>
+                    {props.children}
+                </li>
+            )
     }
     return <span {...props.attributes}>{props.children}</span>
 }
@@ -547,7 +564,7 @@ const EditorView = observer((props: EditorViewProps) => {
     }
 
     const topBar = isMobile ? (
-        <Row justify="space-between" style={{ borderBottom: "2px solid #555" }}>
+        <Row justify="space-between">
             <LinkButton to="/">
                 <Icon svg={arrowBackSvg} />
             </LinkButton>
