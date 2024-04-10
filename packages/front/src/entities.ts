@@ -35,7 +35,6 @@ export type Credentials = {
 }
 
 export type User = {
-    token: string
     id: string
     name: string
     spaces: Space[]

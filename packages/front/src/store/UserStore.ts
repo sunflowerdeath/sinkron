@@ -53,7 +53,7 @@ class UserStore {
             { fireImmediately: true }
         )
 
-        const token = user.token
+        const token = this.api.getToken()
         this.channel = new ChannelClient({
             url: `${env.wsUrl}/channels/${token}`,
             channel: `users/${user.id}`,
@@ -92,6 +92,7 @@ class UserStore {
 
     updateUser(user: User) {
         this.user = user
+        localStorage.setItem("user", JSON.stringify(user))
         if (!user.spaces.find((s) => s.id === this.spaceId)) {
             this.spaceId = user.spaces[0].id
         }

@@ -82,7 +82,7 @@ class SpaceStore {
 
         const col = `spaces/${space.id}`
         const collectionStore = new IndexedDbCollectionStore<Document>(col)
-        const token = this.store.user.token
+        const token = this.api.getToken()
         const transport = new WebsocketTransport(
             `${env.wsUrl}/sinkron/${token}`
         )

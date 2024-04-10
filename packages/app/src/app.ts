@@ -3,7 +3,6 @@ import { createServer } from "http"
 import type { IncomingMessage } from "http"
 import { Duplex } from "stream"
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
-import fastifyCookie from "@fastify/cookie"
 import { DataSource, Raw, In, Or, Equal, Not, Repository } from "typeorm"
 import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
@@ -720,7 +719,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                reply.send({ ...profileRes.value, token: token.token })
+                reply.send({ user: profileRes.value, token: token.token })
             })
         }
     )
@@ -774,9 +773,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     reply.code(500)
                     return
                 }
-                reply
-                    .setCookie("token", token.token, { path: "/" })
-                    .send(getProfileRes.value)
+                reply.send({ user: getProfileRes.value, token: token.token })
             })
         }
     )
@@ -1406,7 +1403,6 @@ class App {
         fastify.get("/", (request, reply) => {
             reply.send("Sinkron API")
         })
-        fastify.register(fastifyCookie)
         fastify.register(loginRoutes(this))
         fastify.register(appRoutes(this))
         fastify.register(cors, {
