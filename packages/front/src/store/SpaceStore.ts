@@ -35,7 +35,7 @@ const getDocumentListItemData = (
     const doc = item.local!.content
     const firstNode = doc.children[0]
     const firstNodeText = firstNode
-        ? firstNode.children.map((c) => c.text).join("")
+        ? firstNode.children.map((c) => c.text).join("").slice(0, 75)
         : ""
     const title = firstNodeText.length > 0 ? firstNodeText : null
     // let subtitle

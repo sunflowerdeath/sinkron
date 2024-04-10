@@ -27,6 +27,7 @@ class AuthStore {
             })
             this.store.fetchUser()
         }
+
         makeAutoObservable(this)
     }
 

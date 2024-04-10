@@ -35,7 +35,14 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
             align="center"
         >
             <Col gap={4} style={{ flexGrow: 1, overflow: "hidden" }}>
-                <div>
+                <div
+                    style={{
+                        width: "100%",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis"
+                    }}
+                >
                     {data.title ?? (
                         <span style={{ opacity: 0.5 }}>Empty document</span>
                     )}
@@ -160,10 +167,7 @@ const DocumentListView = observer(() => {
                     <div style={{ flexGrow: 1 }}>{space.space.name}</div>
                 </Row>
             </LinkButton>
-            <LinkButton
-                to="/notifications"
-                style={{ position: "relative" }}
-            >
+            <LinkButton to="/notifications" style={{ position: "relative" }}>
                 <Icon svg={notificationsSvg} />
                 {unreadMarker}
             </LinkButton>

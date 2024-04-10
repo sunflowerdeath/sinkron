@@ -46,7 +46,7 @@ interface Paragraph {
     type: "paragraph"
 }
 
-interface Title {
+interface TitleElement {
     type: "title"
 }
 
@@ -54,19 +54,28 @@ interface List {
     type: "list"
 }
 
+const Title = (props) => {
+    return (
+        <div
+            style={{
+                fontSize: 28,
+                lineHeight: "135%",
+                marginBottom: 30,
+                fontWeight: 650
+            }}
+            {...props.attributes}
+        >
+            {props.children}
+        </div>
+    )
+}
+
 const renderElement = (props) => {
     switch (props.element.type) {
         case "paragraph":
             return <p {...props.attributes}>{props.children}</p>
         case "title":
-            return (
-                <div
-                    style={{ fontSize: 28, marginBottom: 30, fontWeight: 650 }}
-                    {...props.attributes}
-                >
-                    {props.children}
-                </div>
-            )
+            return <Title {...props} />
         case "heading":
             return (
                 <h3
@@ -432,12 +441,12 @@ const EditorView = observer((props: EditorViewProps) => {
             <Row
                 style={{
                     background: "var(--color-background)",
-                    height: 60,
+                    // height: 60,
                     padding: isMobile ? "0 10px" : "0 40px",
                     boxSizing: "border-box",
                     overflowX: "auto",
-                    flexShrink: 0,
-                    borderTop: "2px solid #555"
+                    flexShrink: 0
+                    // borderTop: "2px solid #555"
                 }}
                 align="center"
             >
@@ -543,12 +552,16 @@ const EditorView = observer((props: EditorViewProps) => {
                 <Icon svg={arrowBackSvg} />
             </LinkButton>
             <Row gap={8}>
-                <Button onClick={() => setShowToolbar((v) => !v)}>Aa</Button>
+                <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
                 {menuButton}
             </Row>
         </Row>
     ) : (
-        <Row gap={8} justify="end">
+        <Row
+            gap={8}
+            justify="end"
+            style={{ position: "absolute", top: 0, right: 0 }}
+        >
             <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
             {menuButton}
         </Row>
