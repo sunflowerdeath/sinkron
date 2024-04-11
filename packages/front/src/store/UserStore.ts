@@ -1,13 +1,30 @@
-import { makeAutoObservable, reaction } from "mobx"
+import { makeAutoObservable, reaction, autorun, toJS } from "mobx"
 import { fromPromise } from "mobx-utils"
 import { ChannelClient } from "sinkron-client"
 
 import env from "../env"
 import { User, Space } from "../entities"
 import { Api } from "../api"
+import { FetchError } from "../utils/fetchJson"
 
 import AuthStore from "./AuthStore"
 import SpaceStore from "./SpaceStore"
+
+const initialRetryTimeout = 555
+const maxRetryTimeout = 10000
+const autoRetry = (cb: (retry: () => void) => void) => {
+    let timeout = initialRetryTimeout
+    let timer = -1
+    const retry = () => {
+        timer = setTimeout(() => cb(retry), timeout)
+        timeout = Math.min(maxRetryTimeout, timeout * 2)
+    }
+    cb(retry)
+    const stop = () => {
+        clearTimeout(timer)
+    }
+    return stop
+}
 
 interface StoreProps {
     user: User
@@ -22,6 +39,9 @@ class UserStore {
     space?: SpaceStore = undefined
     channel: ChannelClient
     api: Api
+
+    disposeReaction?: () => void
+    stopFetchUser?: () => void
 
     constructor(props: StoreProps) {
         const { user, authStore, spaceId } = props
@@ -39,6 +59,11 @@ class UserStore {
         }
 
         makeAutoObservable(this)
+
+        this.disposeReaction = autorun(() => {
+            const json = JSON.stringify(toJS(this.user))
+            localStorage.setItem("user", json)
+        })
 
         reaction(
             () => this.spaceId,
@@ -66,33 +91,38 @@ class UserStore {
     }
 
     dispose() {
+        this.disposeReaction?.()
+        this.stopFetchUser?.()
         this.space?.dispose()
         this.channel.dispose()
     }
 
-    async fetchUser() {
-        console.log("Fetching user...")
-        let user
-        try {
-            user = await this.api.fetch<User>({
-                method: "GET",
-                url: "/profile"
-            })
-        } catch (e) {
-            // if (e.kind === "http") {
-            // TODO if session expired / terminated
-            console.log("Fetch user error")
-            this.logout()
-            // }
-            return
-        }
-        this.updateUser(user)
-        console.log("Fetch user success")
+    fetchUser() {
+        this.stopFetchUser = autoRetry(async (retry) => {
+            console.log("Fetching user...")
+            let user
+            try {
+                user = await this.api.fetch<User>({
+                    method: "GET",
+                    url: "/profile"
+                })
+            } catch (e) {
+                if (e instanceof FetchError && e.kind === "http") {
+                    console.log("Fetch user error")
+                    this.logout()
+                } else {
+                    console.log("FetchError user error, will retry")
+                    retry()
+                }
+                return
+            }
+            this.updateUser(user)
+            console.log("Fetch user success")
+        })
     }
 
     updateUser(user: User) {
         this.user = user
-        localStorage.setItem("user", JSON.stringify(user))
         if (!user.spaces.find((s) => s.id === this.spaceId)) {
             this.spaceId = user.spaces[0].id
         }
