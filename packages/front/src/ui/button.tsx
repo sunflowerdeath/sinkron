@@ -27,11 +27,12 @@ const buttonStyles = (
     const size = props.size === "s" ? 45 : 60
     return {
         root: {
-            color: isHovered
-                ? "var(--color-text)"
-                : props.kind === "faint"
-                ? "#999"
-                : "var(--color-text)",
+            color:
+                props.kind === "faint"
+                    ? isHovered
+                        ? "var(--color-text)"
+                        : "var(--color-secondary)"
+                    : "var(--color-text)",
             textDecoration: "none",
             height: size,
             flexShrink: 0,
@@ -45,10 +46,10 @@ const buttonStyles = (
             outline: "none",
             userSelect: "none",
             background: isHovered
-                ? "#666"
+                ? "var(--color-hover)"
                 : props.kind === "transparent" || props.kind === "faint"
                 ? "transparent"
-                : "#555",
+                : "var(--color-elem)",
             opacity: props.isDisabled ? 0.5 : 1,
             boxShadow: isFocused ? "inset 0 0 0 2px #ccc" : "none",
             WebkitTapHighlightColor: "transparent"

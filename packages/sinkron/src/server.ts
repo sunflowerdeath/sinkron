@@ -5,6 +5,7 @@ import pino from "pino"
 import { Document } from "./entities"
 import { Sinkron, RequestError } from "./core"
 import { Result, ResultType } from "./result"
+import { Action } from "./permissions"
 import {
     ErrorCode,
     SyncMessage,
@@ -182,7 +183,12 @@ class SinkronServer {
 
         // TODO error if second sync message
 
-        // TODO check collection permission
+        // TODO check permission
+        const checkRes = await this.sinkron.checkCollectionPermission({
+            id: col,
+            user: "1", // TODO userid
+            action: Action.read
+        })
 
         const result = await this.sinkron.syncCollection(col, colrev)
         if (!result.isOk) {
@@ -222,13 +228,11 @@ class SinkronServer {
     async handleChangeMessage(msg: ChangeMessage, client: WebSocket) {
         const { op, col } = msg
 
-        // TODO check document permissions
-
         let res: ResultType<Document, RequestError>
         if (op === Op.Create) {
             res = await this.handleCreateMessage(msg)
         } else if (op === Op.Delete) {
-            res = await this.sinkron.deleteDocument(msg.id)
+            res = await this.handleDeleteMessage(msg)
         } else {
             // if (op === Op.Modify)
             res = await this.handleModifyMessage(msg)
@@ -268,6 +272,12 @@ class SinkronServer {
 
     async handleCreateMessage(msg: CreateMessage) {
         const { id, col, data } = msg
+        const checkRes = await this.sinkron.checkCollectionPermission({
+            id: col,
+            user: "1", // TODO userid
+            action: Action.create
+        })
+        // TODO check
         return await this.sinkron.createDocument(
             id!,
             col,
@@ -275,8 +285,24 @@ class SinkronServer {
         )
     }
 
+    async handleDeleteMessage(msg: DeleteMessage) {
+        const checkRes = await this.sinkron.checkCollectionPermission({
+            id: msg.col,
+            user: "1", // TODO userid
+            action: Action.delete
+        })
+        // TODO check
+        return await this.sinkron.deleteDocument(msg.id)
+    }
+
     async handleModifyMessage(msg: ModifyMessage) {
         const { id, col, data } = msg
+        const checkRes = await this.sinkron.checkDocumentPermission({
+            id,
+            user: "1", // TODO userid
+            action: Action.update
+        })
+        // TODO check
         const doc = await this.sinkron.updateDocument(
             id,
             data.map((c) => Buffer.from(c, "base64"))

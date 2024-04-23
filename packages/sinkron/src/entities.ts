@@ -1,4 +1,4 @@
-import { EntitySchema } from 'typeorm'
+import { EntitySchema } from "typeorm"
 
 export type Document = {
     id: string
@@ -20,6 +20,7 @@ export type Collection = {
     updatedAt: Date
     colrev: number
     owner: string
+    permissions: string
 }
 
 export type Group = {
@@ -30,15 +31,16 @@ export type Group = {
 export type GroupMember = {
     id: string
     user: string
+    groupId: string
     group: Group
 }
 
 const DocumentEntity = new EntitySchema<Document>({
-    name: 'document',
+    name: "document",
     columns: {
         id: { type: String, primary: true },
         rev: { type: Number },
-        data: { type: 'blob', nullable: true },
+        data: { type: "blob", nullable: true },
         createdAt: { type: Date, createDate: true },
         updatedAt: { type: Date, updateDate: true },
         isDeleted: { type: Boolean },
@@ -48,17 +50,18 @@ const DocumentEntity = new EntitySchema<Document>({
     },
     relations: {
         // owner: { type: "many-to-one", target: "user" },
-        col: { type: 'many-to-one', target: 'collection' }
+        col: { type: "many-to-one", target: "collection" }
     }
 })
 
 const CollectionEntity = new EntitySchema<Collection>({
-    name: 'collection',
+    name: "collection",
     columns: {
-        id: { type: 'uuid', primary: true, generated: 'uuid' },
+        id: { type: "uuid", primary: true, generated: "uuid" },
         createdAt: { type: Date, createDate: true },
         updatedAt: { type: Date, updateDate: true },
-        colrev: { type: Number }
+        colrev: { type: Number },
+        permissions: { type: String }
     }
     // relations: {
     // entries: { type: "one-to-many", target: "entry" },
@@ -66,20 +69,21 @@ const CollectionEntity = new EntitySchema<Collection>({
 })
 
 const GroupEntity = new EntitySchema<Group>({
-    name: 'group',
+    name: "group",
     columns: {
-        id: { type: 'uuid', primary: true, generated: 'uuid' }
+        id: { type: "uuid", primary: true, generated: "uuid" }
     }
 })
 
 const GroupMemberEntity = new EntitySchema<GroupMember>({
-    name: 'group_member',
+    name: "group_member",
     columns: {
-        id: { type: 'uuid', primary: true, generated: 'uuid' },
-        user: { type: String }
+        id: { type: "uuid", primary: true, generated: "uuid" },
+        user: { type: String },
+        groupId: { type: String }
     },
     relations: {
-        group: { type: 'many-to-one', target: 'group' }
+        group: { type: "many-to-one", target: "group" }
     }
 })
 

@@ -1,0 +1,31 @@
+namespace Siknron.Permissions;
+
+struct Uuid {
+    low: uint64;
+    high: uint64;
+}
+
+enum Action:byte {
+    Read = 0,
+    Create = 1,
+    Update = 2,
+    Delete = 3
+}
+
+enum Role:byte {
+    Any = 0,
+    User = 1,
+    Group = 2
+}
+
+struct Permission {
+    role: Role;
+    id: Uuid;
+    action: Action;
+}
+
+table PermissionTable {
+    permissions: [Permission];
+}
+
+root_type PermissionTable;

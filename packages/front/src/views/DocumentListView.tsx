@@ -26,8 +26,8 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
             style={{
                 height: 60,
                 padding: 8,
-                borderBottom: "2px solid #555",
-                background: isSelected ? "#555" : "transparent",
+                borderBottom: "2px solid var(--color-elem)",
+                background: isSelected ? "var(--color-elem)" : "transparent",
                 gap: 12,
                 cursor: "pointer"
             }}
