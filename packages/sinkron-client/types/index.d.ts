@@ -9,10 +9,15 @@ interface Transport {
     send(msg: string): void;
     emitter: ReturnType<typeof createNanoEvents>;
 }
-declare class WebsocketTransport implements Transport {
-    constructor(url: string);
+type WebSocketTransportProps = {
+    url: string;
+    webSocketImpl?: typeof WebSocket;
+};
+declare class WebSocketTransport implements Transport {
+    constructor(props: WebSocketTransportProps);
     emitter: import("nanoevents").Emitter<import("nanoevents").DefaultEvents>;
     url: string;
+    webSocketImpl: typeof WebSocket;
     ws?: WebSocket;
     open(): void;
     close(): void;
@@ -130,4 +135,4 @@ declare class ChannelClient {
     dispose: () => void;
     constructor(props: ChannelClientProps);
 }
-export { Collection, WebsocketTransport, IndexedDbCollectionStore, ChannelClient };
+export { Collection, WebSocketTransport, IndexedDbCollectionStore, ChannelClient };

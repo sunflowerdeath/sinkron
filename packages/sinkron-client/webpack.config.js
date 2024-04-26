@@ -27,7 +27,8 @@ module.exports = {
         path: path.resolve(__dirname, "./build"),
         filename: "[name].js",
         library: {
-            type: "module"
+            // type: "module"
+            type: "commonjs"
         }
     },
     mode: isProduction ? "production" : "development",

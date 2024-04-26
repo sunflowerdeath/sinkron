@@ -94,7 +94,7 @@ describe("Sinkron", () => {
         assert(!res4.isOk)
     })
 
-    it("check permissions", async () => {
+    it("permissions", async () => {
         const user = "1"
         const user2 = "2"
 
@@ -146,5 +146,29 @@ describe("Sinkron", () => {
         })
         assert(res4.isOk)
         assert.strictEqual(res4.value, false)
+
+        // update permissions
+        await sinkron.updateDocumentPermissions("perm_test_doc", (p) => {
+            p.add(Action.update, Role.user(user2))
+        })
+        await sinkron.updateCollectionPermissions("perm_test", (p) => {
+            p.add(Action.read, Role.user(user2))
+        })
+
+        const res5 = await sinkron.checkCollectionPermission({
+            id: "perm_test",
+            user: user2,
+            action: Action.read
+        })
+        assert(res5.isOk)
+        assert.strictEqual(res5.value, true)
+
+        const res6 = await sinkron.checkDocumentPermission({
+            id: "perm_test_doc",
+            user: user2,
+            action: Action.update
+        })
+        assert(res6.isOk)
+        assert.strictEqual(res6.value, true)
     })
 })

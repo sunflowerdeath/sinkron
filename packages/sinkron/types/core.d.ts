@@ -4,6 +4,10 @@ import type { Document, Collection, Group, GroupMember } from "./entities";
 import { ResultType } from "./result";
 import { Permissions, PermissionsTable, Action } from "./permissions";
 import { ErrorCode } from "./protocol";
+type CreateCollectionProps = {
+    id: string;
+    permissions: PermissionsTable;
+};
 type CheckPermissionProps = {
     id: string;
     action: Action;
@@ -38,10 +42,9 @@ declare class Sinkron {
         members: Repository<import("typeorm").ObjectLiteral>;
     };
     getDocumentTr(m: EntityManager, id: string): Promise<Document | null>;
-    getColEntityTr(m: EntityManager, col: string): Promise<Collection | null>;
-    createCollectionTr(m: EntityManager, id: string): Promise<ResultType<Collection, RequestError>>;
+    createCollectionTr(m: EntityManager, props: CreateCollectionProps): Promise<ResultType<Collection, RequestError>>;
     syncCollectionTr(m: EntityManager, col: string, colrev?: number): Promise<ResultType<ChangedDocuments, RequestError>>;
-    createDocumentTr(m: EntityManager, id: string, col: string, data: Uint8Array, permissions: PermissionsTable): Promise<ResultType<Document, RequestError>>;
+    createDocumentTr(m: EntityManager, id: string, col: string, data: Uint8Array): Promise<ResultType<Document, RequestError>>;
     incrementColrevTr(m: EntityManager, id: string): Promise<ResultType<number, RequestError>>;
     updateDocumentEntityTr(m: EntityManager, doc: Document, update: Partial<Document>): Promise<ResultType<Document, RequestError>>;
     updateDocumentTr(m: EntityManager, id: string, data: Uint8Array[] | null): Promise<ResultType<Document, RequestError>>;
@@ -54,12 +57,12 @@ declare class Sinkron {
     }>;
     checkDocumentPermissionTr(m: EntityManager, props: CheckPermissionProps): Promise<ResultType<boolean, RequestError>>;
     checkCollectionPermissionTr(m: EntityManager, props: CheckPermissionProps): Promise<ResultType<boolean, RequestError>>;
-    createCollection(id: string): Promise<ResultType<Collection, RequestError>>;
+    createCollection(props: CreateCollectionProps): Promise<ResultType<Collection, RequestError>>;
     getCollection(id: string): Promise<Collection | null>;
     deleteCollection(id: string): Promise<ResultType<true, RequestError>>;
     getDocument(id: string): Promise<Document | null>;
     syncCollection(col: string, colrev?: number): Promise<ResultType<ChangedDocuments, RequestError>>;
-    createDocument(id: string, col: string, data: Uint8Array, permissions?: PermissionsTable): Promise<ResultType<Document, RequestError>>;
+    createDocument(id: string, col: string, data: Uint8Array): Promise<ResultType<Document, RequestError>>;
     updateDocument(id: string, data: Uint8Array[] | null): Promise<ResultType<Document, RequestError>>;
     updateDocumentWithCallback<T>(id: string, cb: Automerge.ChangeFn<T>): Promise<ResultType<Document, RequestError>>;
     deleteDocument(id: string): Promise<ResultType<Document, RequestError>>;

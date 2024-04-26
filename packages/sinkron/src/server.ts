@@ -1,3 +1,6 @@
+import { IncomingMessage } from "node:http"
+import { Duplex } from "node:stream"
+
 import Ajv, { JSONSchemaType } from "ajv"
 import { WebSocketServer, WebSocket } from "ws"
 import pino from "pino"
@@ -105,7 +108,7 @@ class SinkronServer {
     sinkron: Sinkron
     ws: WebSocketServer
 
-    clients = new Map<WebSocket, { subscriptions: Set<string> }>()
+    clients = new Map<WebSocket, { subscriptions: Set<string>; id: string }>()
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
 
     logger: ReturnType<typeof pino>
@@ -135,9 +138,24 @@ class SinkronServer {
         this.ws.on("connection", this.onConnect.bind(this))
     }
 
-    async onConnect(ws: WebSocket) {
-        this.logger.debug("Client connected")
-        this.clients.set(ws, { subscriptions: new Set() })
+    upgrade(
+        request: IncomingMessage,
+        socket: Duplex,
+        head: Buffer,
+        client: object
+    ) {
+        this.ws.handleUpgrade(request, socket, head, (ws) => {
+            this.ws.emit("connection", ws, request, client)
+        })
+    }
+
+    async onConnect(
+        ws: WebSocket,
+        request: IncomingMessage,
+        client: { id: string }
+    ) {
+        this.logger.debug("Client connected, id: " + client.id)
+        this.clients.set(ws, { subscriptions: new Set(), id: client.id })
         setTimeout(() => {
             const client = this.clients.get(ws)
             if (client === undefined) return
@@ -183,12 +201,22 @@ class SinkronServer {
 
         // TODO error if second sync message
 
-        // TODO check permission
+        const client = this.clients.get(ws)
+        if (!client) return
         const checkRes = await this.sinkron.checkCollectionPermission({
             id: col,
-            user: "1", // TODO userid
+            user: client.id,
             action: Action.read
         })
+        if (!checkRes.isOk || !checkRes.value === true) {
+            const errorMsg: SyncErrorMessage = {
+                kind: "sync_error",
+                col,
+                code: ErrorCode.AccessDenied
+            }
+            ws.send(JSON.stringify(errorMsg))
+            return
+        }
 
         const result = await this.sinkron.syncCollection(col, colrev)
         if (!result.isOk) {
@@ -225,17 +253,17 @@ class SinkronServer {
         this.logger.debug("Client subscribed to collection %s", msg.col)
     }
 
-    async handleChangeMessage(msg: ChangeMessage, client: WebSocket) {
+    async handleChangeMessage(msg: ChangeMessage, ws: WebSocket) {
         const { op, col } = msg
 
         let res: ResultType<Document, RequestError>
         if (op === Op.Create) {
-            res = await this.handleCreateMessage(msg)
+            res = await this.handleCreateMessage(msg, ws)
         } else if (op === Op.Delete) {
-            res = await this.handleDeleteMessage(msg)
+            res = await this.handleDeleteMessage(msg, ws)
         } else {
             // if (op === Op.Modify)
-            res = await this.handleModifyMessage(msg)
+            res = await this.handleModifyMessage(msg, ws)
         }
         if (!res.isOk) {
             this.logger.debug(
@@ -250,7 +278,7 @@ class SinkronServer {
                 changeid: msg.changeid,
                 code: res.error.code
             }
-            client.send(JSON.stringify(errorMsg))
+            ws.send(JSON.stringify(errorMsg))
             return
         }
         const doc = res.value
@@ -270,14 +298,23 @@ class SinkronServer {
         }
     }
 
-    async handleCreateMessage(msg: CreateMessage) {
-        const { id, col, data } = msg
+    async handleCreateMessage(
+        msg: CreateMessage,
+        ws: WebSocket
+    ): Promise<ResultType<Document, RequestError>> {
+        const { id, col, changeid, data } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
         const checkRes = await this.sinkron.checkCollectionPermission({
             id: col,
-            user: "1", // TODO userid
+            user: client.id,
             action: Action.create
         })
-        // TODO check
+        if (!checkRes.isOk || !checkRes.value === true) {
+            return Result.err({ code: ErrorCode.AccessDenied })
+        }
+
         return await this.sinkron.createDocument(
             id!,
             col,
@@ -285,24 +322,44 @@ class SinkronServer {
         )
     }
 
-    async handleDeleteMessage(msg: DeleteMessage) {
+    async handleDeleteMessage(
+        msg: DeleteMessage,
+        ws: WebSocket
+    ): Promise<ResultType<Document, RequestError>> {
+        const { col, id, changeid } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
         const checkRes = await this.sinkron.checkCollectionPermission({
-            id: msg.col,
-            user: "1", // TODO userid
+            id: col,
+            user: client.id,
             action: Action.delete
         })
-        // TODO check
-        return await this.sinkron.deleteDocument(msg.id)
+        if (!checkRes.isOk || !checkRes.value === true) {
+            return Result.err({ code: ErrorCode.AccessDenied })
+        }
+
+        // TODO send col or check permissions on document
+        return await this.sinkron.deleteDocument(id)
     }
 
-    async handleModifyMessage(msg: ModifyMessage) {
-        const { id, col, data } = msg
+    async handleModifyMessage(
+        msg: ModifyMessage,
+        ws: WebSocket
+    ): Promise<ResultType<Document, RequestError>> {
+        const { id, changeid, col, data } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
         const checkRes = await this.sinkron.checkDocumentPermission({
             id,
-            user: "1", // TODO userid
+            user: client.id,
             action: Action.update
         })
-        // TODO check
+        if (!checkRes.isOk || !checkRes.value === true) {
+            return Result.err({ code: ErrorCode.AccessDenied })
+        }
+
         const doc = await this.sinkron.updateDocument(
             id,
             data.map((c) => Buffer.from(c, "base64"))

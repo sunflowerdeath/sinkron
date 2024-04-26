@@ -40,18 +40,27 @@ interface Transport {
     emitter: ReturnType<typeof createNanoEvents>
 }
 
-class WebsocketTransport implements Transport {
-    constructor(url: string) {
+type WebSocketTransportProps = {
+    url: string,
+    webSocketImpl?: typeof WebSocket
+}
+
+class WebSocketTransport implements Transport {
+    constructor(props: WebSocketTransportProps) {
+        const { url, webSocketImpl } = props
         this.url = url
+        // @ts-ignore
+        this.webSocketImpl = webSocketImpl || global.WebSocket
     }
 
     emitter = createNanoEvents()
     url: string
+    webSocketImpl: typeof WebSocket
     ws?: WebSocket
 
     open() {
         console.log("Connecting to websocket:", this.url)
-        this.ws = new WebSocket(this.url)
+        this.ws = new this.webSocketImpl(this.url)
         this.ws.addEventListener("open", (event) => {
             console.log("Connected to websocket!")
             this.emitter.emit("open")
@@ -726,7 +735,7 @@ class ChannelClient {
     dispose: () => void
     constructor(props: ChannelClientProps) {
         const { url, channel, handler } = props
-        this.transport = new WebsocketTransport(url)
+        this.transport = new WebSocketTransport({ url })
         this.transport.emitter.on("open", () => {
             this.transport.send(`subscribe:${channel}`)
         })
@@ -737,7 +746,7 @@ class ChannelClient {
 
 export {
     Collection,
-    WebsocketTransport,
+    WebSocketTransport,
     IndexedDbCollectionStore,
     ChannelClient
 }

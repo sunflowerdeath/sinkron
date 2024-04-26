@@ -493,6 +493,7 @@ class Sinkron {
         }
 
         const userObject = await this.getUserObject(m, user)
+        console.log(userObject)
         const permissions = Permissions.parse(col.permissions)
         const res = permissions.check(userObject, action)
         return Result.ok(res)
@@ -656,7 +657,7 @@ class Sinkron {
         return this.db.transaction(async (m) => {
             const models = this.getModels(m)
 
-            const count = await models.collections.countBy({ id: group })
+            const count = await models.groups.countBy({ id: group })
             if (count === 0) {
                 return Result.err({
                     code: ErrorCode.InvalidRequest,
@@ -664,7 +665,7 @@ class Sinkron {
                 })
             }
 
-            const res = await models.members.insert({ user, group })
+            const res = await models.members.insert({ user, groupId: group })
             return Result.ok(true)
         })
     }
@@ -676,7 +677,7 @@ class Sinkron {
         return this.db.transaction(async (m) => {
             const models = this.getModels(m)
 
-            const res = await models.members.delete({ user, group })
+            const res = await models.members.delete({ user, groupId: group })
             return Result.ok(true)
         })
     }

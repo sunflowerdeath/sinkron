@@ -1,3 +1,8 @@
+/// <reference types="node" />
+/// <reference types="node" />
+/// <reference types="node" />
+import { IncomingMessage } from "node:http";
+import { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
 import pino from "pino";
 import { Document } from "./entities";
@@ -15,6 +20,7 @@ declare class SinkronServer {
     ws: WebSocketServer;
     clients: Map<WebSocket, {
         subscriptions: Set<string>;
+        id: string;
     }>;
     collections: Map<string, {
         subscribers: Set<WebSocket>;
@@ -22,13 +28,16 @@ declare class SinkronServer {
     logger: ReturnType<typeof pino>;
     messageQueue: MessageQueue;
     constructor(options: SinkronServerOptions);
-    onConnect(ws: WebSocket): Promise<void>;
+    upgrade(request: IncomingMessage, socket: Duplex, head: Buffer, client: object): void;
+    onConnect(ws: WebSocket, request: IncomingMessage, client: {
+        id: string;
+    }): Promise<void>;
     handleMessage([ws, msg]: WsMessage): Promise<void>;
     handleSyncMessage(ws: WebSocket, msg: SyncMessage): Promise<void>;
-    handleChangeMessage(msg: ChangeMessage, client: WebSocket): Promise<void>;
-    handleCreateMessage(msg: CreateMessage): Promise<ResultType<Document, RequestError>>;
-    handleDeleteMessage(msg: DeleteMessage): Promise<ResultType<Document, RequestError>>;
-    handleModifyMessage(msg: ModifyMessage): Promise<ResultType<Document, RequestError>>;
+    handleChangeMessage(msg: ChangeMessage, ws: WebSocket): Promise<void>;
+    handleCreateMessage(msg: CreateMessage, ws: WebSocket): Promise<ResultType<Document, RequestError>>;
+    handleDeleteMessage(msg: DeleteMessage, ws: WebSocket): Promise<ResultType<Document, RequestError>>;
+    handleModifyMessage(msg: ModifyMessage, ws: WebSocket): Promise<ResultType<Document, RequestError>>;
     onDisconnect(ws: WebSocket): void;
     addSubscriber(col: string, ws: WebSocket): void;
 }

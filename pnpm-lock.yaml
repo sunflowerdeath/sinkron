@@ -293,6 +293,9 @@ importers:
       mocha:
         specifier: ^10.1.0
         version: 10.3.0
+      sinkron-client:
+        specifier: workspace:*
+        version: link:../sinkron-client
       ts-loader:
         specifier: ^9.5.1
         version: 9.5.1(typescript@5.4.2)(webpack@5.90.3)

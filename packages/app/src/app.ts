@@ -1338,14 +1338,9 @@ class App {
                 token
             )
             if (res.isOk && res.value !== null) {
-                this.sinkronServer.ws.handleUpgrade(
-                    request,
-                    socket,
-                    head,
-                    (ws) => {
-                        this.sinkronServer.ws.emit("connection", ws, request)
-                    }
-                )
+                this.sinkronServer.upgrade(request, socket, head, {
+                    id: res.value.userId
+                })
             } else {
                 socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
                 socket.destroy()

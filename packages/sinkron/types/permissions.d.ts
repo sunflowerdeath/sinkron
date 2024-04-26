@@ -1,3 +1,8 @@
+declare const Role: {
+    any: () => string;
+    user: (id: string) => string;
+    group: (id: string) => string;
+};
 export declare enum Action {
     read = "read",
     create = "create",
@@ -26,4 +31,4 @@ declare class Permissions {
     stringify(): string;
     static parse(str: string): Permissions;
 }
-export { emptyPermissionsTable, Permissions };
+export { emptyPermissionsTable, Permissions, Role };
