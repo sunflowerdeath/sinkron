@@ -4,6 +4,7 @@ import { createNanoEvents } from "nanoevents"
 import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { nanoid } from "nanoid"
+import pino, { Logger } from "pino"
 import {
     makeObservable,
     makeAutoObservable,
@@ -41,7 +42,7 @@ interface Transport {
 }
 
 type WebSocketTransportProps = {
-    url: string,
+    url: string
     webSocketImpl?: typeof WebSocket
 }
 
@@ -85,7 +86,6 @@ class WebSocketTransport implements Transport {
 
     send(msg: string) {
         if (this.ws) {
-            console.log("Sending message:", msg)
             this.ws.send(msg)
         } else {
             throw new Error("Couldn't send message: connection is closed")
@@ -360,11 +360,25 @@ interface CollectionProps<T> {
     transport: Transport
     store?: CollectionStore<T>
     errorHandler?: (msg: SyncErrorMessage) => void
+    logger?: Logger<string> 
+}
+
+const defaultLogger = (level = "debug"): Logger<string> => {
+    const logger: Logger<string> = pino({
+        transport: { target: "pino-pretty" }
+    })
+    logger.level = level
+    return logger
 }
 
 class Collection<T extends object> {
     constructor(props: CollectionProps<T>) {
-        Object.assign(this, props)
+        const { col, transport, store, errorHandler, logger } = props
+        this.col = col
+        this.transport = transport
+        this.store = store
+        this.errorHandler = errorHandler
+        this.logger = logger === undefined ? defaultLogger() : logger
         makeAutoObservable(this, {
             items: observable.shallow,
             store: false,
@@ -379,23 +393,23 @@ class Collection<T extends object> {
         this.init()
     }
 
-    errorHandler?: (msg: SyncErrorMessage) => void
-    items: Map<string, Item<T>> = new Map()
-    store!: CollectionStore<T>
-    col!: string
+    col: string
     transport!: Transport
+    store?: CollectionStore<T> = undefined
+    logger: Logger<string>
+    errorHandler?: (msg: SyncErrorMessage) => void
+
     colrev: number = -1
+    items: Map<string, Item<T>> = new Map()
+    isLoaded = false
+    status = ConnectionStatus.Disconnected
+    initialSyncCompleted = false
+    isDestroyed = false
 
     flushDebounced: ReturnType<typeof debounce>
     stopAutoReconnect?: () => void
     backupQueue = new Set<string>()
     flushQueue = new Set<string>()
-
-    isLoaded = false
-    status = ConnectionStatus.Disconnected
-    initialSyncCompleted = false
-
-    isDestroyed = false
 
     destroy() {
         this.isDestroyed = true
@@ -407,10 +421,12 @@ class Collection<T extends object> {
         if (this.store) await this.loadFromStore()
         this.isLoaded = true
         this.transport.emitter.on("open", () => {
+            this.logger.debug("Connected to websocket")
             this.status = ConnectionStatus.Connected
             this.startSync()
         })
         this.transport.emitter.on("close", () => {
+            this.logger.debug("Connection closed")
             this.status = ConnectionStatus.Disconnected
             this.flushDebounced.cancel()
         })
@@ -422,7 +438,6 @@ class Collection<T extends object> {
     }
 
     async loadFromStore() {
-        console.log("Loading collection from store")
         const { colrev, items } = await this.store!.load()
         this.colrev = colrev
         items.forEach((stored: StoredItem<T>) => {
@@ -445,7 +460,7 @@ class Collection<T extends object> {
             this.items.set(id, item)
             if (isChanged) this.flushQueue.add(id)
         })
-        console.log(
+        this.logger.debug(
             `Loaded from local store ${items.length} items, colrev: ${colrev}`
         )
     }
@@ -456,17 +471,18 @@ class Collection<T extends object> {
             col: this.col,
             colrev: this.colrev === -1 ? undefined : this.colrev
         }
+        this.logger.trace("Sending message: %s", msg)
         this.transport.send(JSON.stringify(msg))
         this.status = ConnectionStatus.Sync
     }
 
     onMessage(msg: string) {
-        console.log("Received message:", msg)
+        this.logger.trace("Received message: %o", msg)
         let parsed
         try {
             parsed = JSON.parse(msg)
         } catch (e) {
-            console.log("Couldn't parse JSON:", e)
+            this.logger.error("Couldn't parse message JSON: %m", msg)
             return
         }
         if (parsed.kind === "doc") {
@@ -491,7 +507,7 @@ class Collection<T extends object> {
     }
 
     handleSyncError(msg: SyncErrorMessage) {
-        console.log("Sync error:", msg)
+        this.logger.error("Sync error: %o", msg)
         this.status = ConnectionStatus.Error
         this.stopAutoReconnect?.()
         this.errorHandler?.(msg)
@@ -503,7 +519,7 @@ class Collection<T extends object> {
         if (this.items.has(id)) {
             const item = this.items.get(id)!
             if (item.sentChanges.has(changeid)) {
-                console.log("Acknowledged own change:", changeid)
+                this.logger.debug("Acknowledged own change: %s", changeid)
                 item.sentChanges.delete(changeid)
             }
         }
@@ -511,7 +527,8 @@ class Collection<T extends object> {
         if (op === Op.Delete) {
             if (this.items.has(id)) {
                 this.items.delete(id)
-                console.log("Deleted document:", id)
+                this.flushQueue.delete(id)
+                this.logger.debug("Deleted document: %s", id)
             }
         } else if (op === Op.Create) {
             this.handleDocMessage(msg)
@@ -542,7 +559,7 @@ class Collection<T extends object> {
                 createdAt: createdAt ? parseISO(createdAt) : undefined
             })
             this.items.set(id, item)
-            console.log("Received new doc:", id)
+            this.logger.debug("Received new doc: %s", id)
         } else {
             const item = this.items.get(id)!
             item.remote = doc
@@ -560,10 +577,13 @@ class Collection<T extends object> {
             item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
             item.sentChanges.clear()
             if (isChanged) {
-                console.log("Merged remote doc into local:", id)
+                this.logger.debug("Merged remote doc into local: %s", id)
                 this.flushQueue.add(id)
             } else {
-                console.log("Received remote doc identical to local:", id)
+                this.logger.debug(
+                    "Received remote doc identical to local: %s",
+                    id
+                )
                 this.flushQueue.delete(id)
             }
         }
@@ -575,13 +595,13 @@ class Collection<T extends object> {
 
         const item = this.items.get(id)
         if (!item) {
-            console.log("Can't apply changes, unknown doc:", id)
+            this.logger.warn("Can't apply changes, unknown doc: %s", id)
             // TODO request full document
             return
         }
         const changes = data.map(Base64.toUint8Array)
         if (item.remote === null) {
-            console.log("Can't apply changes, doc is not created:", id)
+            this.logger.warn("Can't apply changes, doc is not created: %s", id)
             // TODO request full document
             return
         } else {
@@ -610,8 +630,9 @@ class Collection<T extends object> {
     }
 
     async backup() {
+        if (this.store === undefined) return
+
         if (this.backupQueue.size === 0) {
-            console.log("Backup is skipped, no items changed")
             return
         }
 
@@ -623,20 +644,22 @@ class Collection<T extends object> {
         for (const key of clonedQueue) {
             const item = this.items.get(key)
             if (item) {
-                await this.store!.save(key, item, colrev)
+                await this.store.save(key, item, colrev)
             } else {
-                await this.store!.delete(key, colrev)
+                await this.store.delete(key, colrev)
             }
         }
-        console.log(
+        this.logger.debug(
             `Completed backup to local store, stored ${clonedQueue.size} items`
         )
     }
 
     flush() {
-        console.log(`Flushing changes, ${this.flushQueue.size} items`)
+        this.logger.debug(`Flushing changes, ${this.flushQueue.size} items`)
         this.flushQueue.forEach((id) => {
-            const item = this.items.get(id)!
+            const item = this.items.get(id)
+            if (item === undefined) return
+
             const changeid = nanoid(8)
 
             const msg: any = {
@@ -696,7 +719,7 @@ class Collection<T extends object> {
 
     change(id: string, callback: ChangeFn<T>) {
         const item = this.items.get(id)
-        if (!item || item.local == null) {
+        if (item === undefined) {
             throw new Error("No item with id: " + id)
         }
         if (item.local === null) {

@@ -4,7 +4,7 @@
 import { IncomingMessage } from "node:http";
 import { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
-import pino from "pino";
+import { Logger } from "pino";
 import { Document } from "./entities";
 import { Sinkron, RequestError } from "./core";
 import { ResultType } from "./result";
@@ -12,9 +12,16 @@ import { SyncMessage, ChangeMessage, ModifyMessage, CreateMessage, DeleteMessage
 import { MessageQueue, WsMessage } from "./messageQueue";
 interface SinkronServerOptions {
     sinkron: Sinkron;
+    logger?: Logger<string>;
     host?: string;
     port?: number;
 }
+type ProfilerSegment = {
+    start: number;
+    handledMessages: number;
+    handlerDuration: number;
+    sentMessages: number;
+};
 declare class SinkronServer {
     sinkron: Sinkron;
     ws: WebSocketServer;
@@ -25,8 +32,9 @@ declare class SinkronServer {
     collections: Map<string, {
         subscribers: Set<WebSocket>;
     }>;
-    logger: ReturnType<typeof pino>;
+    logger: Logger<string>;
     messageQueue: MessageQueue;
+    profile?: ProfilerSegment;
     constructor(options: SinkronServerOptions);
     upgrade(request: IncomingMessage, socket: Duplex, head: Buffer, client: object): void;
     onConnect(ws: WebSocket, request: IncomingMessage, client: {
@@ -40,5 +48,6 @@ declare class SinkronServer {
     handleModifyMessage(msg: ModifyMessage, ws: WebSocket): Promise<ResultType<Document, RequestError>>;
     onDisconnect(ws: WebSocket): void;
     addSubscriber(col: string, ws: WebSocket): void;
+    report(): {};
 }
 export { SinkronServer };

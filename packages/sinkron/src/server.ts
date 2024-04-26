@@ -3,7 +3,7 @@ import { Duplex } from "node:stream"
 
 import Ajv, { JSONSchemaType } from "ajv"
 import { WebSocketServer, WebSocket } from "ws"
-import pino from "pino"
+import pino, { Logger } from "pino"
 
 import { Document } from "./entities"
 import { Sinkron, RequestError } from "./core"
@@ -24,6 +24,8 @@ import {
     ClientMessage
 } from "./protocol"
 import { MessageQueue, WsMessage } from "./messageQueue"
+
+const enableProfiling = process.env.ENABLE_PROFILING === "1"
 
 const syncMessageSchema = {
     type: "object",
@@ -95,6 +97,7 @@ const clientDisconnectTimeout = 10000
 
 interface SinkronServerOptions {
     sinkron: Sinkron
+    logger?: Logger<string>
     host?: string
     port?: number
 }
@@ -104,6 +107,28 @@ const defaultServerOptions = {
     port: 8080
 }
 
+const defaultLogger = (level = "debug"): Logger<string> => {
+    const logger: Logger<string> = pino({
+        transport: { target: "pino-pretty" }
+    })
+    logger.level = level
+    return logger
+}
+
+type ProfilerSegment = {
+    start: number
+    handledMessages: number
+    handlerDuration: number
+    sentMessages: number
+}
+
+const initialProfilerSegment = () => ({
+    start: performance.now(),
+    handledMessages: 0,
+    handlerDuration: 0,
+    sentMessages: 0
+})
+
 class SinkronServer {
     sinkron: Sinkron
     ws: WebSocketServer
@@ -111,21 +136,36 @@ class SinkronServer {
     clients = new Map<WebSocket, { subscriptions: Set<string>; id: string }>()
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
 
-    logger: ReturnType<typeof pino>
+    logger: Logger<string>
     messageQueue: MessageQueue
 
-    constructor(options: SinkronServerOptions) {
-        this.logger = pino({
-            transport: { target: "pino-pretty" }
-        })
-        this.logger.level = "debug"
+    profile?: ProfilerSegment
 
-        const { sinkron, host, port } = { ...defaultServerOptions, ...options }
+    constructor(options: SinkronServerOptions) {
+        const { sinkron, host, port, logger } = {
+            ...defaultServerOptions,
+            ...options
+        }
+
+        this.logger = logger === undefined ? defaultLogger() : logger
         this.sinkron = sinkron
+
+        if (enableProfiling) {
+            this.profile = initialProfilerSegment()
+        }
 
         this.messageQueue = new MessageQueue(async (msg: WsMessage) => {
             try {
+                let now
+                if (this.profile) {
+                    now = performance.now()
+                }
                 await this.handleMessage(msg)
+                if (this.profile) {
+                    const duration = performance.now() - now!
+                    this.profile.handledMessages += 1
+                    this.profile.handlerDuration += duration
+                }
             } catch (e) {
                 this.logger.error(
                     "Unhandled exception while handling message, %o",
@@ -226,6 +266,7 @@ class SinkronServer {
                 code: result.error.code
             }
             ws.send(JSON.stringify(errorMsg))
+            if (this.profile) this.profile.sentMessages += 1
             return
         }
 
@@ -240,6 +281,7 @@ class SinkronServer {
                 updatedAt: serializeDate(doc.updatedAt)
             }
             ws.send(JSON.stringify(msg))
+            if (this.profile) this.profile.sentMessages += 1
         })
 
         const syncCompleteMsg = {
@@ -248,6 +290,7 @@ class SinkronServer {
             colrev: result.value.colrev
         }
         ws.send(JSON.stringify(syncCompleteMsg))
+        if (this.profile) this.profile.sentMessages += 1
 
         this.addSubscriber(msg.col, ws)
         this.logger.debug("Client subscribed to collection %s", msg.col)
@@ -292,9 +335,10 @@ class SinkronServer {
             if (msg.op === Op.Create) {
                 response.createdAt = serializeDate(createdAt)
             }
-            collection.subscribers.forEach((sub) =>
+            collection.subscribers.forEach((sub) => {
                 sub.send(JSON.stringify(response))
-            )
+                if (this.profile) this.profile.sentMessages += 1
+            })
         }
     }
 
@@ -390,6 +434,21 @@ class SinkronServer {
         } else {
             this.collections.set(col, { subscribers: new Set([ws]) })
         }
+    }
+
+    report() {
+        if (!this.profile) return {}
+        const { start, handledMessages, handlerDuration, sentMessages } =
+            this.profile
+        const res = {
+            time: performance.now() - start,
+            clients: this.clients.size,
+            handledMessages,
+            duration: handlerDuration / handledMessages,
+            sentMessages
+        }
+        this.profile = initialProfilerSegment()
+        return res
     }
 }
 

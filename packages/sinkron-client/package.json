@@ -28,7 +28,10 @@
         "mobx": "^6.6.2",
         "nanoevents": "^7.0.1",
         "nanoid": "^4.0.0",
+        "pino": "^8.11.0",
+        "pino-pretty": "^10.3.1",
         "sinkron": "0.0.1",
+        "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.43.0",
         "uuid": "^9.0.0"
     }
 }

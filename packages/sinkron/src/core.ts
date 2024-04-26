@@ -493,7 +493,6 @@ class Sinkron {
         }
 
         const userObject = await this.getUserObject(m, user)
-        console.log(userObject)
         const permissions = Permissions.parse(col.permissions)
         const res = permissions.check(userObject, action)
         return Result.ok(res)

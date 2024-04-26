@@ -8,7 +8,7 @@
         "lint": "eslint src",
         "build": "NODE_ENV=production webpack",
         "test": "webpack --config webpack.test.config.js && mocha ./build/test.js",
-        "benchmark": "webpack --config webpack.benchmark.config.js"
+        "benchmark": "NODE_ENV=production webpack --config webpack.benchmark.config.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

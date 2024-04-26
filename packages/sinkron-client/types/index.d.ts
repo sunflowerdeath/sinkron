@@ -1,6 +1,7 @@
 import * as Automerge from "@automerge/automerge";
 import type { ChangeFn } from "@automerge/automerge";
 import { createNanoEvents } from "nanoevents";
+import { Logger } from "pino";
 import { debounce } from "lodash-es";
 import type { SyncErrorMessage, SyncCompleteMessage, DocMessage, CreateMessage, ChangeMessage, ModifyMessage } from "sinkron/types/protocol.d.ts";
 interface Transport {
@@ -91,23 +92,25 @@ interface CollectionProps<T> {
     transport: Transport;
     store?: CollectionStore<T>;
     errorHandler?: (msg: SyncErrorMessage) => void;
+    logger?: Logger<string>;
 }
 declare class Collection<T extends object> {
     constructor(props: CollectionProps<T>);
-    errorHandler?: (msg: SyncErrorMessage) => void;
-    items: Map<string, Item<T>>;
-    store: CollectionStore<T>;
     col: string;
     transport: Transport;
+    store?: CollectionStore<T>;
+    logger: Logger<string>;
+    errorHandler?: (msg: SyncErrorMessage) => void;
     colrev: number;
-    flushDebounced: ReturnType<typeof debounce>;
-    stopAutoReconnect?: () => void;
-    backupQueue: Set<string>;
-    flushQueue: Set<string>;
+    items: Map<string, Item<T>>;
     isLoaded: boolean;
     status: ConnectionStatus;
     initialSyncCompleted: boolean;
     isDestroyed: boolean;
+    flushDebounced: ReturnType<typeof debounce>;
+    stopAutoReconnect?: () => void;
+    backupQueue: Set<string>;
+    flushQueue: Set<string>;
     destroy(): void;
     init(): Promise<void>;
     loadFromStore(): Promise<void>;

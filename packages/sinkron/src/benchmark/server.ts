@@ -2,9 +2,10 @@ import { createServer } from "node:http"
 
 import { Sinkron, SinkronServer } from "../index"
 import { Permissions, Role, Action } from "../permissions"
+import pino, { Logger } from "pino"
 
-const numCols = 10
-const numUsers = 100
+const numCols = 500
+const numUsers = numCols * 2
 const port = 8081
 
 const startServer = async () => {
@@ -30,7 +31,11 @@ const startServer = async () => {
         })
     }
 
-    const sinkronServer = new SinkronServer({ sinkron })
+    const logger: Logger<string> = pino({
+        transport: { target: "pino-pretty" }
+    })
+    logger.level = "warn"
+    const sinkronServer = new SinkronServer({ sinkron, logger })
     const http = createServer()
     http.on("upgrade", (request, socket, head) => {
         const userId = request.url!.slice(1)
@@ -40,6 +45,12 @@ const startServer = async () => {
     http.listen(port, () => {
         console.log(`Server started at port: ${port}`)
     })
+
+    const report = () => {
+        console.log(sinkronServer.report())
+        setTimeout(report, 3000)
+    }
+    setTimeout(report, 3000)
 }
 
 startServer()

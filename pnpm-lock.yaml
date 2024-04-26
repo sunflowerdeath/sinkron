@@ -335,9 +335,18 @@ importers:
       nanoid:
         specifier: ^4.0.0
         version: 4.0.2
+      pino:
+        specifier: ^8.11.0
+        version: 8.19.0
+      pino-pretty:
+        specifier: ^10.3.1
+        version: 10.3.1
       sinkron:
         specifier: 0.0.1
         version: link:../sinkron
+      uWebSockets.js:
+        specifier: github:uNetworking/uWebSockets.js#v20.43.0
+        version: github.com/uNetworking/uWebSockets.js/1977b5039938ad863d42fc4958d48c17e5a1fa06
       uuid:
         specifier: ^9.0.0
         version: 9.0.1
@@ -9709,4 +9718,10 @@ packages:
         optional: true
     dependencies:
       react: 18.2.0
+    dev: false
+
+  github.com/uNetworking/uWebSockets.js/1977b5039938ad863d42fc4958d48c17e5a1fa06:
+    resolution: {tarball: https://codeload.github.com/uNetworking/uWebSockets.js/tar.gz/1977b5039938ad863d42fc4958d48c17e5a1fa06}
+    name: uWebSockets.js
+    version: 20.43.0
     dev: false
