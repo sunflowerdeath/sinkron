@@ -360,7 +360,7 @@ interface CollectionProps<T> {
     transport: Transport
     store?: CollectionStore<T>
     errorHandler?: (msg: SyncErrorMessage) => void
-    logger?: Logger<string> 
+    logger?: Logger<string>
 }
 
 const defaultLogger = (level = "debug"): Logger<string> => {
@@ -381,11 +381,11 @@ class Collection<T extends object> {
         this.logger = logger === undefined ? defaultLogger() : logger
         makeAutoObservable(this, {
             items: observable.shallow,
-            store: false,
             transport: false,
+            store: false,
+            logger: false,
             backupQueue: false,
-            flushQueue: false,
-            handleModifyMessage: action
+            flushQueue: false
         })
         this.flushDebounced = debounce(this.flush.bind(this), flushDelay, {
             maxWait: flushMaxWait

@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 import pino from "pino"
 
+import { createDataSource } from "./db"
 import { entities } from "./entities"
 import type { Document, Collection, Group, GroupMember } from "./entities"
 import { Result, ResultType } from "./result"
@@ -79,14 +80,7 @@ interface SinkronProps {
 class Sinkron {
     constructor(props: SinkronProps) {
         const { dbPath } = props
-        this.db = new DataSource({
-            type: "better-sqlite3",
-            database: dbPath,
-            entities,
-            synchronize: true,
-            // logging: ['query', 'error']
-            logging: ["error"]
-        })
+        this.db = createDataSource(dbPath)
         this.models = {
             documents: this.db.getRepository("document"),
             collections: this.db.getRepository("collection"),

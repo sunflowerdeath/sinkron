@@ -1,17 +1,24 @@
-import path from "node:path"
 import { createServer } from "http"
 import type { IncomingMessage } from "http"
 import { Duplex } from "stream"
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
 import { DataSource, Raw, In, Or, Equal, Not, Repository } from "typeorm"
-import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 import * as Bowser from "bowser"
 import cors from "@fastify/cors"
+import {
+    Sinkron,
+    SinkronServer,
+    ChannelServer,
+    Permissions,
+    Action,
+    Role
+} from "sinkron"
 
 import { Result, ResultType } from "./utils/result"
-import { createDataSource } from "./db"
+import dataSource from "./db/app"
+import { dbPath as sinkronDbPath } from "./db/sinkron"
 import {
     User,
     AuthToken,
@@ -404,21 +411,20 @@ class SpaceService {
         const col = `spaces/${space.id}`
 
         await this.app.sinkron.createGroup(`${col}/readonly`)
-        await this.app.sinkron.createGroup(`${col}/editor`)
-        await this.app.sinkron.createGroup(`${col}/admin`)
+        await this.app.sinkron.createGroup(`${col}/members`)
 
-        /*
         const p = new Permissions()
-        p.add('group:${col}/readonly', [Permission.read])
-        p.add('group:${col}/editor', [Permission.read, Permission.write])
-        p.add('group:${col}/admin', [
-            Permission.read,
-            Permission.write,
-            Permission.admin
-        ])
-        */
-
-        await this.app.sinkron.createCollection(col)
+        const members = Role.group(`${col}/members`)
+        p.add(Action.read, members)
+        p.add(Action.create, members)
+        p.add(Action.update, members)
+        p.add(Action.delete, members)
+        const readonly = Role.group(`${col}/readonly`)
+        p.add(Action.read, readonly)
+        await this.app.sinkron.createCollection({
+            id: col,
+            permissions: p.table
+        })
 
         const meta = Automerge.from({ meta: true, categories: {} })
         await this.app.sinkron.createDocument(
@@ -442,8 +448,7 @@ class SpaceService {
         const col = `spaces/${spaceId}`
         await this.app.sinkron.deleteCollection(col)
         await this.app.sinkron.deleteGroup(`${col}/readonly`)
-        await this.app.sinkron.deleteGroup(`${col}/editor`)
-        await this.app.sinkron.deleteGroup(`${col}/admin`)
+        await this.app.sinkron.deleteGroup(`${col}/members`)
         await models.spaces.delete({ id: spaceId })
     }
 
@@ -460,10 +465,10 @@ class SpaceService {
     async addMember(models: Models, props: AddMemberProps) {
         const { userId, spaceId, role } = props
         await models.members.insert({ userId, spaceId, role })
-        await this.app.sinkron.addMemberToGroup(
-            userId,
-            `spaces/${spaceId}/${role}`
-        )
+        const group =
+            `spaces/${spaceId}/` +
+            (role === "readonly" ? "readonly" : "members")
+        await this.app.sinkron.addMemberToGroup(userId, group)
     }
 
     async getUserSpaces(
@@ -1276,7 +1281,7 @@ class App {
         this.host = host
         this.port = port
 
-        this.db = createDataSource()
+        this.db = dataSource
 
         this.services = {
             users: new UserService(this),
@@ -1293,13 +1298,7 @@ class App {
             invites: this.db.getRepository<Invite>("invite")
         }
 
-        const dbDir =
-            process.env.SINKRON_SQLITE_DB_DIR || path.join(__dirname, "../temp")
-        const dbPath =
-            process.env.SINKRON_SQLITE_MEMORY_DB === "1"
-                ? ":memory:"
-                : path.join(dbDir, "sinkron.sqlite")
-        this.sinkron = new Sinkron({ dbPath })
+        this.sinkron = new Sinkron({ dbPath: sinkronDbPath })
         this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
 
         this.channels = new ChannelServer({})

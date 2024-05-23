@@ -5,7 +5,7 @@ import { without } from "lodash-es"
 import {
     Collection,
     Item,
-    WebsocketTransport,
+    WebSocketTransport,
     IndexedDbCollectionStore,
     ItemState
 } from "sinkron-client"
@@ -34,7 +34,10 @@ const getDocumentListItemData = (
     const doc = item.local!.content
     const firstNode = doc.children[0]
     const firstNodeText = firstNode
-        ? firstNode.children.map((c) => c.text).join("").slice(0, 75)
+        ? firstNode.children
+              .map((c) => c.text)
+              .join("")
+              .slice(0, 75)
         : ""
     const title = firstNodeText.length > 0 ? firstNodeText : null
     // let subtitle
@@ -82,9 +85,9 @@ class SpaceStore {
         const col = `spaces/${space.id}`
         const collectionStore = new IndexedDbCollectionStore<Document>(col)
         const token = this.api.getToken()
-        const transport = new WebsocketTransport(
-            `${env.wsUrl}/sinkron/${token}`
-        )
+        const transport = new WebSocketTransport({
+            url: `${env.wsUrl}/sinkron/${token}`
+        })
         this.collection = new Collection<Document>({
             transport,
             col,

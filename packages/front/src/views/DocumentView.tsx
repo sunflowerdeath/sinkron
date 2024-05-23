@@ -97,7 +97,10 @@ const renderElement = (props) => {
         case "code":
             return (
                 <pre
-                    style={{ padding: 8, border: "2px solid var(--color-elem)" }}
+                    style={{
+                        padding: 8,
+                        border: "2px solid var(--color-elem)"
+                    }}
                     {...props.attributes}
                 >
                     {props.children}
@@ -380,6 +383,7 @@ const EditorView = observer((props: EditorViewProps) => {
     const { id, doc, onChange, onDelete } = props
 
     const space = useSpace()
+    const canDelete = space.space.role !== "readonly"
 
     const forceUpdate = useForceUpdate()
     const editor = useMemo(() => createDocumentEditor(), [])
@@ -473,10 +477,12 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const menu = () => (
         <>
-            <MenuItem>Share</MenuItem>
-            <MenuItem>Copy to another space</MenuItem>
-            <MenuItem>Publish</MenuItem>
-            <MenuItem onSelect={onDelete}>Delete</MenuItem>
+            <MenuItem isDisabled={true}>Share</MenuItem>
+            <MenuItem isDisabled={true}>Copy to another space</MenuItem>
+            <MenuItem isDisabled={true}>Publish</MenuItem>
+            <MenuItem onSelect={onDelete} isDisabled={!canDelete}>
+                Delete
+            </MenuItem>
         </>
     )
 

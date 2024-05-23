@@ -3,6 +3,7 @@
     "version": "0.0.1",
     "description": "",
     "main": "build/main.js",
+    "browser": "build/main.browser.js",
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "eslint src",
