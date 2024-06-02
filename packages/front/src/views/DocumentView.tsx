@@ -97,7 +97,10 @@ const renderElement = (props) => {
         case "code":
             return (
                 <pre
-                    style={{ padding: 8, border: "2px solid #555" }}
+                    style={{
+                        padding: 8,
+                        border: "2px solid var(--color-elem)"
+                    }}
                     {...props.attributes}
                 >
                     {props.children}
@@ -380,6 +383,7 @@ const EditorView = observer((props: EditorViewProps) => {
     const { id, doc, onChange, onDelete } = props
 
     const space = useSpace()
+    const canDelete = space.space.role !== "readonly"
 
     const forceUpdate = useForceUpdate()
     const editor = useMemo(() => createDocumentEditor(), [])
@@ -414,7 +418,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     padding: isMobile ? 8 : "8px 40px",
                     boxSizing: "border-box",
                     background: "var(--color-background)",
-                    borderTop: "2px solid #555"
+                    borderTop: "2px solid var(--color-elem)"
                 }}
             >
                 <Toolbar />
@@ -458,12 +462,11 @@ const EditorView = observer((props: EditorViewProps) => {
             <Row
                 style={{
                     background: "var(--color-background)",
-                    // height: 60,
+                    height: 60,
                     padding: isMobile ? "0 10px" : "0 40px",
                     boxSizing: "border-box",
                     overflowX: "auto",
                     flexShrink: 0
-                    // borderTop: "2px solid #555"
                 }}
                 align="center"
             >
@@ -474,17 +477,19 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const menu = () => (
         <>
-            <MenuItem>Share</MenuItem>
-            <MenuItem>Copy to another space</MenuItem>
-            <MenuItem>Publish</MenuItem>
-            <MenuItem onSelect={onDelete}>Delete</MenuItem>
+            <MenuItem isDisabled={true}>Share</MenuItem>
+            <MenuItem isDisabled={true}>Copy to another space</MenuItem>
+            <MenuItem isDisabled={true}>Publish</MenuItem>
+            <MenuItem onSelect={onDelete} isDisabled={!canDelete}>
+                Delete
+            </MenuItem>
         </>
     )
 
     const menuButton = (
         <Menu
             menu={menu}
-            styles={{ list: { background: "#555" } }}
+            styles={{ list: { background: "var(--color-elem)" } }}
             placement={{ padding: 0, offset: 8, align: "end" }}
             autoSelectFirstItem={false}
         >
@@ -496,10 +501,12 @@ const EditorView = observer((props: EditorViewProps) => {
         </Menu>
     )
 
+    const readOnly = space.space.role === "readonly"
     const editorElem = (
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
             <Editable
                 renderElement={renderElement}
+                readOnly={readOnly}
                 style={{
                     padding: isMobile ? 10 : 40,
                     paddingTop: 20,
@@ -510,7 +517,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     boxSizing: "border-box"
                     // overflow: "auto"
                 }}
-                autoFocus
+                autoFocus={!isMobile}
                 placeholder="Empty document"
                 renderPlaceholder={({ children, attributes }) => {
                     return (
@@ -577,7 +584,7 @@ const EditorView = observer((props: EditorViewProps) => {
         <Row
             gap={8}
             justify="end"
-            style={{ position: "absolute", top: 0, right: 0 }}
+            style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}
         >
             <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
             {menuButton}

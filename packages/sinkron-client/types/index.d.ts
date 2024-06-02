@@ -1,6 +1,7 @@
 import * as Automerge from "@automerge/automerge";
 import type { ChangeFn } from "@automerge/automerge";
 import { createNanoEvents } from "nanoevents";
+import { Logger } from "pino";
 import { debounce } from "lodash-es";
 import type { SyncErrorMessage, SyncCompleteMessage, DocMessage, CreateMessage, ChangeMessage, ModifyMessage } from "sinkron/types/protocol.d.ts";
 interface Transport {
@@ -9,10 +10,15 @@ interface Transport {
     send(msg: string): void;
     emitter: ReturnType<typeof createNanoEvents>;
 }
-declare class WebsocketTransport implements Transport {
-    constructor(url: string);
+type WebSocketTransportProps = {
+    url: string;
+    webSocketImpl?: typeof WebSocket;
+};
+declare class WebSocketTransport implements Transport {
+    constructor(props: WebSocketTransportProps);
     emitter: import("nanoevents").Emitter<import("nanoevents").DefaultEvents>;
     url: string;
+    webSocketImpl: typeof WebSocket;
     ws?: WebSocket;
     open(): void;
     close(): void;
@@ -86,23 +92,25 @@ interface CollectionProps<T> {
     transport: Transport;
     store?: CollectionStore<T>;
     errorHandler?: (msg: SyncErrorMessage) => void;
+    logger?: Logger<string>;
 }
 declare class Collection<T extends object> {
     constructor(props: CollectionProps<T>);
-    errorHandler?: (msg: SyncErrorMessage) => void;
-    items: Map<string, Item<T>>;
-    store: CollectionStore<T>;
     col: string;
     transport: Transport;
+    store?: CollectionStore<T>;
+    logger: Logger<string>;
+    errorHandler?: (msg: SyncErrorMessage) => void;
     colrev: number;
-    flushDebounced: ReturnType<typeof debounce>;
-    stopAutoReconnect?: () => void;
-    backupQueue: Set<string>;
-    flushQueue: Set<string>;
+    items: Map<string, Item<T>>;
     isLoaded: boolean;
     status: ConnectionStatus;
     initialSyncCompleted: boolean;
     isDestroyed: boolean;
+    flushDebounced: ReturnType<typeof debounce>;
+    stopAutoReconnect?: () => void;
+    backupQueue: Set<string>;
+    flushQueue: Set<string>;
     destroy(): void;
     init(): Promise<void>;
     loadFromStore(): Promise<void>;
@@ -130,4 +138,4 @@ declare class ChannelClient {
     dispose: () => void;
     constructor(props: ChannelClientProps);
 }
-export { Collection, WebsocketTransport, IndexedDbCollectionStore, ChannelClient };
+export { Collection, WebSocketTransport, IndexedDbCollectionStore, ChannelClient };

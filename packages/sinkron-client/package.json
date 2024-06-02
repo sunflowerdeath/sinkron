@@ -3,6 +3,7 @@
     "version": "0.0.1",
     "description": "",
     "main": "build/main.js",
+    "browser": "build/main.browser.js",
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "eslint src",
@@ -13,8 +14,7 @@
     "devDependencies": {
         "@types/lodash-es": "^4.17.6",
         "@types/uuid": "^9.0.0",
-        "esbuild": "^0.15.12",
-        "esbuild-loader": "^2.20.0",
+        "esbuild-loader": "^4.1.0",
         "ts-loader": "^9.5.1",
         "typescript": "^5.3.3",
         "webpack": "^5.74.0",
@@ -29,7 +29,10 @@
         "mobx": "^6.6.2",
         "nanoevents": "^7.0.1",
         "nanoid": "^4.0.0",
+        "pino": "^8.11.0",
+        "pino-pretty": "^10.3.1",
         "sinkron": "0.0.1",
+        "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.43.0",
         "uuid": "^9.0.0"
     }
 }

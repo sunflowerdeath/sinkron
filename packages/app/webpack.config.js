@@ -46,34 +46,14 @@ const appConfig = {
 const dbConfig = {
     ...baseConfig,
     entry: {
-        db: "./src/db.ts"
+        "app-db": "./src/db/app.ts",
+        "sinkron-db": "./src/db/sinkron.ts"
     },
     output: {
         path: path.resolve(__dirname, "./build"),
         filename: "[name].js",
-        library: {
-            type: "commonjs"
-        }
+        library: { type: "commonjs" }
     }
 }
 
-const migrations = glob.sync("./src/migrations/*.ts")
-const migrationsEntry = {}
-migrations.forEach((file) => {
-    migrationsEntry[path.basename(file, ".ts")] = file
-})
-const migrationsConfig = {
-    ...baseConfig,
-    entry: migrationsEntry,
-    output: {
-        path: path.resolve(__dirname, "./build/migrations"),
-        clean: true,
-        filename: "[name].js",
-        library: {
-            type: "commonjs"
-        }
-    },
-    devtool: false
-}
-
-module.exports = [appConfig, dbConfig, migrationsConfig]
+module.exports = [appConfig, dbConfig]

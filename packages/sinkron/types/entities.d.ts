@@ -1,4 +1,4 @@
-import { EntitySchema } from 'typeorm';
+import { EntitySchema } from "typeorm";
 export type Document = {
     id: string;
     createdAt: Date;
@@ -18,6 +18,7 @@ export type Collection = {
     updatedAt: Date;
     colrev: number;
     owner: string;
+    permissions: string;
 };
 export type Group = {
     id: string;
@@ -26,6 +27,7 @@ export type Group = {
 export type GroupMember = {
     id: string;
     user: string;
+    groupId: string;
     group: Group;
 };
 declare const entities: (EntitySchema<Collection> | EntitySchema<Group> | EntitySchema<GroupMember>)[];

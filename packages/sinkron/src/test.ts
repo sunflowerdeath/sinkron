@@ -1,8 +1,9 @@
-import assert from 'node:assert'
-import * as Automerge from '@automerge/automerge'
-import { v4 as uuidv4 } from 'uuid'
+import assert from "node:assert"
+import * as Automerge from "@automerge/automerge"
+import { v4 as uuidv4 } from "uuid"
 
-import { Sinkron } from './core'
+import { Sinkron } from "./core"
+import { Permissions, Role, Action, emptyPermissionsTable } from "./permissions"
 
 type Doc = {
     text: string
@@ -12,29 +13,32 @@ type Doc = {
 const makeDoc = () => {
     let doc = Automerge.init<Doc>()
     doc = Automerge.change(doc, (doc) => {
-        doc.text = 'Hello'
+        doc.text = "Hello"
         doc.num = 0
     })
     return doc
 }
 
-describe('Sinkron', () => {
+describe("Sinkron", () => {
     let sinkron: Sinkron
 
     beforeEach(async () => {
-        sinkron = new Sinkron({ dbPath: ':memory:' })
+        sinkron = new Sinkron({ dbPath: ":memory:" })
         await sinkron.init()
-        await sinkron.createCollection('test')
+        await sinkron.createCollection({
+            id: "test",
+            permissions: emptyPermissionsTable
+        })
     })
 
-    it('create', async () => {
+    it("create", async () => {
         const id = uuidv4()
         const doc = makeDoc()
 
         // collection does not exist
         const res = await sinkron.createDocument(
             id,
-            'ERROR',
+            "ERROR",
             Automerge.save(doc)
         )
         assert(!res.isOk)
@@ -42,7 +46,7 @@ describe('Sinkron', () => {
         // created successfully
         const res1 = await sinkron.createDocument(
             id,
-            'test',
+            "test",
             Automerge.save(doc)
         )
         assert(res1.isOk)
@@ -51,19 +55,19 @@ describe('Sinkron', () => {
         // duplicate id
         const res2 = await sinkron.createDocument(
             id,
-            'test',
+            "test",
             Automerge.save(doc)
         )
         assert(!res2.isOk)
     })
 
-    it('update', async () => {
+    it("update", async () => {
         const id = uuidv4()
         let doc = makeDoc()
 
         const res = await sinkron.createDocument(
             id,
-            'test',
+            "test",
             Automerge.save(doc)
         )
         assert(res.isOk)
@@ -81,12 +85,90 @@ describe('Sinkron', () => {
         const updatedDoc = Automerge.load<Doc>(res2.value.data!)
         assert.strictEqual(updatedDoc.num, 100)
 
-        const res3 = await sinkron.updateDocument('WRONG_ID', [change])
+        const res3 = await sinkron.updateDocument("WRONG_ID", [change])
         assert(!res3.isOk)
 
         // bad change
         const badChange = new Uint8Array([1, 2, 3])
         const res4 = await sinkron.updateDocument(id, [badChange])
         assert(!res4.isOk)
+    })
+
+    it("permissions", async () => {
+        const user = "1"
+        const user2 = "2"
+
+        const permissions = new Permissions()
+        permissions.add(Action.read, Role.user(user))
+        permissions.add(Action.create, Role.user(user))
+        permissions.add(Action.update, Role.user(user))
+        permissions.add(Action.delete, Role.user(user))
+        await sinkron.createCollection({
+            id: "perm_test",
+            permissions: permissions.table
+        })
+        await sinkron.createDocument(
+            "perm_test_doc",
+            "perm_test",
+            Automerge.save(makeDoc())
+        )
+
+        // has permission
+        const res = await sinkron.checkCollectionPermission({
+            id: "perm_test",
+            user,
+            action: Action.read
+        })
+        assert(res.isOk)
+        assert.strictEqual(res.value, true)
+
+        const res2 = await sinkron.checkDocumentPermission({
+            id: "perm_test_doc",
+            user,
+            action: Action.update
+        })
+        assert(res2.isOk)
+        assert.strictEqual(res2.value, true)
+
+        // no permission
+        const res3 = await sinkron.checkCollectionPermission({
+            id: "perm_test",
+            user: user2,
+            action: Action.read
+        })
+        assert(res3.isOk)
+        assert.strictEqual(res3.value, false)
+
+        const res4 = await sinkron.checkDocumentPermission({
+            id: "perm_test_doc",
+            user: user2,
+            action: Action.update
+        })
+        assert(res4.isOk)
+        assert.strictEqual(res4.value, false)
+
+        // update permissions
+        await sinkron.updateDocumentPermissions("perm_test_doc", (p) => {
+            p.add(Action.update, Role.user(user2))
+        })
+        await sinkron.updateCollectionPermissions("perm_test", (p) => {
+            p.add(Action.read, Role.user(user2))
+        })
+
+        const res5 = await sinkron.checkCollectionPermission({
+            id: "perm_test",
+            user: user2,
+            action: Action.read
+        })
+        assert(res5.isOk)
+        assert.strictEqual(res5.value, true)
+
+        const res6 = await sinkron.checkDocumentPermission({
+            id: "perm_test_doc",
+            user: user2,
+            action: Action.update
+        })
+        assert(res6.isOk)
+        assert.strictEqual(res6.value, true)
     })
 })

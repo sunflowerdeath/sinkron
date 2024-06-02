@@ -11,12 +11,16 @@ import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 import pino from "pino"
 
+import { createDataSource } from "./db"
 import { entities } from "./entities"
 import type { Document, Collection, Group, GroupMember } from "./entities"
-
-// import { generatePasswordHash, validatePasswordHash } from './passwordHash'
 import { Result, ResultType } from "./result"
-import { emptyPermissionsTable } from "./permissions"
+import {
+    Permissions,
+    emptyPermissionsTable,
+    PermissionsTable,
+    Action
+} from "./permissions"
 import {
     ErrorCode,
     SyncMessage,
@@ -32,7 +36,10 @@ import {
     ClientMessage
 } from "./protocol"
 
-type ChangeHandler = (msg: ChangeMessage) => void
+type CreateCollectionProps = {
+    id: string
+    permissions: PermissionsTable
+}
 
 type CreateDocumentProps = {
     id: string
@@ -52,6 +59,12 @@ type UpdateDocumentWithCallbackProps = {
     callback: (doc: any) => void
 }
 
+type CheckPermissionProps = {
+    id: string
+    action: Action
+    user: string
+}
+
 type ChangedDocuments = {
     col: string
     colrev: number
@@ -67,14 +80,7 @@ interface SinkronProps {
 class Sinkron {
     constructor(props: SinkronProps) {
         const { dbPath } = props
-        this.db = new DataSource({
-            type: "better-sqlite3",
-            database: dbPath,
-            entities,
-            synchronize: true,
-            // logging: ['query', 'error']
-            logging: ["error"]
-        })
+        this.db = createDataSource(dbPath)
         this.models = {
             documents: this.db.getRepository("document"),
             collections: this.db.getRepository("collection"),
@@ -122,22 +128,12 @@ class Sinkron {
         return res as Document | null
     }
 
-    async getColEntityTr(
-        m: EntityManager,
-        col: string
-    ): Promise<Collection | null> {
-        const models = this.getModels(m)
-        const colEntity = await models.collections.findOne({
-            where: { id: col },
-            select: { id: true, colrev: true }
-        })
-        return colEntity as Collection | null
-    }
-
     async createCollectionTr(
         m: EntityManager,
-        id: string
+        props: CreateCollectionProps
     ): Promise<ResultType<Collection, RequestError>> {
+        const { id, permissions } = props
+
         const models = this.getModels(m)
         const count = await models.collections.countBy({ id })
         if (count > 0) {
@@ -147,7 +143,11 @@ class Sinkron {
             })
         }
 
-        await models.collections.insert({ id, colrev: 1 })
+        await models.collections.insert({
+            id,
+            colrev: 1,
+            permissions: JSON.stringify(permissions)
+        })
         // TODO generated fields
         const col = { id, colrev: 1 }
 
@@ -161,7 +161,10 @@ class Sinkron {
     ): Promise<ResultType<ChangedDocuments, RequestError>> {
         const models = this.getModels(m)
 
-        const colEntity = await this.getColEntityTr(m, col)
+        const colEntity = await models.collections.findOne({
+            where: { id: col },
+            select: { colrev: true }
+        })
         if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
 
         const result = { col, colrev: colEntity.colrev }
@@ -229,7 +232,10 @@ class Sinkron {
             })
         }
 
-        const colEntity = await this.getColEntityTr(m, col)
+        const colEntity = await models.collections.findOne({
+            where: { id: col },
+            select: { colrev: true, permissions: true }
+        })
         if (colEntity === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
@@ -242,6 +248,13 @@ class Sinkron {
         await models.collections.update(col, { colrev: nextColrev })
 
         // create document
+        const colPermissions = Permissions.parse(colEntity.permissions)
+        const docPermissions = {
+            create: [],
+            read: [],
+            delete: [],
+            update: colPermissions.table.update
+        }
         const doc = {
             id,
             data,
@@ -249,8 +262,7 @@ class Sinkron {
             colId: col,
             isDeleted: false,
             colrev: nextColrev,
-            // TODO real permissions
-            permissions: JSON.stringify(emptyPermissionsTable)
+            permissions: JSON.stringify(docPermissions)
         }
         await models.documents.insert(doc)
 
@@ -371,38 +383,126 @@ class Sinkron {
         return await this.updateDocumentEntityTr(m, doc, { data: nextData })
     }
 
-    /*
+    async updateCollectionPermissionsTr(
+        m: EntityManager,
+        col: string,
+        cb: (p: Permissions) => void
+    ): Promise<ResultType<true, RequestError>> {
+        const models = this.getModels(m)
+
+        const colEntity = await models.collections.findOne({
+            where: { id: col },
+            select: { permissions: true }
+        })
+        if (colEntity === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                details: "Collection not found"
+            })
+        }
+
+        const permissions = Permissions.parse(colEntity.permissions)
+        cb(permissions)
+        await models.collections.update(col, {
+            permissions: permissions.stringify()
+        })
+        return Result.ok(true)
+    }
+
     async updateDocumentPermissionsTr(
         m: EntityManager,
         id: string,
-        callback: (p: Permissions) => void
-    ) {
+        cb: (p: Permissions) => void
+    ): Promise<ResultType<true, RequestError>> {
         const models = this.getModels(m)
 
         const doc = await models.documents.findOne({
             where: { id },
-            select: { id: true, rev: true, permissions: true },
+            select: { permissions: true }
         })
         if (doc === null) {
-            throw new Error(`Can't update, unknown id: ${id}`) // 404
+            return Result.err({
+                code: ErrorCode.NotFound,
+                details: "Document not found"
+            })
         }
 
-        const nextColrev = await this.incrementColrevTr(m, doc.colId)
         const permissions = Permissions.parse(doc.permissions)
-        callback(permissions)
-        await models.documents.update(id!, {
-            permissions: permissions.stringify(),
-            colrev: nextColrev,
+        cb(permissions)
+        await models.documents.update(id, {
+            permissions: permissions.stringify()
         })
-        return { id, permissions: permissions.table, colrev: nextColrev }
+        return Result.ok(true)
     }
-    */
 
+    async getUserObject(m: EntityManager, user: string) {
+        const models = this.getModels(m)
+        const members = await models.members.find({
+            where: { user },
+            select: { groupId: true }
+        })
+        return { id: user, groups: members.map((g) => g.groupId) }
+    }
+
+    async checkDocumentPermissionTr(
+        m: EntityManager,
+        props: CheckPermissionProps
+    ): Promise<ResultType<boolean, RequestError>> {
+        const models = this.getModels(m)
+        const { id, action, user } = props
+
+        const doc = await models.documents.findOne({
+            where: { id },
+            select: { permissions: true }
+        })
+        if (doc === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                details: "Document not found"
+            })
+        }
+
+        const userObject = await this.getUserObject(m, user)
+        const permissions = Permissions.parse(doc.permissions)
+        const res = permissions.check(userObject, action)
+        return Result.ok(res)
+    }
+
+    async checkCollectionPermissionTr(
+        m: EntityManager,
+        props: CheckPermissionProps
+    ): Promise<ResultType<boolean, RequestError>> {
+        const models = this.getModels(m)
+        const { id, action, user } = props
+
+        const col = await models.collections.findOne({
+            where: { id },
+            select: { permissions: true }
+        })
+        if (col === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                details: "Collection not found"
+            })
+        }
+
+        const userObject = await this.getUserObject(m, user)
+        const permissions = Permissions.parse(col.permissions)
+        const res = permissions.check(userObject, action)
+        return Result.ok(res)
+    }
+
+    // ==========
     // Public API
+    // ==========
+
+    // Collections
+    // -----------
+
     createCollection(
-        id: string
+        props: CreateCollectionProps
     ): Promise<ResultType<Collection, RequestError>> {
-        return this.db.transaction((m) => this.createCollectionTr(m, id))
+        return this.db.transaction((m) => this.createCollectionTr(m, props))
     }
 
     getCollection(id: string): Promise<Collection | null> {
@@ -435,6 +535,9 @@ class Sinkron {
         return this.db.transaction((m) => this.syncCollectionTr(m, col, colrev))
     }
 
+    // Documents
+    // ---------
+
     createDocument(
         id: string,
         col: string,
@@ -465,15 +568,45 @@ class Sinkron {
         return this.updateDocument(id, null)
     }
 
-    /*
-    updateDocumentPermissions(id: string, callback: (p: Permissions) => void) {
+    // Permissions
+    // -----------
+
+    updateCollectionPermissions(
+        col: string,
+        cb: (p: Permissions) => void
+    ): Promise<ResultType<true, RequestError>> {
         return this.db.transaction((m) =>
-            this.updateDocumentPermissionsTr(m, id, callback)
+            this.updateCollectionPermissionsTr(m, col, cb)
         )
     }
-    */
 
-    // checkDocumentPermissions({ id, ... }) : Promise<boolean>
+    updateDocumentPermissions(
+        id: string,
+        cb: (p: Permissions) => void
+    ): Promise<ResultType<true, RequestError>> {
+        return this.db.transaction((m) =>
+            this.updateDocumentPermissionsTr(m, id, cb)
+        )
+    }
+
+    checkDocumentPermission(
+        props: CheckPermissionProps
+    ): Promise<ResultType<boolean, RequestError>> {
+        return this.db.transaction((m) =>
+            this.checkDocumentPermissionTr(m, props)
+        )
+    }
+
+    checkCollectionPermission(
+        props: CheckPermissionProps
+    ): Promise<ResultType<boolean, RequestError>> {
+        return this.db.transaction((m) =>
+            this.checkCollectionPermissionTr(m, props)
+        )
+    }
+
+    // Groups
+    // ------
 
     async createGroup(id: string): Promise<ResultType<Group, RequestError>> {
         return this.db.transaction(async (m) => {
@@ -517,7 +650,7 @@ class Sinkron {
         return this.db.transaction(async (m) => {
             const models = this.getModels(m)
 
-            const count = await models.collections.countBy({ id: group })
+            const count = await models.groups.countBy({ id: group })
             if (count === 0) {
                 return Result.err({
                     code: ErrorCode.InvalidRequest,
@@ -525,7 +658,7 @@ class Sinkron {
                 })
             }
 
-            const res = await models.members.insert({ user, group })
+            const res = await models.members.insert({ user, groupId: group })
             return Result.ok(true)
         })
     }
@@ -537,7 +670,7 @@ class Sinkron {
         return this.db.transaction(async (m) => {
             const models = this.getModels(m)
 
-            const res = await models.members.delete({ user, group })
+            const res = await models.members.delete({ user, groupId: group })
             return Result.ok(true)
         })
     }

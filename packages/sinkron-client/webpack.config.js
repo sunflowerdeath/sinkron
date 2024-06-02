@@ -19,19 +19,8 @@ const rules = [
     }
 ]
 
-module.exports = {
-    entry: {
-        main: "./src/index.ts"
-    },
-    output: {
-        path: path.resolve(__dirname, "./build"),
-        filename: "[name].js",
-        library: {
-            type: "module"
-        }
-    },
+const base = {
     mode: isProduction ? "production" : "development",
-    target: "web",
     resolve: {
         extensions: [".js", ".ts"]
     },
@@ -41,3 +30,31 @@ module.exports = {
     devtool: "cheap-module-source-map",
     optimization: { minimize: false }
 }
+
+const node = {
+    ...base,
+    entry: {
+        main: "./src/index.ts"
+    },
+    output: {
+        path: path.resolve(__dirname, "./build"),
+        filename: "main.js",
+        library: { type: "commonjs" }
+    },
+    // target: "node"
+}
+
+const browser = {
+    ...base,
+    entry: {
+        main: "./src/index.ts"
+    },
+    output: {
+        path: path.resolve(__dirname, "./build"),
+        filename: "main.browser.js",
+        library: { type: "module" }
+    },
+    target: "web"
+}
+
+module.exports = [node, browser]

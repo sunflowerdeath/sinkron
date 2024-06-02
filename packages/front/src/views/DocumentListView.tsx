@@ -26,8 +26,8 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
             style={{
                 height: 60,
                 padding: 8,
-                borderBottom: "2px solid #555",
-                background: isSelected ? "#555" : "transparent",
+                borderBottom: "2px solid var(--color-elem)",
+                background: isSelected ? "var(--color-elem)" : "transparent",
                 gap: 12,
                 cursor: "pointer"
             }}
@@ -108,6 +108,7 @@ const DocumentListView = observer(() => {
     const space = useSpace()
     const [_location, navigate] = useLocation()
 
+    const canCreate = space.space.role !== "readonly"
     const createDocument = () => {
         const id = space.createDocument()
         navigate(`/documents/${id}`)
@@ -136,7 +137,7 @@ const DocumentListView = observer(() => {
             >
                 {space.category?.name || "All documents"}
             </LinkButton>
-            <Button onClick={createDocument}>
+            <Button onClick={createDocument} isDisabled={!canCreate}>
                 <Icon svg={addSvg} />
             </Button>
         </Row>

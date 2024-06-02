@@ -1,10 +1,14 @@
+import { IncomingMessage } from "node:http"
+import { Duplex } from "node:stream"
+
 import Ajv, { JSONSchemaType } from "ajv"
 import { WebSocketServer, WebSocket } from "ws"
-import pino from "pino"
+import pino, { Logger } from "pino"
 
 import { Document } from "./entities"
 import { Sinkron, RequestError } from "./core"
 import { Result, ResultType } from "./result"
+import { Action } from "./permissions"
 import {
     ErrorCode,
     SyncMessage,
@@ -20,6 +24,8 @@ import {
     ClientMessage
 } from "./protocol"
 import { MessageQueue, WsMessage } from "./messageQueue"
+
+const enableProfiling = process.env.ENABLE_PROFILING === "1"
 
 const syncMessageSchema = {
     type: "object",
@@ -91,6 +97,7 @@ const clientDisconnectTimeout = 10000
 
 interface SinkronServerOptions {
     sinkron: Sinkron
+    logger?: Logger<string>
     host?: string
     port?: number
 }
@@ -100,28 +107,65 @@ const defaultServerOptions = {
     port: 8080
 }
 
+const defaultLogger = (level = "debug"): Logger<string> => {
+    const logger: Logger<string> = pino({
+        transport: { target: "pino-pretty" }
+    })
+    logger.level = level
+    return logger
+}
+
+type ProfilerSegment = {
+    start: number
+    handledMessages: number
+    handlerDuration: number
+    sentMessages: number
+}
+
+const initialProfilerSegment = () => ({
+    start: performance.now(),
+    handledMessages: 0,
+    handlerDuration: 0,
+    sentMessages: 0
+})
+
 class SinkronServer {
     sinkron: Sinkron
     ws: WebSocketServer
 
-    clients = new Map<WebSocket, { subscriptions: Set<string> }>()
+    clients = new Map<WebSocket, { subscriptions: Set<string>; id: string }>()
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
 
-    logger: ReturnType<typeof pino>
+    logger: Logger<string>
     messageQueue: MessageQueue
 
-    constructor(options: SinkronServerOptions) {
-        this.logger = pino({
-            transport: { target: "pino-pretty" }
-        })
-        this.logger.level = "debug"
+    profile?: ProfilerSegment
 
-        const { sinkron, host, port } = { ...defaultServerOptions, ...options }
+    constructor(options: SinkronServerOptions) {
+        const { sinkron, host, port, logger } = {
+            ...defaultServerOptions,
+            ...options
+        }
+
+        this.logger = logger === undefined ? defaultLogger() : logger
         this.sinkron = sinkron
+
+        if (enableProfiling) {
+            this.profile = initialProfilerSegment()
+        }
 
         this.messageQueue = new MessageQueue(async (msg: WsMessage) => {
             try {
+                let now
+                if (this.profile) {
+                    now = performance.now()
+                }
                 await this.handleMessage(msg)
+                if (this.profile) {
+                    const duration = performance.now() - now!
+                    this.profile.handledMessages += 1
+                    this.profile.handlerDuration += duration
+                }
             } catch (e) {
                 this.logger.error(
                     "Unhandled exception while handling message, %o",
@@ -134,9 +178,24 @@ class SinkronServer {
         this.ws.on("connection", this.onConnect.bind(this))
     }
 
-    async onConnect(ws: WebSocket) {
-        this.logger.debug("Client connected")
-        this.clients.set(ws, { subscriptions: new Set() })
+    upgrade(
+        request: IncomingMessage,
+        socket: Duplex,
+        head: Buffer,
+        client: object
+    ) {
+        this.ws.handleUpgrade(request, socket, head, (ws) => {
+            this.ws.emit("connection", ws, request, client)
+        })
+    }
+
+    async onConnect(
+        ws: WebSocket,
+        request: IncomingMessage,
+        client: { id: string }
+    ) {
+        this.logger.debug("Client connected, id: " + client.id)
+        this.clients.set(ws, { subscriptions: new Set(), id: client.id })
         setTimeout(() => {
             const client = this.clients.get(ws)
             if (client === undefined) return
@@ -182,7 +241,22 @@ class SinkronServer {
 
         // TODO error if second sync message
 
-        // TODO check collection permission
+        const client = this.clients.get(ws)
+        if (!client) return
+        const checkRes = await this.sinkron.checkCollectionPermission({
+            id: col,
+            user: client.id,
+            action: Action.read
+        })
+        if (!checkRes.isOk || !checkRes.value === true) {
+            const errorMsg: SyncErrorMessage = {
+                kind: "sync_error",
+                col,
+                code: ErrorCode.AccessDenied
+            }
+            ws.send(JSON.stringify(errorMsg))
+            return
+        }
 
         const result = await this.sinkron.syncCollection(col, colrev)
         if (!result.isOk) {
@@ -192,6 +266,7 @@ class SinkronServer {
                 code: result.error.code
             }
             ws.send(JSON.stringify(errorMsg))
+            if (this.profile) this.profile.sentMessages += 1
             return
         }
 
@@ -206,6 +281,7 @@ class SinkronServer {
                 updatedAt: serializeDate(doc.updatedAt)
             }
             ws.send(JSON.stringify(msg))
+            if (this.profile) this.profile.sentMessages += 1
         })
 
         const syncCompleteMsg = {
@@ -214,24 +290,23 @@ class SinkronServer {
             colrev: result.value.colrev
         }
         ws.send(JSON.stringify(syncCompleteMsg))
+        if (this.profile) this.profile.sentMessages += 1
 
         this.addSubscriber(msg.col, ws)
         this.logger.debug("Client subscribed to collection %s", msg.col)
     }
 
-    async handleChangeMessage(msg: ChangeMessage, client: WebSocket) {
+    async handleChangeMessage(msg: ChangeMessage, ws: WebSocket) {
         const { op, col } = msg
-
-        // TODO check document permissions
 
         let res: ResultType<Document, RequestError>
         if (op === Op.Create) {
-            res = await this.handleCreateMessage(msg)
+            res = await this.handleCreateMessage(msg, ws)
         } else if (op === Op.Delete) {
-            res = await this.sinkron.deleteDocument(msg.id)
+            res = await this.handleDeleteMessage(msg, ws)
         } else {
             // if (op === Op.Modify)
-            res = await this.handleModifyMessage(msg)
+            res = await this.handleModifyMessage(msg, ws)
         }
         if (!res.isOk) {
             this.logger.debug(
@@ -246,7 +321,7 @@ class SinkronServer {
                 changeid: msg.changeid,
                 code: res.error.code
             }
-            client.send(JSON.stringify(errorMsg))
+            ws.send(JSON.stringify(errorMsg))
             return
         }
         const doc = res.value
@@ -260,14 +335,30 @@ class SinkronServer {
             if (msg.op === Op.Create) {
                 response.createdAt = serializeDate(createdAt)
             }
-            collection.subscribers.forEach((sub) =>
+            collection.subscribers.forEach((sub) => {
                 sub.send(JSON.stringify(response))
-            )
+                if (this.profile) this.profile.sentMessages += 1
+            })
         }
     }
 
-    async handleCreateMessage(msg: CreateMessage) {
-        const { id, col, data } = msg
+    async handleCreateMessage(
+        msg: CreateMessage,
+        ws: WebSocket
+    ): Promise<ResultType<Document, RequestError>> {
+        const { id, col, changeid, data } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
+        const checkRes = await this.sinkron.checkCollectionPermission({
+            id: col,
+            user: client.id,
+            action: Action.create
+        })
+        if (!checkRes.isOk || !checkRes.value === true) {
+            return Result.err({ code: ErrorCode.AccessDenied })
+        }
+
         return await this.sinkron.createDocument(
             id!,
             col,
@@ -275,8 +366,44 @@ class SinkronServer {
         )
     }
 
-    async handleModifyMessage(msg: ModifyMessage) {
-        const { id, col, data } = msg
+    async handleDeleteMessage(
+        msg: DeleteMessage,
+        ws: WebSocket
+    ): Promise<ResultType<Document, RequestError>> {
+        const { col, id, changeid } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
+        const checkRes = await this.sinkron.checkCollectionPermission({
+            id: col,
+            user: client.id,
+            action: Action.delete
+        })
+        if (!checkRes.isOk || !checkRes.value === true) {
+            return Result.err({ code: ErrorCode.AccessDenied })
+        }
+
+        // TODO send col or check permissions on document
+        return await this.sinkron.deleteDocument(id)
+    }
+
+    async handleModifyMessage(
+        msg: ModifyMessage,
+        ws: WebSocket
+    ): Promise<ResultType<Document, RequestError>> {
+        const { id, changeid, col, data } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
+        const checkRes = await this.sinkron.checkDocumentPermission({
+            id,
+            user: client.id,
+            action: Action.update
+        })
+        if (!checkRes.isOk || !checkRes.value === true) {
+            return Result.err({ code: ErrorCode.AccessDenied })
+        }
+
         const doc = await this.sinkron.updateDocument(
             id,
             data.map((c) => Buffer.from(c, "base64"))
@@ -307,6 +434,21 @@ class SinkronServer {
         } else {
             this.collections.set(col, { subscribers: new Set([ws]) })
         }
+    }
+
+    report() {
+        if (!this.profile) return {}
+        const { start, handledMessages, handlerDuration, sentMessages } =
+            this.profile
+        const res = {
+            time: performance.now() - start,
+            clients: this.clients.size,
+            handledMessages,
+            duration: handlerDuration / handledMessages,
+            sentMessages
+        }
+        this.profile = initialProfilerSegment()
+        return res
     }
 }
 

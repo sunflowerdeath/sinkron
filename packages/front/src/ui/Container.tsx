@@ -32,7 +32,7 @@ const containerStyles = (
               flexDirection: "column",
               width: 480,
               height: "100dvh",
-              borderRight: "2px solid #555",
+              borderRight: "2px solid var(--color-elem)",
               overflow: "scroll"
           },
     content: {

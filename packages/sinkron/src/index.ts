@@ -1,9 +1,18 @@
 import { Sinkron } from "./core"
 import { SinkronServer } from "./server"
-import { Permissions } from "./permissions"
+import { Permissions, Action, Role } from "./permissions"
 import { ChannelServer } from "./channels"
+import { createDataSource } from "./db"
 
-export { Sinkron, SinkronServer, Permissions, ChannelServer }
+export {
+    Sinkron,
+    SinkronServer,
+    ChannelServer,
+    Permissions,
+    Action,
+    Role,
+    createDataSource
+}
 
 export { Op } from "./protocol"
 export type {

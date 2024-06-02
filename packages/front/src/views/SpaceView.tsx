@@ -94,7 +94,7 @@ const SpaceView = observer(() => {
                     <div
                         style={{
                             width: 400,
-                            borderRight: "2px solid #555",
+                            borderRight: "2px solid var(--color-elem)",
                             height: "100%",
                             flexShrink: 0
                         }}
