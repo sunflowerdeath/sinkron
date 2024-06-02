@@ -13,7 +13,7 @@ import { compareDesc } from "date-fns"
 
 import env from "../env"
 import { Space, Document, Category, Metadata } from "../entities"
-import { toAutomerge } from "../slate"
+import { toAutomerge, Node } from "../slate"
 import { Api } from "../api"
 import { TransformedMap } from "../utils/transformedMap"
 import listToTree from "../utils/listToTree"
@@ -172,6 +172,15 @@ class SpaceStore {
         const doc = makeInitialDocument()
         if (this.categoryId !== null) {
             doc.categories.push(this.categoryId)
+        }
+        const id = this.collection.create(doc)
+        return id
+    }
+
+    importDocument(content: Node) {
+        const doc = {
+            content: toAutomerge(content),
+            categories: []
         }
         const id = this.collection.create(doc)
         return id
