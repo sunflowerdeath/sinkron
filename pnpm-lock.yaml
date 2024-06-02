@@ -293,12 +293,61 @@ importers:
       mocha:
         specifier: ^10.1.0
         version: 10.3.0
-      sinkron-client:
-        specifier: workspace:*
-        version: link:../sinkron-client
       ts-loader:
         specifier: ^9.5.1
         version: 9.5.1(typescript@5.4.2)(webpack@5.90.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.4.2
+      webpack:
+        specifier: ^5.74.0
+        version: 5.90.3(webpack-cli@4.10.0)
+      webpack-cli:
+        specifier: ^4.10.0
+        version: 4.10.0(webpack-bundle-analyzer@4.10.1)(webpack@5.90.3)
+      webpack-node-externals:
+        specifier: ^3.0.0
+        version: 3.0.0
+
+  packages/sinkron-benchmark:
+    dependencies:
+      '@automerge/automerge':
+        specifier: ^2.1.10
+        version: 2.1.10
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
+      pino:
+        specifier: ^8.11.0
+        version: 8.19.0
+      pino-pretty:
+        specifier: ^10.3.1
+        version: 10.3.1
+      sinkron:
+        specifier: workspace:*
+        version: link:../sinkron
+      sinkron-client:
+        specifier: workspace:*
+        version: link:../sinkron-client
+      uuid:
+        specifier: ^9.0.0
+        version: 9.0.1
+      ws:
+        specifier: ^8.11.0
+        version: 8.16.0
+    devDependencies:
+      '@types/lodash':
+        specifier: ^4.14.202
+        version: 4.14.202
+      '@types/node':
+        specifier: ^18.11.9
+        version: 18.19.22
+      '@types/ws':
+        specifier: ^8.5.7
+        version: 8.5.10
+      esbuild-loader:
+        specifier: ^4.1.0
+        version: 4.1.0(webpack@5.90.3)
       typescript:
         specifier: ^5.3.3
         version: 5.4.2
@@ -8140,6 +8189,7 @@ packages:
 
   /rimraf@2.6.3:
     resolution: {integrity: sha512-mwqeW5XsA2qAejG46gYdENaxXjx9onRNCfn7L0duuP4hCuTIi/QO7PDK07KJfp1d+izWPrzEJDcSqBa0OZQriA==}
+    deprecated: Rimraf versions prior to v4 are no longer supported
     hasBin: true
     dependencies:
       glob: 7.2.3

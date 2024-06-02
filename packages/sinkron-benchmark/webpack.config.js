@@ -19,8 +19,8 @@ const rules = [
 
 module.exports = {
     entry: {
-        benchmark_server: './src/benchmark/server.ts',
-        benchmark_client: './src/benchmark/client.ts'
+        benchmark_server: './src/server.ts',
+        benchmark_client: './src/client.ts'
     },
     output: {
         path: path.resolve(__dirname, './build')

@@ -1,7 +1,6 @@
 import { createServer } from "node:http"
 
-import { Sinkron, SinkronServer } from "../index"
-import { Permissions, Role, Action } from "../permissions"
+import { Sinkron, SinkronServer, Permissions, Role, Action } from "sinkron"
 import pino, { Logger } from "pino"
 
 const numCols = 500

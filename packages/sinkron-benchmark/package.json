@@ -1,25 +1,18 @@
 {
-    "name": "sinkron",
+    "name": "sinkron-benchmark",
     "version": "0.0.1",
-    "description": "Synchronized collections",
-    "main": "build/main.js",
-    "types": "types/index.d.ts",
+    "description": "",
     "scripts": {
         "lint": "eslint src",
-        "build": "NODE_ENV=production webpack",
-        "test": "webpack --config webpack.test.config.js && mocha ./build/test.js"
+        "build": "NODE_ENV=production webpack"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
         "@types/lodash": "^4.14.202",
-        "@types/mocha": "^10.0.6",
         "@types/node": "^18.11.9",
-        "@types/uuid": "^9.0.0",
         "@types/ws": "^8.5.7",
         "esbuild-loader": "^4.1.0",
-        "mocha": "^10.1.0",
-        "ts-loader": "^9.5.1",
         "typescript": "^5.3.3",
         "webpack": "^5.74.0",
         "webpack-cli": "^4.10.0",
@@ -27,15 +20,12 @@
     },
     "dependencies": {
         "@automerge/automerge": "^2.1.10",
-        "ajv": "^8.12.0",
-        "better-sqlite3": "^9.4.3",
-        "date-fns": "^2.30.0",
-        "flatbuffers": "^24.3.25",
         "lodash": "^4.17.21",
         "pino": "^8.11.0",
         "pino-pretty": "^10.3.1",
-        "typeorm": "^0.3.13",
         "uuid": "^9.0.0",
-        "ws": "^8.11.0"
+        "ws": "^8.11.0",
+        "sinkron-client": "workspace:*",
+        "sinkron": "workspace:*"
     }
 }
