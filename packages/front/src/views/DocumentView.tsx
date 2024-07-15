@@ -13,7 +13,15 @@ import {
     Element,
     Text
 } from "slate"
-import { useSlate, withReact, ReactEditor, Slate, Editable } from "slate-react"
+import {
+    useSlate,
+    withReact,
+    ReactEditor,
+    Slate,
+    Editable,
+    useSlateStatic,
+    useReadOnly
+} from "slate-react"
 import { Row, Col } from "oriente"
 import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
@@ -26,6 +34,9 @@ import formatBoldSvg from "@material-design-icons/svg/outlined/format_bold.svg"
 import formatItalicSvg from "@material-design-icons/svg/outlined/format_italic.svg"
 import formatUnderlinedSvg from "@material-design-icons/svg/outlined/format_underlined.svg"
 import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_strikethrough.svg"
+
+import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
+import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
 import { useSpace } from "../store"
 import type { Document } from "../entities"
@@ -86,6 +97,40 @@ const Heading = (props) => {
     )
 }
 
+const CheckListItem = (props) => {
+    const { attributes, children, element } = props
+    const editor = useSlateStatic()
+    const readOnly = useReadOnly()
+
+    const toggle = () => {
+        const path = ReactEditor.findPath(editor, element)
+        const newProps = { isChecked: !element.isChecked }
+        Transforms.setNodes(editor, newProps, { at: path })
+    }
+
+    return (
+        <li
+            style={{
+                margin: ".25rem 0",
+                listStyleType: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 4
+            }}
+            {...attributes}
+        >
+            <div contentEditable={false}>
+                <Button size="s" onClick={toggle} kind="transparent">
+                    <Icon
+                        svg={element.isChecked ? checkBox : checkBoxOutline}
+                    />
+                </Button>
+            </div>
+            {children}
+        </li>
+    )
+}
+
 const renderElement = (props) => {
     switch (props.element.type) {
         case "paragraph":
@@ -120,6 +165,8 @@ const renderElement = (props) => {
                     {props.children}
                 </li>
             )
+        case "check-list-item":
+            return <CheckListItem {...props} />
     }
     return <span {...props.attributes}>{props.children}</span>
 }
@@ -147,7 +194,9 @@ const toggleBlock = (editor: Editor, type: Block) => {
         Transforms.setNodes(editor, { type: "paragraph" })
     } else {
         if (listTypes.includes(type)) {
-            Transforms.setNodes(editor, { type: "list-item" })
+            const itemType =
+                type === "check-list" ? "check-list-item" : "list-item"
+            Transforms.setNodes(editor, { type: itemType })
             Transforms.wrapNodes(editor, { type })
         } else {
             Transforms.setNodes(editor, { type })
