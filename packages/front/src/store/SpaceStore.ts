@@ -33,19 +33,25 @@ const getDocumentListItemData = (
 ): DocumentListItemData => {
     const doc = item.local!.content
     const firstNode = doc.children[0]
-    const firstNodeText = firstNode
+    let firstNodeText = ""
+    try {
+        firstNodeText = firstNode
         ? firstNode.children
               .map((c) => c.text)
               .join("")
               .slice(0, 75)
         : ""
+    } catch {}
     const title = firstNodeText.length > 0 ? firstNodeText : null
     // let subtitle
     // if (title !== null && title.length > 0) {
     const secondNode = doc.children[1]
-    const secondNodeText = secondNode
+    let secondNodeText = ""
+    try {
+        secondNodeText = secondNode
         ? secondNode.children.map((c) => c.text).join("")
         : ""
+    } catch {}
     const subtitle = secondNodeText.slice(0, 100)
     // }
     return { id: item.id, item, title, subtitle }

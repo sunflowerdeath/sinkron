@@ -10,6 +10,8 @@ import {
     mergeRefs
 } from "oriente"
 
+type InputHeight = "s" | "m"
+
 interface InputProps extends StyleProps<[InputProps, boolean]> {
     value: string
     stretch?: boolean
@@ -18,6 +20,7 @@ interface InputProps extends StyleProps<[InputProps, boolean]> {
     onBlur?: () => void
     isDisabled?: boolean
     autoFocus?: boolean
+    height?: InputHeight
 }
 
 const inputStyles = (props: InputProps, isFocused: boolean): StyleMap => ({
@@ -27,7 +30,7 @@ const inputStyles = (props: InputProps, isFocused: boolean): StyleMap => ({
         color: "var(--text-color)",
         fontSize: "1rem",
         background: "transparent",
-        height: 60,
+        height: props.height === "s" ? 45 : 60,
         padding: "0 8px",
         boxSizing: "border-box",
         outline: "none"

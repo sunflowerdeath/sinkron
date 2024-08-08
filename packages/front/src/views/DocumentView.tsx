@@ -6,6 +6,7 @@ import { useMedia } from "react-use"
 import {
     createEditor,
     Node,
+    Range,
     Transforms,
     Editor,
     Point,
@@ -20,7 +21,9 @@ import {
     Slate,
     Editable,
     useSlateStatic,
-    useReadOnly
+    // useReadOnly,
+    RenderElementProps,
+    RenderLeafProps
 } from "slate-react"
 import { Row, Col } from "oriente"
 import { without, isEqual } from "lodash-es"
@@ -43,7 +46,7 @@ import type { Document } from "../entities"
 import { fromAutomerge, applySlateOps } from "../slate"
 import SelectCategoriesView from "../views/SelectCategoriesView"
 import CategoriesList from "../components/CategoriesList"
-import { Button, LinkButton, Icon, Menu, MenuItem } from "../ui"
+import { Button, LinkButton, Icon, Menu, MenuItem, Input } from "../ui"
 
 const useForceUpdate = () => {
     const [_state, setState] = useState({})
@@ -53,42 +56,134 @@ const useForceUpdate = () => {
     return forceUpdate
 }
 
-interface Paragraph {
-    type: "paragraph"
+type TextElement = {
+    text: string
+    bold?: boolean
+    italic?: boolean
+    underline?: boolean
+    strikethrough?: boolean
 }
 
-interface TitleElement {
+type LinkElement = {
+    type: "link"
+    url: string
+    children: TextElement[]
+}
+
+type InlineElement = TextElement | LinkElement
+
+type TitleElement = {
     type: "title"
+    children: InlineElement[]
 }
 
-interface List {
+type HeadingElement = {
+    type: "heading"
+    children: InlineElement[]
+}
+
+type ParagraphElement = {
+    type: "paragraph"
+    children: InlineElement[]
+}
+
+type ListItemElement = {
+    type: "list-item"
+    children: InlineElement[]
+}
+
+type CheckListItemElement = {
+    type: "check-list-item"
+    isChecked: boolean
+    children: InlineElement[]
+}
+
+type ListElement = {
     type: "list"
+    children: ListItemElement[]
 }
 
-const Title = (props) => {
+type CheckListElement = {
+    type: "check-list"
+    children: CheckListItemElement[]
+}
+
+type OrderedListElement = {
+    type: "ordered-list"
+    children: ListItemElement[]
+}
+
+type CodeElement = {
+    type: "code"
+    children: string
+}
+
+type CustomElement =
+    | TitleElement
+    | HeadingElement
+    | ParagraphElement
+    | ListItemElement
+    | CheckListItemElement
+    | ListElement
+    | CheckListElement
+    | OrderedListElement
+    | CodeElement
+    | LinkElement
+
+declare module "slate" {
+    interface CustomTypes {
+        Element: CustomElement
+        Text: TextElement
+    }
+}
+
+type CustomRenderElementProps<T> = Omit<RenderElementProps, "element"> & {
+    element: T
+}
+
+const Title = (props: CustomRenderElementProps<TitleElement>) => {
+    const { element } = props
+    const editor = useSlateStatic()
+    const placeholder = Editor.isEmpty(editor, element) && (
+        <div
+            style={{
+                opacity: 0.5,
+                position: "absolute",
+                top: 0,
+                left: 0,
+                userSelect: "none",
+                pointerEvents: "none"
+            }}
+            contentEditable={false}
+        >
+            Title
+        </div>
+    )
     return (
         <div
             style={{
                 fontSize: 28,
                 lineHeight: "135%",
                 marginBottom: 30,
-                fontWeight: 650
+                fontWeight: 650,
+                position: "relative"
             }}
             {...props.attributes}
         >
             {props.children}
+            {placeholder}
         </div>
     )
 }
 
-const Heading = (props) => {
+const Heading = (props: CustomRenderElementProps<HeadingElement>) => {
     return (
         <h3
             style={{
                 fontSize: 22.5,
                 fontWeight: 650,
                 lineHeight: "135%",
-                margin: "1rem 0"
+                margin: "2rem 0 1rem"
             }}
             {...props.attributes}
         >
@@ -97,10 +192,20 @@ const Heading = (props) => {
     )
 }
 
-const CheckListItem = (props) => {
+const Link = (props: CustomRenderElementProps<LinkElement>) => {
+    return (
+        <span style={{ color: "var(--color-link)" }} {...props.attributes}>
+            {props.children}
+        </span>
+    )
+}
+
+const CheckListItem = (
+    props: CustomRenderElementProps<CheckListItemElement>
+) => {
     const { attributes, children, element } = props
-    const editor = useSlateStatic()
-    const readOnly = useReadOnly()
+    const editor = useSlateStatic() as ReactEditor
+    // const readOnly = useReadOnly()
 
     const toggle = () => {
         const path = ReactEditor.findPath(editor, element)
@@ -131,7 +236,7 @@ const CheckListItem = (props) => {
     )
 }
 
-const renderElement = (props) => {
+const EditorElement = (props: RenderElementProps) => {
     switch (props.element.type) {
         case "paragraph":
             return <p {...props.attributes}>{props.children}</p>
@@ -139,6 +244,8 @@ const renderElement = (props) => {
             return <Title {...props} />
         case "heading":
             return <Heading {...props} />
+        case "link":
+            return <Link {...props} />
         case "code":
             return (
                 <pre
@@ -169,6 +276,33 @@ const renderElement = (props) => {
             return <CheckListItem {...props} />
     }
     return <span {...props.attributes}>{props.children}</span>
+}
+
+type CustomRenderLeafProps = RenderLeafProps & { leaf: TextElement }
+
+const EditorLeaf = (props: CustomRenderLeafProps) => {
+    const { attributes, leaf } = props
+
+    let children = props.children
+    if (leaf.bold) {
+        children = <strong style={{ fontWeight: 800 }}>{children}</strong>
+    }
+
+    if (leaf.italic) {
+        children = <em>{children}</em>
+    }
+
+    if (leaf.underline) {
+        children = <u>{children}</u>
+    }
+
+    if (leaf.strikethrough) {
+        children = (
+            <span style={{ textDecoration: "line-through" }}>{children}</span>
+        )
+    }
+
+    return <span {...attributes}>{children}</span>
 }
 
 const isNodeActive = (editor: Editor, type: string) => {
@@ -204,17 +338,121 @@ const toggleBlock = (editor: Editor, type: Block) => {
     }
 }
 
+type TextMark = "bold" | "italic" | "underline" | "strikethrough"
+
+const isMarkActive = (editor: ReactEditor, format: TextMark) => {
+    const marks = Editor.marks(editor)
+    return marks ? marks[format] === true : false
+}
+
+const toggleMark = (editor: ReactEditor, format: TextMark) => {
+    const isActive = isMarkActive(editor, format)
+    if (isActive) {
+        Editor.removeMark(editor, format)
+    } else {
+        Editor.addMark(editor, format, true)
+    }
+}
+
+const isAtEndOfNode = (editor: Editor, type: string): Element | undefined => {
+    const { selection } = editor
+    if (!selection || !Range.isCollapsed(selection)) return
+    const [res] = Editor.nodes(editor, {
+        match: (node) =>
+            !Editor.isEditor(node) &&
+            Element.isElement(node) &&
+            node.type === type
+    })
+    if (!res) return
+    const [node, path] = res
+    if (!Element.isElement(node)) return
+    const end = Editor.end(editor, path)
+    return Point.equals(selection.anchor, end) ? node : undefined
+}
+
 const createDocumentEditor = (): ReactEditor => {
     const editor = withReact(createEditor())
-    const { normalizeNode } = editor
-    // editor.onChange = onChange
+    const { normalizeNode, insertBreak, deleteBackward } = editor
+
+    editor.insertBreak = () => {
+        const heading = isAtEndOfNode(editor, "heading")
+        if (heading) {
+            if (Editor.isEmpty(editor, heading)) {
+                // Convert to paragraph if the node is a heading and empty
+                Transforms.setNodes(editor, { type: "paragraph" })
+            } else {
+                // Insert a new paragraph
+                Transforms.insertNodes(editor, {
+                    type: "paragraph",
+                    children: [{ text: "" }]
+                })
+            }
+            return
+        }
+
+        const listItem = isAtEndOfNode(editor, "list-item")
+        if (listItem && Editor.isEmpty(editor, listItem)) {
+            if (isNodeActive(editor, "list")) {
+                toggleBlock(editor, "list")
+                return
+            }
+            if (isNodeActive(editor, "ordered-list")) {
+                toggleBlock(editor, "ordered-list")
+                return
+            }
+        }
+
+        const checkListItem = isAtEndOfNode(editor, "check-list-item")
+        if (checkListItem && Editor.isEmpty(editor, checkListItem)) {
+            toggleBlock(editor, "check-list")
+            return
+        }
+
+        insertBreak()
+    }
+
+    editor.deleteBackward = (unit) => {
+        if (unit === "character") {
+            const list = isAtEndOfNode(editor, "list")
+            if (list) {
+                const listItem = isAtEndOfNode(editor, "list-item")
+                if (listItem && Editor.isEmpty(editor, listItem)) {
+                    toggleBlock(editor, "list")
+                    return
+                }
+            }
+
+            const orderedList = isAtEndOfNode(editor, "ordered-list")
+            if (orderedList) {
+                const listItem = isAtEndOfNode(editor, "list-item")
+                if (listItem && Editor.isEmpty(editor, listItem)) {
+                    toggleBlock(editor, "ordered-list")
+                    return
+                }
+            }
+
+            const checkList = isAtEndOfNode(editor, "check-list")
+            if (checkList) {
+                const checkListItem = isAtEndOfNode(editor, "check-list-item")
+                if (checkListItem && Editor.isEmpty(editor, checkListItem)) {
+                    toggleBlock(editor, "check-list")
+                    return
+                }
+            }
+        }
+
+        deleteBackward(unit)
+    }
+
+    editor.isInline = (elem) => elem.type === "link"
+
     editor.normalizeNode = (entry) => {
         const [node, path] = entry
         if (path.length === 0) {
             for (const [child, childPath] of Node.children(editor, path)) {
                 const index = childPath[0]
                 if (index === 0) {
-                    if (child.type !== "title") {
+                    if ('type' in child && child.type !== "title") {
                         Transforms.setNodes(
                             editor,
                             { type: "title" },
@@ -223,7 +461,7 @@ const createDocumentEditor = (): ReactEditor => {
                         return
                     }
                 } else {
-                    if (child.type === "title") {
+                    if ('type' in child && child.type === "title") {
                         Transforms.setNodes(
                             editor,
                             { type: "paragraph" },
@@ -238,6 +476,7 @@ const createDocumentEditor = (): ReactEditor => {
         const elementsWithInlineChildren = [
             "paragraph",
             "list-item",
+            "check-list-item",
             "heading",
             "title"
         ]
@@ -253,20 +492,27 @@ const createDocumentEditor = (): ReactEditor => {
             }
         }
 
-        if (Element.isElement(node) && node.type === "list") {
+        const isList = Element.isElement(node) && node.type === "list"
+        const isOrderedList =
+            Element.isElement(node) && node.type === "ordered-list"
+        const isCheckList =
+            Element.isElement(node) && node.type === "check-list"
+        if (isOrderedList || isList || isCheckList) {
+            const itemType =
+                isList || isOrderedList ? "list-item" : "check-list-item"
             for (const [child, childPath] of Node.children(editor, path)) {
                 if (Text.isText(child)) {
                     Transforms.wrapNodes(
                         editor,
-                        { type: "list-item" },
+                        { type: itemType },
                         { at: childPath }
                     )
                     return
                 }
-                if (Element.isElement(child) && child.type !== "list-item") {
+                if (Element.isElement(child) && child.type !== itemType) {
                     Transforms.setNodes(
                         editor,
-                        { type: "list-item" },
+                        { type: itemType },
                         { at: childPath }
                     )
                     return
@@ -280,40 +526,10 @@ const createDocumentEditor = (): ReactEditor => {
     return editor
 }
 
-const checkSelectionPoint = (editor: Editor, point: Point) => {
-    const nodes = Editor.nodes(editor, { at: point })
+const ToolbarButtons = (props) => {
+    const { onChangeView } = props
 
-    let node: Node = editor
-    let path: Path = []
-    let error = false
-    while (true) {
-        let res
-        try {
-            res = nodes.next()
-        } catch (e) {
-            error = true
-            break
-        }
-        if (res.value === undefined) break
-        node = res.value[0]
-        path = res.value[1]
-    }
-
-    if (error) {
-        return Editor.start(editor, path)
-    }
-
-    // TODO check how it works with nested blocks and voids
-
-    if (!("text" in node)) {
-        return Editor.start(editor, path)
-    }
-
-    return { path, offset: Math.min(node.text.length, point.offset) }
-}
-
-const Toolbar = () => {
-    const editor = useSlate()
+    const editor  = useSlate() as ReactEditor
     const isMobile = useMedia("(max-width: 1023px)")
 
     const blockNodes = [
@@ -329,24 +545,31 @@ const Toolbar = () => {
         }
     ]
     const textNodes = [
-        { type: "b", label: <Icon svg={formatBoldSvg} /> },
-        { type: "i", label: <Icon svg={formatItalicSvg} /> },
-        { type: "u", label: <Icon svg={formatUnderlinedSvg} /> },
-        { type: "s", label: <Icon svg={formatStrikethroughSvg} /> }
+        { type: "bold", label: <Icon svg={formatBoldSvg} /> },
+        { type: "italic", label: <Icon svg={formatItalicSvg} /> },
+        { type: "underline", label: <Icon svg={formatUnderlinedSvg} /> },
+        { type: "strikethrough", label: <Icon svg={formatStrikethroughSvg} /> }
     ]
 
     const blockButtons = blockNodes.map(({ type, label }) => (
         <Button
+            key={type}
             style={{
                 width: "100%",
                 boxShadow: isNodeActive(editor, type)
                     ? "0 0 0 2px #dfdfdf inset"
                     : "none"
             }}
-            onClick={(e) => {
-                toggleBlock(editor, type)
-                // e.preventDefault()
-            }}
+            onClick={
+                (/*e*/) => {
+                    if (type === "link") {
+                        onChangeView("create_link")
+                    } else {
+                        toggleBlock(editor, type)
+                    }
+                    // e.preventDefault()
+                }
+            }
             size="s"
         >
             {label}
@@ -355,16 +578,19 @@ const Toolbar = () => {
 
     const textButtons = textNodes.map(({ type, label }) => (
         <Button
+            key={type}
             style={{
                 width: isMobile ? "100%" : 60,
-                boxShadow: isNodeActive(editor, type)
+                boxShadow: isMarkActive(editor, type)
                     ? "0 0 0 2px #dfdfdf inset"
                     : "none"
             }}
-            onClick={(e) => {
-                toggleBlock(editor, type)
-                // e.preventDefault()
-            }}
+            onClick={
+                (/*e*/) => {
+                    toggleMark(editor, type)
+                    // e.preventDefault()
+                }
+            }
             size="s"
         >
             {label}
@@ -421,6 +647,154 @@ const Toolbar = () => {
     }
 }
 
+type LinkProps = { text: string; url: string }
+
+interface ToolbarCreateLinkProps {
+    onCancel: () => void
+    onCreate: (link: LinkProps) => void
+}
+
+const ToolbarCreateLink = (props: ToolbarCreateLinkProps) => {
+    const { onCancel, onCreate } = props
+    const [text, setText] = useState("")
+    const [url, setUrl] = useState("")
+    return (
+        <Col style={{ maxWidth: 400 }} gap={8} align="stretch">
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "60px 1fr",
+                    gap: 8,
+                    alignItems: "center"
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                    Url
+                </div>
+                <Input height="s" value={url} onChange={setUrl} />
+            </div>
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "60px 1fr",
+                    gap: 8,
+                    alignItems: "center"
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                    Text
+                </div>
+                <Input height="s" value={text} onChange={setText} />
+            </div>
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8
+                }}
+            >
+                <Button size="s" onClick={onCancel}>
+                    Cancel
+                </Button>
+                <Button size="s" onClick={() => onCreate({ text, url })}>
+                    Create link
+                </Button>
+            </div>
+        </Col>
+    )
+}
+
+const ToolbarEditLink = () => {
+    return (
+        <Col style={{ maxWidth: 800 }}>
+            Url:
+            <input />
+            Text:
+            <input />
+            <Row gap={10}>
+                <Button>Remove link</Button>
+                <Button>Done</Button>
+            </Row>
+        </Col>
+    )
+}
+
+type ToolbarView = "toolbar" | "create_link" | "edit_link"
+
+const Toolbar = () => {
+    const [view, setView] = useState<ToolbarView>("toolbar")
+
+    const editor = useSlate()
+
+    const createLink = ({ text, url }: LinkProps) => {
+        if (editor.selection) {
+            const { selection } = editor
+            const isCollapsed = Range.isCollapsed(selection)
+            const link : LinkElement = {
+                type: "link",
+                url,
+                children: isCollapsed ? [{ text }] : []
+            }
+            if (isCollapsed) {
+                Transforms.insertNodes(editor, link)
+            } else {
+                Transforms.wrapNodes(editor, link, { split: true })
+                Transforms.collapse(editor, { edge: "end" })
+            }
+        }
+        setView("toolbar")
+    }
+
+    if (view === "toolbar") {
+        return <ToolbarButtons onChangeView={setView} />
+    } else if (view === "create_link") {
+        return (
+            <ToolbarCreateLink
+                onCancel={() => setView("toolbar")}
+                onCreate={createLink}
+            />
+        )
+    } else if (view === "edit_link") {
+        return <ToolbarEditLink />
+    }
+    return null
+}
+
+const checkSelectionPoint = (editor: Editor, point: Point) => {
+    const nodes = Editor.nodes(editor, { at: point })
+
+    let node: Node = editor
+    let path: Path = []
+    let error = false
+    while (true) {
+        let res
+        try {
+            res = nodes.next()
+        } catch (e) {
+            error = true
+            break
+        }
+        if (res.value === undefined) break
+        node = res.value[0]
+        path = res.value[1]
+    }
+
+    if (error) {
+        // Couldn't find node by given path
+        return Editor.start(editor, path)
+    }
+
+    // TODO check how it works with nested blocks and voids
+
+    if (!("text" in node)) {
+        // Node is not a text node, so text offset is not valid
+        return Editor.start(editor, path)
+    }
+
+    // Limit offset to text length in the node
+    return { path, offset: Math.min(node.text.length, point.offset) }
+}
+
 type EditorViewProps = {
     id: string
     doc: Automerge.Doc<Document>
@@ -455,6 +829,15 @@ const EditorView = observer((props: EditorViewProps) => {
             forceUpdate()
         }
     }, [value])
+
+    const renderElement = useCallback(
+        (props: RenderElementProps) => <EditorElement {...props} />,
+        []
+    )
+    const renderLeaf = useCallback(
+        (props: RenderLeafProps) => <EditorLeaf {...props} />,
+        []
+    )
 
     const isMobile = useMedia("(max-width: 1023px)")
 
@@ -555,6 +938,7 @@ const EditorView = observer((props: EditorViewProps) => {
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
             <Editable
                 renderElement={renderElement}
+                renderLeaf={renderLeaf}
                 readOnly={readOnly}
                 style={{
                     padding: isMobile ? 10 : 40,
@@ -567,7 +951,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     // overflow: "auto"
                 }}
                 autoFocus={!isMobile}
-                placeholder="Empty document"
+                // placeholder="Empty document"
                 renderPlaceholder={({ children, attributes }) => {
                     return (
                         <div
@@ -655,6 +1039,7 @@ const EditorView = observer((props: EditorViewProps) => {
             editor={editor}
             onChange={(a) => {
                 // Prevent bug firing twice on Android
+                if (editor.operations.length === 0) return
                 if (!editor.operations.fired) {
                     onChange?.(editor)
                     editor.operations.fired = true

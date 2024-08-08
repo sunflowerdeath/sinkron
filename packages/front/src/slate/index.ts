@@ -111,6 +111,13 @@ const setNode = (root: AutomergeNode, op: SetNodeOperation): AutomergeNode => {
         }
     }
 
+    const oldProperties = op.properties as any
+    for (const key in oldProperties) {
+        if (!(key in newProperties)) {
+            delete node[key]
+        }
+    }
+
     return root
 }
 
