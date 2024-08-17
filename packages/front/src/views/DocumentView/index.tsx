@@ -3,6 +3,7 @@ import { ErrorBoundary } from "react-error-boundary"
 import { observer } from "mobx-react-lite"
 import { useLocation, Redirect } from "wouter"
 import { useMedia } from "react-use"
+import { makeAutoObservable } from "mobx"
 import {
     createEditor,
     Node,
@@ -41,12 +42,12 @@ import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_s
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
-import { useSpace } from "../store"
-import type { Document } from "../entities"
-import { fromAutomerge, applySlateOps } from "../slate"
-import SelectCategoriesView from "../views/SelectCategoriesView"
-import CategoriesList from "../components/CategoriesList"
-import { Button, LinkButton, Icon, Menu, MenuItem, Input } from "../ui"
+import { useSpace } from "../../store"
+import type { Document } from "../../entities"
+import { fromAutomerge, applySlateOps } from "../../slate"
+import SelectCategoriesView from "../../views/SelectCategoriesView"
+import CategoriesList from "../../components/CategoriesList"
+import { Button, LinkButton, Icon, Menu, MenuItem, Input } from "../../ui"
 
 const useForceUpdate = () => {
     const [_state, setState] = useState({})
@@ -413,8 +414,7 @@ const createDocumentEditor = (): ReactEditor => {
 
     editor.deleteBackward = (unit) => {
         if (unit === "character") {
-            const list = isAtEndOfNode(editor, "list")
-            if (list) {
+            if (isAtEndOfNode(editor, "list")) {
                 const listItem = isAtEndOfNode(editor, "list-item")
                 if (listItem && Editor.isEmpty(editor, listItem)) {
                     toggleBlock(editor, "list")
@@ -422,8 +422,7 @@ const createDocumentEditor = (): ReactEditor => {
                 }
             }
 
-            const orderedList = isAtEndOfNode(editor, "ordered-list")
-            if (orderedList) {
+            if (isAtEndOfNode(editor, "ordered-list")) {
                 const listItem = isAtEndOfNode(editor, "list-item")
                 if (listItem && Editor.isEmpty(editor, listItem)) {
                     toggleBlock(editor, "ordered-list")
@@ -431,8 +430,7 @@ const createDocumentEditor = (): ReactEditor => {
                 }
             }
 
-            const checkList = isAtEndOfNode(editor, "check-list")
-            if (checkList) {
+            if (isAtEndOfNode(editor, "check-list")) {
                 const checkListItem = isAtEndOfNode(editor, "check-list-item")
                 if (checkListItem && Editor.isEmpty(editor, checkListItem)) {
                     toggleBlock(editor, "check-list")
@@ -452,7 +450,7 @@ const createDocumentEditor = (): ReactEditor => {
             for (const [child, childPath] of Node.children(editor, path)) {
                 const index = childPath[0]
                 if (index === 0) {
-                    if ('type' in child && child.type !== "title") {
+                    if ("type" in child && child.type !== "title") {
                         Transforms.setNodes(
                             editor,
                             { type: "title" },
@@ -461,7 +459,7 @@ const createDocumentEditor = (): ReactEditor => {
                         return
                     }
                 } else {
-                    if ('type' in child && child.type === "title") {
+                    if ("type" in child && child.type === "title") {
                         Transforms.setNodes(
                             editor,
                             { type: "paragraph" },
@@ -526,10 +524,13 @@ const createDocumentEditor = (): ReactEditor => {
     return editor
 }
 
-const ToolbarButtons = (props) => {
-    const { onChangeView } = props
+interface ToolbarViewProps {
+    store: ToolbarStore
+}
 
-    const editor  = useSlate() as ReactEditor
+const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
+    const { store } = props
+    const editor = useSlate() as ReactEditor
     const isMobile = useMedia("(max-width: 1023px)")
 
     const blockNodes = [
@@ -563,7 +564,11 @@ const ToolbarButtons = (props) => {
             onClick={
                 (/*e*/) => {
                     if (type === "link") {
-                        onChangeView("create_link")
+                        if (isNodeActive(editor, "link")) {
+                            store.view = "edit_link"
+                        } else {
+                            store.view = "create_link"
+                        }
                     } else {
                         toggleBlock(editor, type)
                     }
@@ -645,19 +650,17 @@ const ToolbarButtons = (props) => {
             </Row>
         )
     }
-}
+})
 
 type LinkProps = { text: string; url: string }
 
-interface ToolbarCreateLinkProps {
-    onCancel: () => void
-    onCreate: (link: LinkProps) => void
-}
+const ToolbarCreateLinkView = observer((props: ToolbarViewProps) => {
+    const { store } = props
 
-const ToolbarCreateLink = (props: ToolbarCreateLinkProps) => {
-    const { onCancel, onCreate } = props
     const [text, setText] = useState("")
     const [url, setUrl] = useState("")
+    const isEmpty = text.length === 0 || url.length === 0
+
     return (
         <Col style={{ maxWidth: 400 }} gap={8} align="stretch">
             <div
@@ -693,72 +696,151 @@ const ToolbarCreateLink = (props: ToolbarCreateLinkProps) => {
                     gap: 8
                 }}
             >
-                <Button size="s" onClick={onCancel}>
+                <Button
+                    size="s"
+                    onClick={() => {
+                        store.view = "toolbar"
+                    }}
+                >
                     Cancel
                 </Button>
-                <Button size="s" onClick={() => onCreate({ text, url })}>
+                <Button
+                    size="s"
+                    onClick={() => store.createLink({ text, url })}
+                    isDisabled={isEmpty}
+                >
                     Create link
                 </Button>
             </div>
         </Col>
     )
-}
+})
 
-const ToolbarEditLink = () => {
+const ToolbarEditLinkView = observer((props: ToolbarViewProps) => {
+    const { store } = props
+
+    const [text, setText] = useState("")
+    const [url, setUrl] = useState("")
+    const isEmpty = text.length === 0 || url.length === 0
+
     return (
-        <Col style={{ maxWidth: 800 }}>
-            Url:
-            <input />
-            Text:
-            <input />
-            <Row gap={10}>
-                <Button>Remove link</Button>
-                <Button>Done</Button>
-            </Row>
+        <Col style={{ maxWidth: 400 }} gap={8} align="stretch">
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "60px 1fr",
+                    gap: 8,
+                    alignItems: "center"
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                    Url
+                </div>
+                <Input height="s" value={url} onChange={setUrl} />
+            </div>
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "60px 1fr",
+                    gap: 8,
+                    alignItems: "center"
+                }}
+            >
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                    Text
+                </div>
+                <Input height="s" value={text} onChange={setText} />
+            </div>
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8
+                }}
+            >
+                <Button size="s" onClick={() => store.removeLink()}>
+                    Remove link
+                </Button>
+                <Button
+                    size="s"
+                    onClick={() => {
+                        store.updateLink({ text, url })
+                    }}
+                    isDisabled={isEmpty}
+                >
+                    Apply
+                </Button>
+            </div>
         </Col>
     )
-}
+})
 
 type ToolbarView = "toolbar" | "create_link" | "edit_link"
 
-const Toolbar = () => {
-    const [view, setView] = useState<ToolbarView>("toolbar")
+class ToolbarStore {
+    editor: ReactEditor
 
-    const editor = useSlate()
+    view: ToolbarView = "toolbar"
 
-    const createLink = ({ text, url }: LinkProps) => {
-        if (editor.selection) {
-            const { selection } = editor
+    selection?: Selection = undefined
+
+    constructor(editor: ReactEditor) {
+        this.editor = editor
+        makeAutoObservable(this, { editor: false })
+    }
+
+    createLink({ text, url }: LinkProps) {
+        const { selection } = this.editor
+        if (selection) {
             const isCollapsed = Range.isCollapsed(selection)
-            const link : LinkElement = {
+            const link: LinkElement = {
                 type: "link",
                 url,
                 children: isCollapsed ? [{ text }] : []
             }
             if (isCollapsed) {
-                Transforms.insertNodes(editor, link)
+                Transforms.insertNodes(this.editor, link)
             } else {
-                Transforms.wrapNodes(editor, link, { split: true })
-                Transforms.collapse(editor, { edge: "end" })
+                Transforms.wrapNodes(this.editor, link, { split: true })
+                Transforms.collapse(this.editor, { edge: "end" })
             }
         }
-        setView("toolbar")
+        this.view = "toolbar"
     }
 
-    if (view === "toolbar") {
-        return <ToolbarButtons onChangeView={setView} />
-    } else if (view === "create_link") {
-        return (
-            <ToolbarCreateLink
-                onCancel={() => setView("toolbar")}
-                onCreate={createLink}
-            />
-        )
-    } else if (view === "edit_link") {
-        return <ToolbarEditLink />
+    updateLink({ text, url }: LinkProps) {}
+
+    removeLink() {
+        const { selection } = this.editor
+        if (selection) {
+            const nodes = Array.from(
+                Editor.nodes(this.editor, {
+                    match: (n) => Element.isElement(n) && n.type === "link"
+                })
+            )
+            if (nodes.length > 0) {
+                const [_link, at] = nodes[0]
+                Transforms.unwrapNodes(this.editor, { at })
+            }
+        }
+
+        this.view = "toolbar"
+    }
+}
+
+const Toolbar = observer(() => {
+    const editor = useSlate() as ReactEditor
+    const store = useMemo(() => new ToolbarStore(editor), [])
+
+    if (store.view === "toolbar") {
+        return <ToolbarButtonsView store={store} />
+    } else if (store.view === "create_link") {
+        return <ToolbarCreateLinkView store={store} />
+    } else if (store.view === "edit_link") {
+        return <ToolbarEditLinkView store={store} />
     }
     return null
-}
+})
 
 const checkSelectionPoint = (editor: Editor, point: Point) => {
     const nodes = Editor.nodes(editor, { at: point })

@@ -5,6 +5,7 @@ export {
 } from "./ActionStateView"
 export { Avatar } from "./avatar"
 export { Button, LinkButton } from "./button"
+export { Dialog, useDialog } from "./dialog"
 export { Heading } from "./heading"
 export { Icon } from "./icon"
 export { Input } from "./input"

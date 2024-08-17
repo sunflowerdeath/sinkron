@@ -36,11 +36,11 @@ const getDocumentListItemData = (
     let firstNodeText = ""
     try {
         firstNodeText = firstNode
-        ? firstNode.children
-              .map((c) => c.text)
-              .join("")
-              .slice(0, 75)
-        : ""
+            ? firstNode.children
+                  .map((c) => c.text)
+                  .join("")
+                  .slice(0, 75)
+            : ""
     } catch {}
     const title = firstNodeText.length > 0 ? firstNodeText : null
     // let subtitle
@@ -49,8 +49,8 @@ const getDocumentListItemData = (
     let secondNodeText = ""
     try {
         secondNodeText = secondNode
-        ? secondNode.children.map((c) => c.text).join("")
-        : ""
+            ? secondNode.children.map((c) => c.text).join("")
+            : ""
     } catch {}
     const subtitle = secondNodeText.slice(0, 100)
     // }
@@ -273,6 +273,16 @@ class SpaceStore {
             this.api.fetch({
                 method: "POST",
                 url: `/invites/${inviteId}/cancel`
+            })
+        )
+    }
+
+    renameSpace(name: string) {
+        return fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/rename`,
+                data: { name }
             })
         )
     }
