@@ -1,14 +1,17 @@
+import { useState } from "react"
 import { observer } from "mobx-react-lite"
 import { Col, Row } from "oriente"
 import { useLocation } from "wouter"
 
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
+import keyboardArrowDownSvg from "@material-design-icons/svg/outlined/keyboard_arrow_down.svg"
+import keyboardArrowUpSvg from "@material-design-icons/svg/outlined/keyboard_arrow_up.svg"
 
 import { Menu, MenuItem, Button, LinkButton, Icon } from "../ui"
 import Container from "../ui/Container"
 import { useSpace } from "../store"
 import { Category } from "../entities"
-import type { TreeNode } from "../utils/listToTree"
+import type { Tree, TreeNode } from "../utils/listToTree"
 
 type CategoriesListItemProps = {
     category: TreeNode<Category>
@@ -19,7 +22,10 @@ type CategoriesListItemProps = {
 const CategoryListItem = (props: CategoriesListItemProps) => {
     const { category, onSelect, onDelete } = props
 
+    const [isCollapsed, setIsCollapsed] = useState(true)
     const [_location, navigate] = useLocation()
+
+    const hasChildren = category.children.length > 0
 
     const menu = () => (
         <>
@@ -48,6 +54,19 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
     return (
         <>
             <Row align="center" gap={8} style={{ alignSelf: "stretch" }}>
+                {hasChildren ? (
+                    <Button onClick={() => setIsCollapsed((v) => !v)}>
+                        <Icon
+                            svg={
+                                isCollapsed
+                                    ? keyboardArrowDownSvg
+                                    : keyboardArrowUpSvg
+                            }
+                        />
+                    </Button>
+                ) : (
+                    <div style={{ width: 60 }} />
+                )}
                 <Button
                     style={{
                         flexGrow: 1,
@@ -81,7 +100,7 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                     )}
                 </Menu>
             </Row>
-            {category.children.length > 0 && (
+            {hasChildren && !isCollapsed && (
                 <Col style={{ marginLeft: 32, alignSelf: "normal" }}>
                     <CategoryList
                         categories={category.children}
@@ -151,7 +170,7 @@ const CategoriesView = observer(() => {
                         </Row>
                     </Button>
                     <CategoryList
-                        categories={space.categoryTree}
+                        categories={space.categoryTree.nodes}
                         onDelete={onDelete}
                         onSelect={(id) => selectCategory(id)}
                     />

@@ -6,11 +6,41 @@ import { ItemState } from "sinkron-client"
 import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
 import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
+import folderSvg from "@material-design-icons/svg/outlined/folder.svg"
 import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
 import { useStore, useSpace } from "../store"
 import type { DocumentListItemData } from "../store/SpaceStore"
 import { Avatar, Button, LinkButton, Icon, ActionStateView } from "../ui"
+
+interface DocumentListCategoryItemProps {
+    name: string
+    onSelect: () => void
+}
+
+const DocumentListCategoryItem = observer(
+    (props: DocumentListCategoryItemProps) => {
+        const { name, onSelect } = props
+        return (
+            <Row
+                style={{
+                    height: 60,
+                    padding: 8,
+                    borderBottom: "2px solid var(--color-elem)",
+                    gap: 12,
+                    cursor: "pointer"
+                }}
+                align="center"
+                onClick={onSelect}
+            >
+                <div>{<Icon svg={folderSvg} />}</div>
+                <Col gap={4} style={{ flexGrow: 1, overflow: "hidden" }}>
+                    {name}
+                </Col>
+            </Row>
+        )
+    }
+)
 
 interface DocumentListItemProps {
     data: DocumentListItemData
@@ -20,6 +50,36 @@ interface DocumentListItemProps {
 
 const DocumentListItem = observer((props: DocumentListItemProps) => {
     const { data, onSelect, isSelected } = props
+
+    const title = (
+        <div
+            style={{
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                maxWidth: "100%"
+            }}
+        >
+            {!data.title ? (
+                <span style={{ opacity: 0.5 }}>Untitled</span>
+            ) : (
+                data.title
+            )}
+        </div>
+    )
+    const subtitle = data.subtitle && (
+        <div
+            style={{
+                opacity: ".5",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                maxWidth: "100%"
+            }}
+        >
+            {data.subtitle}
+        </div>
+    )
 
     return (
         <Row
@@ -35,31 +95,8 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
             align="center"
         >
             <Col gap={4} style={{ flexGrow: 1, overflow: "hidden" }}>
-                <div
-                    style={{
-                        width: "100%",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis"
-                    }}
-                >
-                    {data.title ?? (
-                        <span style={{ opacity: 0.5 }}>Empty document</span>
-                    )}
-                </div>
-                {data.subtitle && (
-                    <div
-                        style={{
-                            opacity: ".5",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            maxWidth: "100%"
-                        }}
-                    >
-                        {data.subtitle}
-                    </div>
-                )}
+                {title}
+                {subtitle}
             </Col>
             <div>
                 {data.item.state !== ItemState.Synchronized ? (
@@ -70,36 +107,40 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
     )
 })
 
-const DocumentList = observer(() => {
-    const space = useSpace()
-    const [_location, navigate] = useLocation()
-    const [match, params] = useRoute("/documents/:id")
-    const selectedId = match ? params.id : undefined
+interface DocumentListProps {
+    selectedDocId?: string
+}
 
-    return (
-        <div style={{ flexGrow: 1, overflow: "auto" }}>
-            <ActionStateView state={space.loadedState}>
-                {() => {
-                    let content
-                    if (
-                        space.collection.isLoaded &&
-                        space.documentList.map.size > 0
-                    ) {
-                        content = space.sortedDocumentList.map((item) => (
-                            <DocumentListItem
-                                key={item.id}
-                                data={item}
-                                isSelected={item.id === selectedId}
-                                onSelect={() =>
-                                    navigate(`/documents/${item.id}`)
-                                }
-                            />
-                        ))
-                    }
-                    return content
+const DocumentList = observer((props: DocumentListProps) => {
+    const { selectedDocId } = props
+
+    const [_location, navigate] = useLocation()
+    const space = useSpace()
+
+    const categoryItems =
+        space.category &&
+        space.category.children.map((c) => (
+            <DocumentListCategoryItem
+                key={c.id}
+                name={c.name}
+                onSelect={() => {
+                    space.selectCategory(c.id)
                 }}
-            </ActionStateView>
-        </div>
+            />
+        ))
+    const docItems = space.sortedDocumentList.map((item) => (
+        <DocumentListItem
+            key={item.id}
+            data={item}
+            isSelected={item.id === selectedDocId}
+            onSelect={() => navigate(`/documents/${item.id}`)}
+        />
+    ))
+    return (
+        <>
+            {categoryItems}
+            {docItems}
+        </>
     )
 })
 
@@ -107,6 +148,9 @@ const DocumentListView = observer(() => {
     const store = useStore()
     const space = useSpace()
     const [_location, navigate] = useLocation()
+
+    const [match, params] = useRoute("/documents/:id")
+    const selectedDocId = match ? params.id : undefined
 
     const canCreate = space.space.role !== "readonly"
     const createDocument = () => {
@@ -157,6 +201,18 @@ const DocumentListView = observer(() => {
         />
     )
 
+    const list = (
+        <div style={{ flexGrow: 1, overflow: "auto" }}>
+            <ActionStateView state={space.loadedState}>
+                {() => {
+                    return space.collection.isLoaded ? (
+                        <DocumentList selectedDocId={selectedDocId} />
+                    ) : null
+                }}
+            </ActionStateView>
+        </div>
+    )
+
     const bottomBar = (
         <Row gap={8}>
             <LinkButton
@@ -178,7 +234,7 @@ const DocumentListView = observer(() => {
     return (
         <Col style={{ alignItems: "stretch", height: "100dvh" }} gap={8}>
             {topBar}
-            <DocumentList />
+            {list}
             {bottomBar}
         </Col>
     )

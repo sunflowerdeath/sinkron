@@ -8,7 +8,7 @@ import { LinkButton, Button, Icon } from "../ui"
 import Container from "../ui/Container"
 import CategoriesList from "../components/CategoriesList"
 import type { Category } from "../entities"
-import type { TreeNode } from "../utils/listToTree"
+import type { Tree, TreeNode } from "../utils/listToTree"
 
 interface CategoriesTreeItemProps {
     value: string[]
@@ -96,18 +96,17 @@ const CategoriesTree = (props: CategoriesTreeProps) => {
 interface SelectCategoriesViewProps {
     value: string[]
     onChange: (value: string[]) => void
-    tree: TreeNode<Category>[]
-    categories: { [key: string]: Category }
+    categoryTree: Tree<Category>
     onClose: () => void
 }
 
 const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
-    const { categories, onChange, onClose, value, tree } = props
+    const { categoryTree, onChange, onClose, value } = props
 
     const treeElem =
-        tree.length > 0 ? (
+        categoryTree.nodes.length > 0 ? (
             <CategoriesTree
-                categories={tree}
+                categories={categoryTree.nodes}
                 value={value}
                 onChange={onChange}
             />
@@ -140,7 +139,7 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
                 }}
             >
                 <CategoriesList
-                    items={value.map((id) => categories[id]!)}
+                    items={value.map((id) => categoryTree.map[id]!)}
                     onRemove={(id) => onChange(without(value, id))}
                 />
             </div>

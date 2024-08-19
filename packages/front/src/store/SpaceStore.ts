@@ -133,7 +133,6 @@ class SpaceStore {
             meta: computed,
             categoryId: observable,
             category: computed,
-            categoryMap: computed,
             categoryTree: computed
         })
     }
@@ -168,12 +167,6 @@ class SpaceStore {
         this.collection.change(this.metaItem.id, cb)
     }
 
-    get category() {
-        return this.categoryId === null
-            ? null
-            : this.meta.categories[this.categoryId]
-    }
-
     createDocument() {
         const doc = makeInitialDocument()
         if (this.categoryId !== null) {
@@ -192,12 +185,14 @@ class SpaceStore {
         return id
     }
 
-    get categoryMap() {
-        return this.meta.categories
+    get categoryTree(): Tree<Category> {
+        return listToTree(Object.values(this.meta.categories))
     }
 
-    get categoryTree(): Tree<Category> {
-        return listToTree(Object.values(this.categoryMap))
+    get category() {
+        return this.categoryId === null
+            ? null
+            : this.categoryTree.map[this.categoryId]
     }
 
     selectCategory(id: string | null) {

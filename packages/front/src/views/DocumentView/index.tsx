@@ -310,19 +310,21 @@ const isNodeActive = (editor: Editor, type: string) => {
     const { selection } = editor
     if (!selection) return false
     const nodes = Array.from(
-        Editor.nodes(editor, { match: (n) => n.type === type })
+        Editor.nodes(editor, {
+            match: (n) => Element.isElement(n) && n.type === type
+        })
     )
     return nodes.length > 0
 }
 
 type Block = "heading" | "list" | "ordered-list" | "check-list" | "code"
 
-const listTypes: Block[] = ["list", "ordered-list", "check-list"]
+const listTypes = ["list", "ordered-list", "check-list"]
 
 const toggleBlock = (editor: Editor, type: Block) => {
     const isActive = isNodeActive(editor, type)
     Transforms.unwrapNodes(editor, {
-        match: (n) => listTypes.includes(n.type),
+        match: (n) => Element.isElement(n) && listTypes.includes(n.type),
         split: true
     })
     if (isActive) {
@@ -446,11 +448,13 @@ const createDocumentEditor = (): ReactEditor => {
 
     editor.normalizeNode = (entry) => {
         const [node, path] = entry
+
+        // Ensure that first and only first node is of type 'title'
         if (path.length === 0) {
             for (const [child, childPath] of Node.children(editor, path)) {
                 const index = childPath[0]
                 if (index === 0) {
-                    if ("type" in child && child.type !== "title") {
+                    if (Element.isElement(child) && child.type !== "title") {
                         Transforms.setNodes(
                             editor,
                             { type: "title" },
@@ -459,7 +463,7 @@ const createDocumentEditor = (): ReactEditor => {
                         return
                     }
                 } else {
-                    if ("type" in child && child.type === "title") {
+                    if (Element.isElement(child) && child.type === "title") {
                         Transforms.setNodes(
                             editor,
                             { type: "paragraph" },
@@ -469,6 +473,16 @@ const createDocumentEditor = (): ReactEditor => {
                     }
                 }
             }
+        }
+
+        // Remove empty links
+        if (
+            Element.isElement(node) &&
+            node.type === "link" &&
+            Editor.isEmpty(editor, node)
+        ) {
+            Transforms.removeNodes(editor, { at: path })
+            return
         }
 
         const elementsWithInlineChildren = [
@@ -490,6 +504,7 @@ const createDocumentEditor = (): ReactEditor => {
             }
         }
 
+        // Ensure all children of list are correct list-items
         const isList = Element.isElement(node) && node.type === "list"
         const isOrderedList =
             Element.isElement(node) && node.type === "ordered-list"
@@ -520,7 +535,10 @@ const createDocumentEditor = (): ReactEditor => {
 
         normalizeNode(entry)
     }
+
+    // @ts-expect-error expose global editor for debug
     window.editor = editor
+
     return editor
 }
 
@@ -1077,8 +1095,7 @@ const EditorView = observer((props: EditorViewProps) => {
                             doc.categories = value
                         })
                     }}
-                    tree={space.categoryTree}
-                    categories={space.categoryMap}
+                    categoryTree={space.categoryTree}
                     onClose={() => setShowSelect(false)}
                 />
             </div>
