@@ -496,7 +496,7 @@ class SpaceService {
             .select("COUNT(1)", "count")
             .addSelect("spaceId", "id")
             .where({ spaceId: In(spaces.map((s) => s.id)) })
-            .groupBy("id")
+            .groupBy("spaceId")
             .getRawMany()
         membersCount.forEach((item) => {
             spaces.find((s) => s.id === item.id)!.membersCount = item.count

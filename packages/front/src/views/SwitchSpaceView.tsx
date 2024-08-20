@@ -6,6 +6,7 @@ import type { Space } from "../entities"
 import { useStore } from "../store"
 import { Button, LinkButton, Avatar } from "../ui"
 import Container from "../ui/Container"
+import numForm from "../utils/numForm"
 
 const SwitchSpaceView = observer(() => {
     const store = useStore()
@@ -30,7 +31,11 @@ const SwitchSpaceView = observer(() => {
                             <Col>
                                 <div>{s.name || "."}</div>
                                 <div style={{ opacity: 0.6 }}>
-                                    {s.membersCount} members &ndash; {s.role}
+                                    {numForm(s.membersCount, {
+                                        one: "member",
+                                        many: "members"
+                                    })}{" "}
+                                    &ndash; {s.role}
                                 </div>
                             </Col>
                         </Row>

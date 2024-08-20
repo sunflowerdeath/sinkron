@@ -4,6 +4,7 @@ import { fromPromise } from "mobx-utils"
 import { ConnectionStatus } from "sinkron-client"
 import { Col, Row, useModal } from "oriente"
 
+import numForm from "../utils/numForm"
 import {
     Modal,
     Heading,
@@ -108,8 +109,11 @@ const AccountAndSpaceView = observer(() => {
                     <Col>
                         <div>{space.space.name}</div>
                         <div style={{ opacity: ".6" }}>
-                            {space.space.membersCount} member &ndash;{" "}
-                            {roleMap[role]}
+                            {numForm(space.space.membersCount, {
+                                one: "member",
+                                many: "members"
+                            })}{" "}
+                            &ndash; {roleMap[role]}
                         </div>
                     </Col>
                 </Row>
