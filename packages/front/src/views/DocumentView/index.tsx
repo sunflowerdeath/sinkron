@@ -13,20 +13,23 @@ import {
     Point,
     Path,
     Element,
-    Text
+    Text,
+    NodeEntry
 } from "slate"
 import {
-    useSlate,
     withReact,
     ReactEditor,
     Slate,
     Editable,
+    useSlate,
     useSlateStatic,
+    useFocused,
+    useSelected,
     // useReadOnly,
     RenderElementProps,
     RenderLeafProps
 } from "slate-react"
-import { Row, Col } from "oriente"
+import { Popup, Row, Col, mergeRefs } from "oriente"
 import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 
@@ -194,10 +197,70 @@ const Heading = (props: CustomRenderElementProps<HeadingElement>) => {
 }
 
 const Link = (props: CustomRenderElementProps<LinkElement>) => {
+    const { element, attributes, children } = props
+    const isFocused = useFocused()
+    const isSelected = useSelected()
+
+    const popup = useCallback(
+        (ref) => (
+            <div
+                ref={ref}
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    height: 45,
+                    padding: "0 8px",
+                    background: "var(--color-elem)",
+                    willChange: "transform",
+                    minWidth: 60,
+                    maxWidth: 200,
+                    overflow: "hidden",
+                    fontSize: ".85rem"
+                }}
+                onMouseDown={(e) => {
+                    // prevent blur
+                    e.preventDefault()
+                }}
+            >
+                <a
+                    href={element.url}
+                    style={{
+                        color: "var(--color-link)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap"
+                    }}
+                    target="_blank"
+                >
+                    {element.url}
+                </a>
+            </div>
+        ),
+        [element.url]
+    )
+
     return (
-        <span style={{ color: "var(--color-link)" }} {...props.attributes}>
-            {props.children}
-        </span>
+        <Popup
+            popup={popup}
+            isActive={isFocused && isSelected}
+            placement={{
+                side: "bottom",
+                align: "center",
+                offset: 4,
+                padding: 4,
+                constrain: true
+            }}
+        >
+            {(ref) => (
+                <span
+                    style={{ color: "var(--color-link)" }}
+                    {...attributes}
+                    ref={mergeRefs(ref, attributes.ref)}
+                >
+                    {children}
+                </span>
+            )}
+        </Popup>
     )
 }
 
@@ -579,20 +642,18 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
                     ? "0 0 0 2px #dfdfdf inset"
                     : "none"
             }}
-            onClick={
-                (/*e*/) => {
-                    if (type === "link") {
-                        if (isNodeActive(editor, "link")) {
-                            store.view = "edit_link"
-                        } else {
-                            store.view = "create_link"
-                        }
+            preventFocusSteal
+            onClick={() => {
+                if (type === "link") {
+                    if (isNodeActive(editor, "link")) {
+                        store.view = "edit_link"
                     } else {
-                        toggleBlock(editor, type)
+                        store.view = "create_link"
                     }
-                    // e.preventDefault()
+                } else {
+                    toggleBlock(editor, type)
                 }
-            }
+            }}
             size="s"
         >
             {label}
@@ -602,18 +663,16 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
     const textButtons = textNodes.map(({ type, label }) => (
         <Button
             key={type}
+            preventFocusSteal
             style={{
                 width: isMobile ? "100%" : 60,
                 boxShadow: isMarkActive(editor, type)
                     ? "0 0 0 2px #dfdfdf inset"
                     : "none"
             }}
-            onClick={
-                (/*e*/) => {
-                    toggleMark(editor, type)
-                    // e.preventDefault()
-                }
-            }
+            onClick={() => {
+                toggleMark(editor, type)
+            }}
             size="s"
         >
             {label}
@@ -737,8 +796,10 @@ const ToolbarCreateLinkView = observer((props: ToolbarViewProps) => {
 const ToolbarEditLinkView = observer((props: ToolbarViewProps) => {
     const { store } = props
 
-    const [text, setText] = useState("")
-    const [url, setUrl] = useState("")
+    const editor = useSlate() as ReactEditor
+    const linkNode = useMemo(() => store.getLinkNode(editor), [])
+    const [text, setText] = useState(linkNode ? Node.string(linkNode[0]) : "")
+    const [url, setUrl] = useState(linkNode ? linkNode[0].url : "")
     const isEmpty = text.length === 0 || url.length === 0
 
     return (
@@ -782,7 +843,7 @@ const ToolbarEditLinkView = observer((props: ToolbarViewProps) => {
                 <Button
                     size="s"
                     onClick={() => {
-                        store.updateLink({ text, url })
+                        store.updateLink(editor, { text, url })
                     }}
                     isDisabled={isEmpty}
                 >
@@ -807,6 +868,17 @@ class ToolbarStore {
         makeAutoObservable(this, { editor: false })
     }
 
+    getLinkNode(editor: ReactEditor): NodeEntry<LinkElement> | undefined {
+        const { selection } = editor
+        if (!selection) return
+        const nodes = Array.from(
+            Editor.nodes(editor, {
+                match: (n) => Element.isElementType(n, "link")
+            })
+        )
+        return nodes[0] as NodeEntry<LinkElement>
+    }
+
     createLink({ text, url }: LinkProps) {
         const { selection } = this.editor
         if (selection) {
@@ -817,7 +889,7 @@ class ToolbarStore {
                 children: isCollapsed ? [{ text }] : []
             }
             if (isCollapsed) {
-                Transforms.insertNodes(this.editor, link)
+                Transforms.insertNodes(this.editor, [link, { text: " " }])
             } else {
                 Transforms.wrapNodes(this.editor, link, { split: true })
                 Transforms.collapse(this.editor, { edge: "end" })
@@ -826,14 +898,22 @@ class ToolbarStore {
         this.view = "toolbar"
     }
 
-    updateLink({ text, url }: LinkProps) {}
+    updateLink(editor: ReactEditor, { text, url }: LinkProps) {
+        const linkNode = this.getLinkNode(editor)
+        if (linkNode) {
+            const [_link, at] = linkNode
+            Transforms.setNodes(editor, { url }, { at })
+            Transforms.insertText(editor, text, { at })
+        }
+        this.view = "toolbar"
+    }
 
     removeLink() {
         const { selection } = this.editor
         if (selection) {
             const nodes = Array.from(
                 Editor.nodes(this.editor, {
-                    match: (n) => Element.isElement(n) && n.type === "link"
+                    match: (n) => Element.isElementType(n, "link")
                 })
             )
             if (nodes.length > 0) {
@@ -841,7 +921,6 @@ class ToolbarStore {
                 Transforms.unwrapNodes(this.editor, { at })
             }
         }
-
         this.view = "toolbar"
     }
 }
@@ -1136,7 +1215,7 @@ const EditorView = observer((props: EditorViewProps) => {
         <Slate
             initialValue={value}
             editor={editor}
-            onChange={(a) => {
+            onChange={() => {
                 // Prevent bug firing twice on Android
                 if (editor.operations.length === 0) return
                 if (!editor.operations.fired) {

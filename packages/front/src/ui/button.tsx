@@ -15,9 +15,10 @@ interface ButtonProps extends StyleProps<[ButtonProps, TapState]> {
     children: React.ReactNode
     kind?: "solid" | "transparent" | "faint"
     size?: "s" | "m"
-    onClick?: () => void
+    onClick?: (e: MouseEvent | KeyboardEvent) => void
     isDisabled?: boolean
     onChangeTapState?: (tapState: TapState) => void
+    preventFocusSteal?: boolean
 }
 
 const buttonStyles = (
@@ -58,13 +59,21 @@ const buttonStyles = (
 }
 
 const Button = forwardRef((props: ButtonProps, ref) => {
-    const { as, children, onClick, isDisabled, onChangeTapState, ...rest } =
-        props
+    const {
+        as,
+        children,
+        onClick,
+        isDisabled,
+        onChangeTapState,
+        preventFocusSteal,
+        ...rest
+    } = props
     const Component = as || "div"
     const { tapState, render } = useTaply({
         onClick,
         isDisabled,
-        onChangeTapState
+        onChangeTapState,
+        preventFocusSteal
     })
     const styles = useStyles(buttonStyles, [props, tapState])
     return render((attrs, taplyRef) => {
