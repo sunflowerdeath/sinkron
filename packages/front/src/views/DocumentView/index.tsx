@@ -373,9 +373,7 @@ const isNodeActive = (editor: Editor, type: string) => {
     const { selection } = editor
     if (!selection) return false
     const nodes = Array.from(
-        Editor.nodes(editor, {
-            match: (n) => Element.isElement(n) && n.type === type
-        })
+        Editor.nodes(editor, { match: (n) => Element.isElementType(n, type) })
     )
     return nodes.length > 0
 }
@@ -424,10 +422,7 @@ const isAtEndOfNode = (editor: Editor, type: string): Element | undefined => {
     const { selection } = editor
     if (!selection || !Range.isCollapsed(selection)) return
     const [res] = Editor.nodes(editor, {
-        match: (node) =>
-            !Editor.isEditor(node) &&
-            Element.isElement(node) &&
-            node.type === type
+        match: (node) => Element.isElementType(node, type)
     })
     if (!res) return
     const [node, path] = res
@@ -540,8 +535,7 @@ const createDocumentEditor = (): ReactEditor => {
 
         // Remove empty links
         if (
-            Element.isElement(node) &&
-            node.type === "link" &&
+            Element.isElementType(node, "link") &&
             Editor.isEmpty(editor, node)
         ) {
             Transforms.removeNodes(editor, { at: path })
@@ -568,11 +562,9 @@ const createDocumentEditor = (): ReactEditor => {
         }
 
         // Ensure all children of list are correct list-items
-        const isList = Element.isElement(node) && node.type === "list"
-        const isOrderedList =
-            Element.isElement(node) && node.type === "ordered-list"
-        const isCheckList =
-            Element.isElement(node) && node.type === "check-list"
+        const isList = Element.isElementType(node, "list")
+        const isOrderedList = Element.isElementType(node, "ordered-list")
+        const isCheckList = Element.isElementType(node, "check-list")
         if (isOrderedList || isList || isCheckList) {
             const itemType =
                 isList || isOrderedList ? "list-item" : "check-list-item"

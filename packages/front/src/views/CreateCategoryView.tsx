@@ -9,13 +9,18 @@ import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useSpace } from "../store"
 import type { Category } from "../entities"
-import type { Tree } from "../utils/listToTree"
+import type { Tree, TreeNode } from "../utils/listToTree"
 import { Input, Button, Icon, Menu, MenuItem } from "../ui"
 import Container from "../ui/Container"
 
-const renderItems = (props: CategorySelectProps) => {
-    const { categoryTree, disabledItems, onChange } = props
-    return categoryTree.map((c) => (
+const renderNode = (c: TreeNode<Category>, props: CategorySelectProps) => {
+    const { disabledItems, onChange } = props
+    const children = c.children.length > 0 && (
+        <div style={{ paddingLeft: 30 }}>
+            {c.children.map((child) => renderNode(child, props))}
+        </div>
+    )
+    return (
         <>
             <MenuItem
                 value={c.id}
@@ -26,32 +31,27 @@ const renderItems = (props: CategorySelectProps) => {
             >
                 {c.name}
             </MenuItem>
-            {c.children.length > 0 && (
-                <div style={{ paddingLeft: 30 }}>
-                    {renderItems({ ...props, categoryTree: c.children })}
-                </div>
-            )}
+            {children}
         </>
-    ))
+    )
 }
 
 interface CategorySelectProps {
     value: string | null
     onChange: (value: string | null) => void
-    categoryMap: { [key: string]: Category }
     categoryTree: Tree<Category>
     disabledItems: string[]
 }
 
 const CategorySelect = (props: CategorySelectProps) => {
-    const { categoryTree, categoryMap, value, onChange } = props
+    const { categoryTree, value, onChange } = props
     const menu = () => {
-        return categoryTree.length === 0 ? (
+        return categoryTree.nodes.length === 0 ? (
             <Row style={{ color: "#999", height: 45 }} align="center">
                 No categories
             </Row>
         ) : (
-            renderItems(props)
+            categoryTree.nodes.map((c) => renderNode(c, props))
         )
     }
     return (
@@ -86,7 +86,7 @@ const CategorySelect = (props: CategorySelectProps) => {
                         }}
                     >
                         {value ? (
-                            categoryMap[value].name
+                            categoryTree.map[value].name
                         ) : (
                             <div style={{ color: "#999" }}>No parent</div>
                         )}
@@ -107,7 +107,6 @@ const CategorySelect = (props: CategorySelectProps) => {
 interface EditCategoryFormProps {
     initialValues?: { name: string; parent: string | null }
     disabledItems: string[]
-    categoryMap: { [key: string]: Category }
     categoryTree: Tree<Category>
     submitButtonText: React.ReactNode
     onSubmit: (values: { name: string; parent: string | null }) => void
@@ -116,7 +115,6 @@ interface EditCategoryFormProps {
 const EditCategoryForm = (props: EditCategoryFormProps) => {
     const {
         initialValues,
-        categoryMap,
         categoryTree,
         disabledItems,
         onSubmit,
@@ -140,7 +138,6 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
                 Parent category
                 <CategorySelect
                     disabledItems={disabledItems}
-                    categoryMap={categoryMap}
                     categoryTree={categoryTree}
                     value={parent}
                     onChange={setParent}
@@ -166,7 +163,7 @@ const CreateCategoryView = observer(() => {
             : null
 
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
 
     const create = (values: { name: string; parent: string | null }) => {
         const id = space.createCategory(values)
@@ -184,7 +181,6 @@ const CreateCategoryView = observer(() => {
                 initialValues={{ name: "", parent: initialParent }}
                 onSubmit={create}
                 submitButtonText="Create"
-                categoryMap={space.categoryMap}
                 categoryTree={space.categoryTree}
                 disabledItems={[]}
             />
@@ -200,7 +196,7 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
     const { id } = props
 
     const space = useSpace()
-    const [location, navigate] = useLocation()
+    const [_location, navigate] = useLocation()
 
     if (!space.collection.initialSyncCompleted) {
         return "Loading..."
@@ -218,7 +214,6 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
                 initialValues={category}
                 onSubmit={update}
                 submitButtonText="Save"
-                categoryMap={space.categoryMap}
                 categoryTree={space.categoryTree}
                 disabledItems={[id]}
             />
