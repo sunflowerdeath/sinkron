@@ -10,10 +10,11 @@ import {
     ItemState
 } from "sinkron-client"
 import { compareDesc } from "date-fns"
+import { Node, Path } from "slate"
 
 import env from "../env"
 import { Space, Document, Category, Metadata } from "../entities"
-import { toAutomerge, Node } from "../slate"
+import { toAutomerge } from "../slate"
 import { Api } from "../api"
 import { TransformedMap } from "../utils/transformedMap"
 import listToTree from "../utils/listToTree"
@@ -28,32 +29,76 @@ export interface DocumentListItemData {
     subtitle: string | null
 }
 
+// Implementation of Node.nodes that works with Automerge doc 
+const nodes = function* (root: Node, from?: Path) {
+    let n = root
+    let p: Path = []
+    const visited = new Set()
+    while (true) {
+        yield n
+
+        // go down
+        if (!visited.has(n) && "children" in n && n.children.length >= 0) {
+            visited.add(n)
+            const nextIndex =
+                from && Path.isAncestor(p, from) ? from[p.length] : 0
+            p = [...p, nextIndex]
+            n = Node.get(root, p)
+            continue
+        }
+
+        if (p.length === 0) break
+
+        // go right
+        const nextPath = Path.next(p)
+        if (Node.has(root, nextPath)) {
+            p = nextPath
+            n = Node.get(root, p)
+            continue
+        }
+
+        // go up
+        p = Path.parent(p)
+        n = Node.get(root, p)
+    }
+}
+
+// Implementation of Node.texts that works with Automerge doc 
+const texts = function*(root: Node, from?: Path) {
+    const gen = nodes(root, from)
+    for (const node of gen) {
+        if ("text" in node) yield node.text
+    }
+}
+
 const getDocumentListItemData = (
     item: Item<Document>
 ): DocumentListItemData => {
     const doc = item.local!.content
-    const firstNode = doc.children[0]
-    let firstNodeText = ""
+
+    let title = ""
+    let subtitle = ""
+
     try {
-        firstNodeText = firstNode
-            ? firstNode.children
-                  .map((c) => c.text)
-                  .join("")
-                  .slice(0, 75)
-            : ""
-    } catch {}
-    const title = firstNodeText.length > 0 ? firstNodeText : null
-    // let subtitle
-    // if (title !== null && title.length > 0) {
-    const secondNode = doc.children[1]
-    let secondNodeText = ""
-    try {
-        secondNodeText = secondNode
-            ? secondNode.children.map((c) => c.text).join("")
-            : ""
-    } catch {}
-    const subtitle = secondNodeText.slice(0, 100)
-    // }
+        if (doc.children.length > 0) {
+            const gen = texts(doc.children[0])
+            for (const text of gen) {
+                title += text
+                if (title.length >= 75) break
+            }
+        }
+
+        if (doc.children.length > 1) {
+            const gen = texts(doc, [1])
+            for (const text of gen) {
+                subtitle += text + " "
+                if (subtitle.length >= 75) break
+            }
+        }
+    } catch (_) {
+        // just in case
+    }
+
     return { id: item.id, item, title, subtitle }
 }
 
