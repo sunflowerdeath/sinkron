@@ -7,13 +7,12 @@ import checkBoxOutlineSvg from "@material-design-icons/svg/outlined/check_box_ou
 import { LinkButton, Button, Icon } from "../ui"
 import Container from "../ui/Container"
 import CategoriesList from "../components/CategoriesList"
-import type { Category } from "../entities"
-import type { Tree, TreeNode } from "../utils/listToTree"
+import type { CategoryTree, CategoryTreeNode } from "../store/SpaceStore"
 
 interface CategoriesTreeItemProps {
     value: string[]
     onChange: (value: string[]) => void
-    category: TreeNode<Category>
+    category: CategoryTreeNode
 }
 
 const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
@@ -74,7 +73,7 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
 interface CategoriesTreeProps {
     value: string[]
     onChange: (value: string[]) => void
-    categories: TreeNode<Category>[]
+    categories: CategoryTreeNode[]
 }
 
 const CategoriesTree = (props: CategoriesTreeProps) => {
@@ -96,7 +95,7 @@ const CategoriesTree = (props: CategoriesTreeProps) => {
 interface SelectCategoriesViewProps {
     value: string[]
     onChange: (value: string[]) => void
-    categoryTree: Tree<Category>
+    categoryTree: CategoryTree
     onClose: () => void
 }
 

@@ -10,11 +10,10 @@ import keyboardArrowUpSvg from "@material-design-icons/svg/outlined/keyboard_arr
 import { Menu, MenuItem, Button, LinkButton, Icon } from "../ui"
 import Container from "../ui/Container"
 import { useSpace } from "../store"
-import { Category } from "../entities"
-import type { Tree, TreeNode } from "../utils/listToTree"
+import type { CategoryTree, CategoryTreeNode } from "../store/SpaceStore"
 
 type CategoriesListItemProps = {
-    category: TreeNode<Category>
+    category: CategoryTreeNode
     onDelete: (id: string) => void
     onSelect: (id: string) => void
 }
@@ -77,15 +76,27 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                     kind="transparent"
                     onClick={() => onSelect(category.id)}
                 >
-                    <div
+                    <Row
                         style={{
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap"
+                            flexGrow: 1,
+                            overflow: "hidden"
                         }}
+                        gap={10}
                     >
-                        {category.name}
-                    </div>
+                        <div
+                            style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                flexGrow: 1
+                            }}
+                        >
+                            {category.name}
+                        </div>
+                        <div style={{ color: "var(--color-secondary)" }}>
+                            {category.count}
+                        </div>
+                    </Row>
                 </Button>
                 <Menu
                     menu={menu}
@@ -114,7 +125,7 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
 }
 
 interface CategoryListProps {
-    categories: TreeNode<Category>[]
+    categories: CategoryTreeNode[]
     onDelete: (id: string) => void
     onSelect: (id: string) => void
 }

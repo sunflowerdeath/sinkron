@@ -17,19 +17,28 @@ import { Space, Document, Category, Metadata } from "../entities"
 import { toAutomerge } from "../slate"
 import { Api } from "../api"
 import { TransformedMap } from "../utils/transformedMap"
-import listToTree from "../utils/listToTree"
-import type { Tree } from "../utils/listToTree"
 
 import UserStore from "./UserStore"
+
+export type CategoryTreeNode = Category & {
+    count: number
+    children: CategoryTreeNode[]
+}
+
+export type CategoryTree = {
+    map: { [key: string]: CategoryTreeNode }
+    nodes: CategoryTreeNode[]
+}
 
 export interface DocumentListItemData {
     id: string
     item: Item<Document>
+    categories: string[]
     title: string
     subtitle: string | null
 }
 
-// Implementation of Node.nodes that works with Automerge doc 
+// Implementation of Node.nodes that works with Automerge doc
 const nodes = function* (root: Node, from?: Path) {
     let n = root
     let p: Path = []
@@ -63,8 +72,8 @@ const nodes = function* (root: Node, from?: Path) {
     }
 }
 
-// Implementation of Node.texts that works with Automerge doc 
-const texts = function*(root: Node, from?: Path) {
+// Implementation of Node.texts that works with Automerge doc
+const texts = function* (root: Node, from?: Path) {
     const gen = nodes(root, from)
     for (const node of gen) {
         if ("text" in node) yield node.text
@@ -89,7 +98,7 @@ const getDocumentListItemData = (
         }
 
         if (doc.children.length > 1) {
-            const gen = texts(doc, [1])
+            const gen = texts(doc as Node, [1])
             for (const text of gen) {
                 subtitle += text + " "
                 if (subtitle.length >= 75) break
@@ -99,7 +108,13 @@ const getDocumentListItemData = (
         // just in case
     }
 
-    return { id: item.id, item, title, subtitle }
+    return {
+        id: item.id,
+        item,
+        title,
+        subtitle,
+        categories: item.local!.categories
+    }
 }
 
 const getUpdatedAt = <T>(item: Item<T>) =>
@@ -107,7 +122,7 @@ const getUpdatedAt = <T>(item: Item<T>) =>
         ? item.updatedAt!
         : item.localUpdatedAt!
 
-const makeInitialDocument = () => ({
+const makeInitialDocument = (): Document => ({
     content: toAutomerge({
         children: [
             {
@@ -193,7 +208,7 @@ class SpaceStore {
     }
 
     get metaItem() {
-        for (const [key, item] of this.collection.items.entries()) {
+        for (const [_key, item] of this.collection.items.entries()) {
             if (item.local?.meta === true) return item
         }
     }
@@ -230,8 +245,33 @@ class SpaceStore {
         return id
     }
 
-    get categoryTree(): Tree<Category> {
-        return listToTree(Object.values(this.meta.categories))
+    get categoryTree() {
+        const map: { [key: string]: CategoryTreeNode } = {}
+
+        const list = Object.values(this.meta.categories)
+        list.forEach((c) => {
+            map[c.id] = { ...c, count: 0, children: [] }
+        })
+
+        for (const doc of this.documentList.map.values()) {
+            console.log(doc.categories)
+            for (const i in doc.categories) {
+                map[doc.categories[i]].count++
+            }
+        }
+
+        const nodes: CategoryTreeNode[] = []
+        list.forEach((c) => {
+            const node = map[c.id]
+            if (c.parent) {
+                const parentNode = map[c.parent]
+                parentNode.children.push(node)
+            } else {
+                nodes.push(node)
+            }
+        })
+
+        return { map, nodes }
     }
 
     get category() {

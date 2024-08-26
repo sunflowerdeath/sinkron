@@ -1,4 +1,4 @@
-import { autorun, makeAutoObservable, ObservableMap } from "mobx"
+import { ObservableMap } from "mobx"
 import { createTransformer, ITransformer } from "mobx-utils"
 
 interface TransformedMapProps<A extends object, B extends object> {
@@ -14,7 +14,7 @@ class TransformedMap<A extends object, B extends object> {
         this.transformer = createTransformer(
             (collection: ObservableMap<string, A>) => {
                 const res = new ObservableMap<string, B>()
-                for (let [key, item] of collection.entries()) {
+                for (const [key, item] of collection.entries()) {
                     if (filter === undefined || filter(item)) {
                         res.set(key, itemTransformer(item))
                     }

@@ -8,12 +8,11 @@ import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useSpace } from "../store"
-import type { Category } from "../entities"
-import type { Tree, TreeNode } from "../utils/listToTree"
+import type { CategoryTree, CategoryTreeNode } from "../store/SpaceStore"
 import { Input, Button, Icon, Menu, MenuItem } from "../ui"
 import Container from "../ui/Container"
 
-const renderNode = (c: TreeNode<Category>, props: CategorySelectProps) => {
+const renderNode = (c: CategoryTreeNode, props: CategorySelectProps) => {
     const { disabledItems, onChange } = props
     const children = c.children.length > 0 && (
         <div style={{ paddingLeft: 30 }}>
@@ -39,7 +38,7 @@ const renderNode = (c: TreeNode<Category>, props: CategorySelectProps) => {
 interface CategorySelectProps {
     value: string | null
     onChange: (value: string | null) => void
-    categoryTree: Tree<Category>
+    categoryTree: CategoryTree
     disabledItems: string[]
 }
 
@@ -107,7 +106,7 @@ const CategorySelect = (props: CategorySelectProps) => {
 interface EditCategoryFormProps {
     initialValues?: { name: string; parent: string | null }
     disabledItems: string[]
-    categoryTree: Tree<Category>
+    categoryTree: CategoryTree
     submitButtonText: React.ReactNode
     onSubmit: (values: { name: string; parent: string | null }) => void
 }

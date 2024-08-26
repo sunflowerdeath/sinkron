@@ -179,7 +179,7 @@ const DocumentListView = observer(() => {
                 style={{ flexGrow: 1, justifyContent: "start" }}
                 to="/categories"
             >
-                {space.category?.name || "All documents"}
+                {space.category ? space.category.name : "All documents"}
             </LinkButton>
             <Button onClick={createDocument} isDisabled={!canCreate}>
                 <Icon svg={addSvg} />
