@@ -2,6 +2,8 @@ import * as Automerge from "@automerge/automerge"
 import {
     Path,
     Node,
+    Element,
+    Text,
     Operation,
     InsertNodeOperation,
     MoveNodeOperation,
@@ -14,10 +16,13 @@ import {
 } from "slate"
 
 export type AutomergeNodeWithChildren = {
+    [key: string]: any
     children: AutomergeNode[]
+}
+export type AutomergeTextNode = {
+    text: Automerge.Text
     [key: string]: any
 }
-export type AutomergeTextNode = { text: Automerge.Text; [key: string]: any }
 export type AutomergeNode = AutomergeNodeWithChildren | AutomergeTextNode
 
 const toJS = (node: AutomergeNode) => JSON.parse(JSON.stringify(node))
@@ -25,21 +30,27 @@ const toJS = (node: AutomergeNode) => JSON.parse(JSON.stringify(node))
 const cloneNode = (node: AutomergeNode) => toAutomerge(toJS(node))
 
 const toAutomerge = (node: Node): AutomergeNode => {
-    if ("children" in node) {
-        return { ...node, children: node.children.map(toAutomerge) }
-    } else if ("text" in node) {
+    if ("children" in node && Array.isArray(node.children)) {
+        return {
+            ...node,
+            children: node.children.map(toAutomerge)
+        }
+    } else if (Text.isText(node)) {
         return { ...node, text: new Automerge.Text(node.text) }
     }
-    return node
+    return node as any as AutomergeNode
 }
 
 const fromAutomerge = (node: AutomergeNode): Node => {
-    if ("children" in node) {
-        return { ...node, children: node.children.map(fromAutomerge) }
-    } else if ("text" in node) {
+    if ("text" in node) {
         return { ...node, text: String(node.text) }
+    } else if ("children" in node) {
+        return {
+            ...node,
+            children: node.children.map(fromAutomerge)
+        } as Element
     }
-    return node
+    return node as any as Node
 }
 
 const findNode = (root: AutomergeNode, path: Path): AutomergeNode => {
@@ -159,13 +170,13 @@ const splitNode = (
 
     if ("text" in fromNode) {
         fromNode.text.deleteAt(op.position, fromNode.text.length - op.position)
-        toNode.text.deleteAt(0, op.position)
+        ;(toNode as AutomergeTextNode).text.deleteAt(0, op.position)
     } else {
         fromNode.children.splice(
             op.position,
             fromNode.children.length - op.position
         )
-        toNode.children.splice(0, op.position)
+        ;(toNode as AutomergeNodeWithChildren).children.splice(0, op.position)
     }
 
     parent.children.insertAt(idx + 1, toNode)
@@ -205,6 +216,7 @@ const ops = {
 
 const applyOperation = (root: AutomergeNode, op: Operation) => {
     if (op.type === "set_selection") return
+    // @ts-expect-error all operation types
     ops[op.type](root, op)
 }
 

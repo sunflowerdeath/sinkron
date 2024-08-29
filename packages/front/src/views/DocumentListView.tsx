@@ -15,28 +15,37 @@ import { Avatar, Button, LinkButton, Icon, ActionStateView } from "../ui"
 
 interface DocumentListCategoryItemProps {
     name: string
+    count: number
     onSelect: () => void
 }
 
 const DocumentListCategoryItem = observer(
     (props: DocumentListCategoryItemProps) => {
-        const { name, onSelect } = props
+        const { name, onSelect, count } = props
         return (
             <Row
                 style={{
                     height: 60,
                     padding: 8,
                     borderBottom: "2px solid var(--color-elem)",
-                    gap: 12,
+                    gap: 10,
                     cursor: "pointer"
                 }}
                 align="center"
                 onClick={onSelect}
             >
-                <div>{<Icon svg={folderSvg} />}</div>
-                <Col gap={4} style={{ flexGrow: 1, overflow: "hidden" }}>
+                <Icon svg={folderSvg} />
+                <div
+                    style={{
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                        flexGrow: 1
+                    }}
+                >
                     {name}
-                </Col>
+                </div>
+                <div style={{ color: "var(--color-secondary)" }}>{count}</div>
             </Row>
         )
     }
@@ -123,6 +132,7 @@ const DocumentList = observer((props: DocumentListProps) => {
             <DocumentListCategoryItem
                 key={c.id}
                 name={c.name}
+                count={c.count}
                 onSelect={() => {
                     space.selectCategory(c.id)
                 }}
@@ -176,10 +186,29 @@ const DocumentListView = observer(() => {
                 </Button>
             )}
             <LinkButton
-                style={{ flexGrow: 1, justifyContent: "start" }}
+                style={{
+                    flexGrow: 1,
+                    justifyContent: "start",
+                    display: "flex",
+                    gap: 10
+                }}
                 to="/categories"
             >
-                {space.category ? space.category.name : "All documents"}
+                <div
+                    style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flexGrow: 1
+                    }}
+                >
+                    {space.category ? space.category.name : "All documents"}
+                </div>
+                <div style={{ color: "var(--color-secondary)" }}>
+                    {space.category
+                        ? space.category.count
+                        : space.documents.length}
+                </div>
             </LinkButton>
             <Button onClick={createDocument} isDisabled={!canCreate}>
                 <Icon svg={addSvg} />

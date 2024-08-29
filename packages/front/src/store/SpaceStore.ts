@@ -14,7 +14,7 @@ import { Node, Path } from "slate"
 
 import env from "../env"
 import { Space, Document, Category, Metadata } from "../entities"
-import { toAutomerge } from "../slate"
+import { toAutomerge, AutomergeNode } from "../slate"
 import { Api } from "../api"
 import { TransformedMap } from "../utils/transformedMap"
 
@@ -39,7 +39,7 @@ export interface DocumentListItemData {
 }
 
 // Implementation of Node.nodes that works with Automerge doc
-const nodes = function* (root: Node, from?: Path) {
+const nodes = function* (root: AutomergeNode, from?: Path) {
     let n = root
     let p: Path = []
     const visited = new Set()
@@ -52,7 +52,7 @@ const nodes = function* (root: Node, from?: Path) {
             const nextIndex =
                 from && Path.isAncestor(p, from) ? from[p.length] : 0
             p = [...p, nextIndex]
-            n = Node.get(root, p)
+            n = Node.get(root as Node, p) as AutomergeNode
             continue
         }
 
@@ -60,20 +60,20 @@ const nodes = function* (root: Node, from?: Path) {
 
         // go right
         const nextPath = Path.next(p)
-        if (Node.has(root, nextPath)) {
+        if (Node.has(root as Node, nextPath)) {
             p = nextPath
-            n = Node.get(root, p)
+            n = Node.get(root as Node, p) as AutomergeNode
             continue
         }
 
         // go up
         p = Path.parent(p)
-        n = Node.get(root, p)
+        n = Node.get(root as Node, p) as AutomergeNode
     }
 }
 
 // Implementation of Node.texts that works with Automerge doc
-const texts = function* (root: Node, from?: Path) {
+const texts = function* (root: AutomergeNode, from?: Path) {
     const gen = nodes(root, from)
     for (const node of gen) {
         if ("text" in node) yield node.text
@@ -83,22 +83,22 @@ const texts = function* (root: Node, from?: Path) {
 const getDocumentListItemData = (
     item: Item<Document>
 ): DocumentListItemData => {
-    const doc = item.local!.content
+    const { content, categories } = item.local!
 
     let title = ""
     let subtitle = ""
 
     try {
-        if (doc.children.length > 0) {
-            const gen = texts(doc.children[0])
+        if (content.children.length > 0) {
+            const gen = texts(content.children[0])
             for (const text of gen) {
                 title += text
                 if (title.length >= 75) break
             }
         }
 
-        if (doc.children.length > 1) {
-            const gen = texts(doc as Node, [1])
+        if (content.children.length > 1) {
+            const gen = texts(content, [1])
             for (const text of gen) {
                 subtitle += text + " "
                 if (subtitle.length >= 75) break
@@ -108,13 +108,7 @@ const getDocumentListItemData = (
         // just in case
     }
 
-    return {
-        id: item.id,
-        item,
-        title,
-        subtitle,
-        categories: item.local!.categories
-    }
+    return { id: item.id, item, title, subtitle, categories }
 }
 
 const getUpdatedAt = <T>(item: Item<T>) =>
@@ -126,6 +120,7 @@ const makeInitialDocument = (): Document => ({
     content: toAutomerge({
         children: [
             {
+                // @ts-expect-error valid TitleElement
                 type: "title",
                 children: [{ text: "" }]
             }
@@ -134,13 +129,20 @@ const makeInitialDocument = (): Document => ({
     categories: []
 })
 
+const isMeta = (item: Document | Metadata): item is Metadata => {
+    return "meta" in item && item.meta == true
+}
+
 class SpaceStore {
     space: Space
     store: UserStore
-    collection: Collection<Document>
+    collection: Collection<Document | Metadata>
     loadedState: IPromiseBasedObservable<void>
     categoryId: string | null = null
-    documentList: TransformedMap<Item<Document>, DocumentListItemData>
+    documentList: TransformedMap<
+        Item<Document | Metadata>,
+        DocumentListItemData
+    >
     api: Api
 
     constructor(space: Space, store: UserStore) {
@@ -149,12 +151,14 @@ class SpaceStore {
         this.store = store
 
         const col = `spaces/${space.id}`
-        const collectionStore = new IndexedDbCollectionStore<Document>(col)
+        const collectionStore = new IndexedDbCollectionStore<
+            Document | Metadata
+        >(col)
         const token = this.api.getToken()
         const transport = new WebSocketTransport({
             url: `${env.wsUrl}/sinkron/${token}`
         })
-        this.collection = new Collection<Document>({
+        this.collection = new Collection<Document | Metadata>({
             transport,
             col,
             store: collectionStore,
@@ -174,11 +178,13 @@ class SpaceStore {
         )
 
         this.documentList = new TransformedMap({
+            // @ts-expect-error "this.collection.items" is ObservableMap
             source: this.collection.items,
             filter: (item) => {
                 if (item.local === null) return false
-                if (item.local.meta) return false
+                if (isMeta(item.local)) return false
                 if (this.categoryId !== null) {
+                    // @ts-expect-error item is not meta
                     return item.local.categories.includes(this.categoryId)
                 } else {
                     return true
@@ -188,6 +194,7 @@ class SpaceStore {
         })
 
         makeObservable(this, {
+            documents: computed,
             sortedDocumentList: computed,
             metaItem: computed,
             meta: computed,
@@ -201,6 +208,13 @@ class SpaceStore {
         this.collection.destroy()
     }
 
+    get documents() {
+        const documents = Array.from(this.collection.items.values()).filter(
+            (item) => item.local !== null && !isMeta(item.local)
+        )
+        return documents as Item<Document>[]
+    }
+
     get sortedDocumentList() {
         return Array.from(this.documentList.map.values()).sort((a, b) =>
             compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
@@ -208,9 +222,10 @@ class SpaceStore {
     }
 
     get metaItem() {
-        for (const [_key, item] of this.collection.items.entries()) {
-            if (item.local?.meta === true) return item
+        for (const item of this.collection.items.values()) {
+            if (item.local && isMeta(item.local)) return item
         }
+        return undefined
     }
 
     get meta() {
@@ -224,7 +239,15 @@ class SpaceStore {
         if (!this.metaItem || this.metaItem.local === null) {
             throw new Error("Metadata document not found!")
         }
-        this.collection.change(this.metaItem.id, cb)
+        this.collection.change(this.metaItem.id, (doc) => {
+            cb(doc as Metadata)
+        })
+    }
+
+    changeDoc(id: string, cb: (doc: Document) => void) {
+        this.collection.change(id, (doc) => {
+            if (!isMeta(doc)) cb(doc)
+        })
     }
 
     createDocument() {
@@ -253,8 +276,8 @@ class SpaceStore {
             map[c.id] = { ...c, count: 0, children: [] }
         })
 
-        for (const doc of this.documentList.map.values()) {
-            console.log(doc.categories)
+        for (const item of this.documents) {
+            const doc = item.local as Document
             for (const i in doc.categories) {
                 map[doc.categories[i]].count++
             }
@@ -303,15 +326,18 @@ class SpaceStore {
 
     deleteCategory(id: string) {
         this.changeMeta((meta) => {
+            // TODO if deleted category has subcategories, change their parents
             delete meta.categories[id]
         })
 
         this.collection.items.forEach((item) => {
             if (item.local === null) return
             const data = item.local
-            if (data.meta) return
+            if (!isMeta(data)) return
+            // @ts-expect-error item is not meta
             if (data.categories.includes(id)) {
                 this.collection.change(item.id, (d) => {
+                    // @ts-expect-error item is not meta
                     d.categories = without(d.categories, id)
                 })
             }

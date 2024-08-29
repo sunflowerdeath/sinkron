@@ -52,93 +52,20 @@ import SelectCategoriesView from "../../views/SelectCategoriesView"
 import CategoriesList from "../../components/CategoriesList"
 import { Button, LinkButton, Icon, Menu, MenuItem, Input } from "../../ui"
 
+import {
+    SinkronTextElement,
+    TitleElement,
+    HeadingElement,
+    CheckListItemElement,
+    LinkElement
+} from "../../types"
+
 const useForceUpdate = () => {
     const [_state, setState] = useState({})
     const forceUpdate = useCallback(() => {
         setState(() => ({}))
     }, [])
     return forceUpdate
-}
-
-type TextElement = {
-    text: string
-    bold?: boolean
-    italic?: boolean
-    underline?: boolean
-    strikethrough?: boolean
-}
-
-type LinkElement = {
-    type: "link"
-    url: string
-    children: TextElement[]
-}
-
-type InlineElement = TextElement | LinkElement
-
-type TitleElement = {
-    type: "title"
-    children: InlineElement[]
-}
-
-type HeadingElement = {
-    type: "heading"
-    children: InlineElement[]
-}
-
-type ParagraphElement = {
-    type: "paragraph"
-    children: InlineElement[]
-}
-
-type ListItemElement = {
-    type: "list-item"
-    children: InlineElement[]
-}
-
-type CheckListItemElement = {
-    type: "check-list-item"
-    isChecked: boolean
-    children: InlineElement[]
-}
-
-type ListElement = {
-    type: "list"
-    children: ListItemElement[]
-}
-
-type CheckListElement = {
-    type: "check-list"
-    children: CheckListItemElement[]
-}
-
-type OrderedListElement = {
-    type: "ordered-list"
-    children: ListItemElement[]
-}
-
-type CodeElement = {
-    type: "code"
-    children: string
-}
-
-type CustomElement =
-    | TitleElement
-    | HeadingElement
-    | ParagraphElement
-    | ListItemElement
-    | CheckListItemElement
-    | ListElement
-    | CheckListElement
-    | OrderedListElement
-    | CodeElement
-    | LinkElement
-
-declare module "slate" {
-    interface CustomTypes {
-        Element: CustomElement
-        Text: TextElement
-    }
 }
 
 type CustomRenderElementProps<T> = Omit<RenderElementProps, "element"> & {
@@ -202,7 +129,7 @@ const Link = (props: CustomRenderElementProps<LinkElement>) => {
     const isSelected = useSelected()
 
     const popup = useCallback(
-        (ref) => (
+        (ref: React.RefObject<HTMLDivElement>) => (
             <div
                 ref={ref}
                 style={{
@@ -305,11 +232,19 @@ const EditorElement = (props: RenderElementProps) => {
         case "paragraph":
             return <p {...props.attributes}>{props.children}</p>
         case "title":
-            return <Title {...props} />
+            return (
+                <Title {...(props as CustomRenderElementProps<TitleElement>)} />
+            )
         case "heading":
-            return <Heading {...props} />
+            return (
+                <Heading
+                    {...(props as CustomRenderElementProps<HeadingElement>)}
+                />
+            )
         case "link":
-            return <Link {...props} />
+            return (
+                <Link {...(props as CustomRenderElementProps<LinkElement>)} />
+            )
         case "code":
             return (
                 <pre
@@ -337,12 +272,16 @@ const EditorElement = (props: RenderElementProps) => {
                 </li>
             )
         case "check-list-item":
-            return <CheckListItem {...props} />
+            return (
+                <CheckListItem
+                    {...(props as CustomRenderElementProps<CheckListItemElement>)}
+                />
+            )
     }
     return <span {...props.attributes}>{props.children}</span>
 }
 
-type CustomRenderLeafProps = RenderLeafProps & { leaf: TextElement }
+type CustomRenderLeafProps = RenderLeafProps & { leaf: SinkronTextElement }
 
 const EditorLeaf = (props: CustomRenderLeafProps) => {
     const { attributes, leaf } = props
@@ -395,6 +334,7 @@ const toggleBlock = (editor: Editor, type: Block) => {
             const itemType =
                 type === "check-list" ? "check-list-item" : "list-item"
             Transforms.setNodes(editor, { type: itemType })
+            // @ts-expect-error wrap doesn't need "children"
             Transforms.wrapNodes(editor, { type })
         } else {
             Transforms.setNodes(editor, { type })
@@ -572,6 +512,7 @@ const createDocumentEditor = (): ReactEditor => {
                 if (Text.isText(child)) {
                     Transforms.wrapNodes(
                         editor,
+                        // @ts-expect-error wrap doesn't need "children"
                         { type: itemType },
                         { at: childPath }
                     )
@@ -643,7 +584,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
                         store.view = "create_link"
                     }
                 } else {
-                    toggleBlock(editor, type)
+                    toggleBlock(editor, type as Block)
                 }
             }}
             size="s"
@@ -658,12 +599,12 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             preventFocusSteal
             style={{
                 width: isMobile ? "100%" : 60,
-                boxShadow: isMarkActive(editor, type)
+                boxShadow: isMarkActive(editor, type as TextMark)
                     ? "0 0 0 2px #dfdfdf inset"
                     : "none"
             }}
             onClick={() => {
-                toggleMark(editor, type)
+                toggleMark(editor, type as TextMark)
             }}
             size="s"
         >
@@ -725,8 +666,13 @@ type LinkProps = { text: string; url: string }
 
 const ToolbarCreateLinkView = observer((props: ToolbarViewProps) => {
     const { store } = props
+    const editor = useSlate()
 
-    const [text, setText] = useState("")
+    const selectedText = useMemo(
+        () => (editor.selection ? Editor.string(editor, editor.selection) : ""),
+        []
+    )
+    const [text, setText] = useState(selectedText)
     const [url, setUrl] = useState("")
     const isEmpty = text.length === 0 || url.length === 0
 
@@ -931,6 +877,7 @@ const Toolbar = observer(() => {
     return null
 })
 
+// This fixes selection when elements may be deleted by remote user
 const checkSelectionPoint = (editor: Editor, point: Point) => {
     const nodes = Editor.nodes(editor, { at: point })
 
@@ -1038,7 +985,7 @@ const EditorView = observer((props: EditorViewProps) => {
                                 (id) => space.meta.categories[id]!
                             )}
                             onRemove={(c) => {
-                                space.collection.change(id, (doc) => {
+                                space.changeDoc(id, (doc) => {
                                     doc.categories = without(doc.categories, c)
                                 })
                             }}
@@ -1232,7 +1179,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
     const [_location, navigate] = useLocation()
 
     const item = space.collection.items.get(id)
-    if (item === undefined || item.local === null) {
+    if (item === undefined || item.local === null || "meta" in item.local) {
         return <Redirect to="/" />
     }
 
@@ -1241,7 +1188,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
             (op) => op.type !== "set_selection"
         )
         if (ops.length > 0) {
-            space.collection.change(id, (doc) => {
+            space.changeDoc(id, (doc) => {
                 applySlateOps(doc.content, ops)
             })
         }
