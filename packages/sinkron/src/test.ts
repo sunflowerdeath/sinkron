@@ -10,6 +10,7 @@ type Doc = {
     num: number
 }
 
+
 const makeDoc = () => {
     let doc = Automerge.init<Doc>()
     doc = Automerge.change(doc, (doc) => {
@@ -21,6 +22,10 @@ const makeDoc = () => {
 
 describe("Sinkron", () => {
     let sinkron: Sinkron
+
+    before(async () => {
+        await Automerge.wasmInitialized()
+    })
 
     beforeEach(async () => {
         sinkron = new Sinkron({ dbPath: ":memory:" })

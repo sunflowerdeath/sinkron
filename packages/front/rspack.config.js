@@ -2,7 +2,6 @@ const path = require("path")
 const { DefinePlugin } = require("@rspack/core")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
-const { EsbuildPlugin } = require("esbuild-loader")
 
 const isProduction = process.env.NODE_ENV === "production"
 const isTauriApp = process.env.TAURI === "1"
@@ -33,12 +32,12 @@ const rules = [
     {
         test: /\.svg$/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
-        use: ["raw-loader"]
+        type: 'asset/source'
     },
     {
         test: /\.png/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
-        use: ["file-loader"]
+        type: 'asset/resource'
     }
 ]
 
@@ -72,8 +71,7 @@ module.exports = {
     },
     mode: "none",
     optimization: {
-        minimizer: [new EsbuildPlugin({ target: "es2015" })],
-        minimize: false
+        // minimize: isProduction
     },
     target: "web",
     resolve: {

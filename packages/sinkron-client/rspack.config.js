@@ -44,6 +44,7 @@ const node = {
     // target: "node"
 }
 
+/*
 const browser = {
     ...base,
     entry: {
@@ -58,3 +59,6 @@ const browser = {
 }
 
 module.exports = [node, browser]
+*/
+
+module.exports = node

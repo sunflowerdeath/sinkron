@@ -28,7 +28,7 @@
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
-        "@automerge/automerge": "^2.1.10",
+        "@automerge/automerge": "^2.2.8",
         "@fastify/cookie": "^9.3.1",
         "@fastify/cors": "^9.0.1",
         "ajv": "^8.12.0",
