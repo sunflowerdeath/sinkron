@@ -45,7 +45,10 @@ const rules = [
 const plugins = [
     new DefinePlugin({
         IS_PRODUCTION: isProduction,
-        IS_TAURI: isTauriApp
+        IS_TAURI: isTauriApp,
+        // bug in rspack@1.0.0 mode=production not working
+        // set mode to "none" and define manually
+        "process.env.NODE_ENV": isProduction ? '"production"' : '"development"'
     }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
@@ -67,7 +70,7 @@ module.exports = {
         publicPath: isTauriApp ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[fullhash].js"
     },
-    // mode: isProduction ? "production" : "development",
+    mode: "none",
     optimization: {
         minimizer: [new EsbuildPlugin({ target: "es2015" })],
         minimize: false
