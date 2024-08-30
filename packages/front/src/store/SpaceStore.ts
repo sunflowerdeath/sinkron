@@ -384,13 +384,17 @@ class SpaceStore {
     }
 
     renameSpace(name: string) {
-        return fromPromise(
+        const res = fromPromise(
             this.api.fetch({
                 method: "POST",
                 url: `/spaces/${this.space.id}/rename`,
                 data: { name }
             })
         )
+        res.then(() => {
+            this.space.name = name
+        })
+        return res
     }
 }
 

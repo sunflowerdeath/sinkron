@@ -31,6 +31,7 @@
         "@automerge/automerge": "^2.1.10",
         "@fastify/cookie": "^9.3.1",
         "@fastify/cors": "^9.0.1",
+        "ajv": "^8.12.0",
         "bcrypt": "^5.1.1",
         "better-sqlite3": "^9.4.3",
         "bowser": "^2.11.0",

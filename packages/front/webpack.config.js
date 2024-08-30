@@ -65,7 +65,7 @@ module.exports = {
         clean: true,
         path: path.resolve(__dirname, "./build"),
         publicPath: isTauriApp ? "/" : isProduction ? "/static/" : "/",
-        filename: "[name].[hash].js"
+        filename: "[name].[fullhash].js"
     },
     mode: isProduction ? "production" : "development",
     optimization: {
