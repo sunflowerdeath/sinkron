@@ -704,6 +704,11 @@ class App {
         await this.db.initialize()
     }
 
+    async destroy() {
+        // this.sinkron.destroy()
+        await this.db.destroy()
+    }
+
     async handleUpgrade(
         request: IncomingMessage,
         socket: Duplex,

@@ -1,5 +1,5 @@
 const path = require("path")
-const { DefinePlugin } = require("webpack")
+const { DefinePlugin } = require("@rspack/core")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 const { EsbuildPlugin } = require("esbuild-loader")
@@ -44,8 +44,8 @@ const rules = [
 
 const plugins = [
     new DefinePlugin({
-        "IS_PRODUCTION": isProduction,
-        "IS_TAURI": isTauriApp
+        IS_PRODUCTION: isProduction,
+        IS_TAURI: isTauriApp
     }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
@@ -84,11 +84,12 @@ module.exports = {
         host: "0.0.0.0",
         port: 1337,
         historyApiFallback: true,
-        proxy: {
-            "/api": {
+        proxy: [
+            {
+                context: "/api",
                 target: "http://localhost:80",
                 pathRewrite: { "^/api": "" }
             }
-        }
+        ]
     }
 }

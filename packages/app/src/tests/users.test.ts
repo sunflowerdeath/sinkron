@@ -5,9 +5,14 @@ import { App } from "../app"
 
 describe("Users", () => {
     let app: App
+
     beforeEach(async () => {
         app = new App({})
         await app.init()
+    })
+
+    afterEach(async () => {
+        await app.destroy()
     })
 
     it("signup", async () => {

@@ -27,11 +27,15 @@ describe("Invites", () => {
     let user: User
 
     beforeEach(async () => {
-        app = new App()
+        app = new App({})
         await app.init()
 
         owner = await createUser(app, "owner")
         user = await createUser(app, "user")
+    })
+
+    afterEach(async () => {
+        await app.destroy()
     })
 
     it("send invite", async () => {

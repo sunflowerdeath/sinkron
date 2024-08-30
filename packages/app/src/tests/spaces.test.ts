@@ -1,7 +1,7 @@
 import assert from "node:assert"
 import cookie from "@fastify/cookie"
 
-import { Sinkron } from "sinkron"
+// import { Sinkron } from "sinkron"
 import { App } from "../app"
 
 describe("Spaces", () => {
@@ -35,6 +35,10 @@ describe("Spaces", () => {
         })
         assert(tokenRes.isOk)
         headers = { Cookie: cookie.serialize("token", tokenRes.value.token) }
+    })
+
+    afterEach(async () => {
+        await app.destroy()
     })
 
     it("create, delete", async () => {

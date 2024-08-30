@@ -7,19 +7,19 @@
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "eslint src",
-        "build": "NODE_ENV=production webpack"
+        "build": "NODE_ENV=production rspack --config rspack.config.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
+        "@rspack/cli": "^1.0.0",
+        "@rspack/core": "^1.0.0",
         "@types/lodash-es": "^4.17.6",
         "@types/uuid": "^9.0.0",
         "esbuild-loader": "^4.1.0",
         "ts-loader": "^9.5.1",
         "typescript": "^5.3.3",
-        "webpack": "^5.74.0",
-        "webpack-bundle-analyzer": "^4.10.1",
-        "webpack-cli": "^4.10.0"
+        "webpack-bundle-analyzer": "^4.10.1"
     },
     "dependencies": {
         "@automerge/automerge": "^2.1.10",
