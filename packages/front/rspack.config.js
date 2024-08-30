@@ -67,7 +67,7 @@ module.exports = {
         publicPath: isTauriApp ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[fullhash].js"
     },
-    mode: isProduction ? "production" : "development",
+    // mode: isProduction ? "production" : "development",
     optimization: {
         minimizer: [new EsbuildPlugin({ target: "es2015" })],
         minimize: false

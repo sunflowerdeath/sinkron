@@ -12,6 +12,7 @@ import { LoginView, SignupView } from './views/LoginView'
 const Root = observer(() => {
     const authStore = useMemo(() => {
         const s = new AuthStore()
+        // @ts-expect-error expose store globally
         window.store = s
         return s
     }, [])
