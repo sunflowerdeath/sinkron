@@ -1,4 +1,6 @@
 import { Row } from "oriente"
+import { useLocation } from "wouter"
+import { useMedia } from "react-use"
 
 import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 
@@ -53,6 +55,8 @@ interface CategoriesListProps {
 const CategoriesList = (props: CategoriesListProps) => {
     const { items, onRemove } = props
     const spaceStore = useSpace()
+    const [_location, navigate] = useLocation()
+    const isMobile = useMedia("(max-width: 1023px)")
     return (
         <Row gap={8} style={{ height: 60, flexShrink: 0 }} align="center">
             {items.map((item) => (
@@ -61,7 +65,7 @@ const CategoriesList = (props: CategoriesListProps) => {
                     item={item}
                     onSelect={() => {
                         spaceStore.selectCategory(item.id)
-                        // TODO on mobile go to list
+                        if (isMobile) navigate("/")
                     }}
                     onRemove={() => onRemove(item.id)}
                 />
