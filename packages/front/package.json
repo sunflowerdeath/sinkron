@@ -6,6 +6,7 @@
     "scripts": {
         "start": "rspack serve --config rspack.config.js",
         "build": "NODE_ENV=production rspack --config rspack.config.js",
+        "test": "rspack --config rspack.test.config.js && mocha ./build/test.js",
         "tauri-dev": "pnpm tauri dev",
         "tauri-build": "pnpm tauri build",
         "lint": "eslint src/index.tsx"
@@ -24,7 +25,9 @@
         "esbuild-loader": "^4.1.0",
         "html-webpack-plugin": "^5.5.0",
         "mocha": "^10.1.0",
-        "webpack-bundle-analyzer": "^4.10.1"
+        "webpack": "^5.94.0",
+        "webpack-bundle-analyzer": "^4.10.1",
+        "webpack-cli": "^5.1.4"
     },
     "dependencies": {
         "@automerge/automerge": "^2.2.8",
