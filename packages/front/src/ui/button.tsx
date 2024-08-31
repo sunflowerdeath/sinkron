@@ -1,5 +1,6 @@
 import { forwardRef, createElement } from "react"
 import { Link } from "wouter"
+import { omit } from "lodash-es"
 
 import {
     useTaply,
@@ -80,7 +81,7 @@ const Button = forwardRef((props: ButtonProps, ref) => {
         return createElement(
             Component,
             {
-                ...rest,
+                ...omit(rest, ["kind"]),
                 style: styles.root,
                 ...attrs,
                 ref: mergeRefs(ref, taplyRef)

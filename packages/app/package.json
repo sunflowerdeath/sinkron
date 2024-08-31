@@ -7,7 +7,7 @@
         "migrate": "typeorm migration:run -d ./build/app-db.js && typeorm migration:run -d ./build/sinkron-db.js",
         "start": "node ./build/main.js",
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
-        "test": "webpack --config=rspack.config.test.js && SINKRON_SQLITE_MEMORY_DB=1 mocha ./build/test.js",
+        "test": "rspack --config=rspack.config.test.js && SINKRON_SQLITE_MEMORY_DB=1 mocha ./build/test.js",
         "dev": "rspack && node ./build/main.js"
     },
     "author": "sunflowerdeath",
