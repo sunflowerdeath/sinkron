@@ -56,6 +56,9 @@ importers:
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
+      mkdirp:
+        specifier: ^3.0.1
+        version: 3.0.1
       pino:
         specifier: ^8.11.0
         version: 8.19.0
@@ -293,6 +296,9 @@ importers:
       esbuild-loader:
         specifier: ^4.1.0
         version: 4.1.0(webpack@5.94.0)
+      mkdirp:
+        specifier: ^3.0.1
+        version: 3.0.1
       mocha:
         specifier: ^10.1.0
         version: 10.3.0
@@ -302,6 +308,12 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.4.2
+      webpack:
+        specifier: ^5.94.0
+        version: 5.94.0(webpack-cli@5.1.4)
+      webpack-cli:
+        specifier: ^5.1.4
+        version: 5.1.4(webpack-bundle-analyzer@4.10.1)(webpack@5.94.0)
       webpack-node-externals:
         specifier: ^3.0.0
         version: 3.0.0
@@ -415,6 +427,12 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.4.2
+      webpack:
+        specifier: ^5.94.0
+        version: 5.94.0(webpack-cli@5.1.4)
+      webpack-cli:
+        specifier: ^5.1.4
+        version: 5.1.4(webpack-bundle-analyzer@4.10.1)(webpack@5.94.0)
 
 packages:
 
@@ -7207,6 +7225,11 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
     dev: false
+
+  /mkdirp@3.0.1:
+    resolution: {integrity: sha512-+NsyUUAZDmo6YVHzL/stxSu3t9YS1iljliy3BSDrXJ/dkn1KYdmtZODGGjLcc9XLgVVpH4KshHB8XmZgMhaBXg==}
+    engines: {node: '>=10'}
+    hasBin: true
 
   /mnemonist@0.39.6:
     resolution: {integrity: sha512-A/0v5Z59y63US00cRSLiloEIw3t5G+MiKz4BhX21FI+YBJXBOGW0ohFxTxO08dsOYlzxo87T7vGfZKYp2bcAWA==}

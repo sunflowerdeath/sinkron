@@ -6,7 +6,8 @@
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "eslint src",
-        "build": "NODE_ENV=production rspack --config rspack.config.js",
+        "build": "NODE_ENV=production webpack --config rspack.config.js",
+        "build2": "NODE_ENV=production rspack --config rspack.config.js",
         "test": "rspack --config rspack.test.config.js && mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
@@ -20,9 +21,12 @@
         "@types/uuid": "^9.0.0",
         "@types/ws": "^8.5.7",
         "esbuild-loader": "^4.1.0",
+        "mkdirp": "^3.0.1",
         "mocha": "^10.1.0",
         "ts-loader": "^9.5.1",
         "typescript": "^5.3.3",
+        "webpack": "^5.94.0",
+        "webpack-cli": "^5.1.4",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {

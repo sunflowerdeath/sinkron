@@ -13,7 +13,7 @@ const rules = [
         test: /\.ts$/,
         include: [src],
         use: [
-            { loader: "esbuild-loader", options: { loader: "ts" } },
+            // { loader: "esbuild-loader", options: { loader: "ts" } },
             { loader: "ts-loader" }
         ]
     }

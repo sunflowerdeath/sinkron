@@ -1,6 +1,8 @@
 import { createServer } from "http"
 import type { IncomingMessage } from "http"
 import { Duplex } from "stream"
+import path from "path"
+
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
 import { DataSource, Or, Equal, Not, Repository } from "typeorm"
 import * as Bowser from "bowser"
@@ -11,10 +13,12 @@ import dataSource from "./db/app"
 import { dbPath as sinkronDbPath } from "./db/sinkron"
 import { User, AuthToken, Space, SpaceMember, Invite } from "./entities"
 
+import { LocalObjectStorage } from "./files/local"
 import { UserService } from "./services/user"
 import { AuthService } from "./services/auth"
 import { SpaceService } from "./services/space"
 import { InviteService } from "./services/invite"
+import { FileUploadService } from "./services/fileUpload"
 
 const authTokenHeader = "x-sinkron-auth-token"
 
@@ -346,6 +350,52 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             })
         }
     )
+
+    fastify.post<{ Body: Buffer; Params: { spaceId: string; fileId: string } }>(
+        "/spaces/:spaceId/upload/:fileId",
+        async (request, reply) => {
+            await app.transaction(async (models) => {
+                const { spaceId, fileId } = request.params
+
+                const member = await models.members.findOne({
+                    where: { spaceId, userId: request.token.userId },
+                    select: { role: true }
+                })
+                if (!member) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Space not found" } })
+                    return
+                }
+                if (!["admin", "owner", "editor"].includes(member.role)) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
+                    return
+                }
+
+                const res = await app.services.fileUpload.upload(models, {
+                    id: fileId,
+                    content: request.body,
+                    spaceId
+                })
+                if (!res.isOk) {
+                    reply
+                        .code(500)
+                        .send({
+                            error: {
+                                message: "Couldn't upload",
+                                details: res.error
+                            }
+                        })
+                    return
+                }
+
+                reply.send({})
+            })
+        }
+    )
+
 }
 
 type InviteCreateBody = {
@@ -643,6 +693,7 @@ type Services = {
     auth: AuthService
     spaces: SpaceService
     invites: InviteService
+    fileUpload: FileUploadService
 }
 
 class App {
@@ -663,11 +714,15 @@ class App {
 
         this.db = dataSource
 
+        const storage = new LocalObjectStorage(
+            path.join(process.cwd(), "temp/files")
+        )
         this.services = {
             users: new UserService(this),
             auth: new AuthService(this),
             spaces: new SpaceService(this),
-            invites: new InviteService(this)
+            invites: new InviteService(this),
+            fileUpload: new FileUploadService(this, storage)
         }
 
         this.models = {
@@ -763,6 +818,14 @@ class App {
             }
         })
 
+        fastify.addContentTypeParser(
+            "application/octet-stream",
+            { parseAs: "buffer" },
+            (req, body, done) => {
+                done(null, body)
+            }
+        )
+
         fastify.setErrorHandler((error, request, reply) => {
             if (error.validation) {
                 reply.status(422).send({
@@ -783,6 +846,43 @@ class App {
             reply.send("Sinkron API")
         })
         fastify.register(loginRoutes(this))
+
+
+        fastify.get<{ Params: { spaceId: string; fileId: string } }>(
+            "/spaces/:spaceId/files/:fileId",
+            async (request, reply) => {
+                await this.transaction(async (models) => {
+                    const { spaceId, fileId } = request.params
+
+                    /*
+                    const member = await models.members.findOne({
+                        where: { spaceId, userId: request.token.userId },
+                        select: { role: true }
+                    })
+                    if (!member) {
+                        reply
+                            .code(500)
+                            .send({ error: { message: "Space not found" } })
+                        return
+                    }
+                    */
+
+                    const res = await this.services.fileUpload.get(models, {
+                        spaceId,
+                        fileId
+                    })
+                    if (!res.isOk) {
+                        reply
+                            .code(404)
+                            .send({ error: { message: "File not found" } })
+                        return
+                    }
+
+                    reply.send(res.value)
+                })
+            }
+        )
+
         fastify.register(appRoutes(this))
         fastify.register(cors, {
             origin: [

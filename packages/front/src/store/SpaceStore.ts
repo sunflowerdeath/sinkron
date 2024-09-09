@@ -30,12 +30,18 @@ export type CategoryTree = {
     nodes: CategoryTreeNode[]
 }
 
-export interface DocumentListItemData {
+export type DocumentListItemData = {
     id: string
     item: Item<Document>
     categories: string[]
     title: string
     subtitle: string | null
+}
+
+type UploadState = {
+    id: string
+    content: Blob
+    state: Promise<object>
 }
 
 // Implementation of Node.nodes that works with Automerge doc
@@ -268,6 +274,8 @@ class SpaceStore {
         return id
     }
 
+    // === Categories
+
     get categoryTree() {
         const map: { [key: string]: CategoryTreeNode } = {}
 
@@ -346,6 +354,8 @@ class SpaceStore {
         if (this.categoryId === id) this.categoryId = null
     }
 
+    // === Members and invites
+
     fetchMembers() {
         return fromPromise(
             this.api.fetch({
@@ -383,6 +393,8 @@ class SpaceStore {
         )
     }
 
+    // === Space settings
+
     renameSpace(name: string) {
         const res = fromPromise(
             this.api.fetch({
@@ -395,6 +407,29 @@ class SpaceStore {
             this.space.name = name
         })
         return res
+    }
+
+    // === File uploads
+
+    uploadQueue: Map<string, UploadState> = new Map()
+
+    upload(content: Blob): string {
+        const id = uuidv4()
+        const state = this.api.fetch({
+            method: "POST",
+            url: `/spaces/${this.space.id}/upload/${id}`,
+            data: content
+        })
+        state.then(
+            () => {
+                this.uploadQueue.delete(id)
+            },
+            () => {
+                // toast
+            }
+        )
+        this.uploadQueue.set(id, { id, content, state })
+        return id
     }
 }
 

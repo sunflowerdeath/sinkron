@@ -62,7 +62,7 @@ class FetchError extends Error {
 const fetchJson = async <T extends object = object>(
     params: FetchParams
 ): Promise<T> => {
-    const { url, method, data, headers, signal } = {
+    const { url, method, data, headers /*, signal */ } = {
         ...defaultFetchParams,
         ...params
     }
@@ -71,13 +71,19 @@ const fetchJson = async <T extends object = object>(
         ...headers,
         Accept: "application/json"
     }
+    let body: string | Blob | undefined = undefined
     if (data !== undefined) {
-        reqHeaders["Content-type"] = "application/json;charset=UTF-8"
+        if (data instanceof Blob) {
+            reqHeaders["Content-type"] = "application/octet-stream"
+            body = data
+        } else {
+            reqHeaders["Content-type"] = "application/json;charset=UTF-8"
+            body = JSON.stringify(data)
+        }
     }
-
     const request = fetch(url, {
         method,
-        body: data ? JSON.stringify(data) : undefined,
+        body,
         credentials: "include",
         headers: reqHeaders
     })
