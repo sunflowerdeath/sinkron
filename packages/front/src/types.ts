@@ -60,6 +60,11 @@ export type CodeElement = {
     children: string
 }
 
+export type ImageElement = {
+    type: "image"
+    id: string
+}
+
 export type SinkronElement =
     | TitleElement
     | HeadingElement
@@ -71,6 +76,7 @@ export type SinkronElement =
     | OrderedListElement
     | CodeElement
     | LinkElement
+    | ImageElement
 
 declare module "slate" {
     interface CustomTypes {

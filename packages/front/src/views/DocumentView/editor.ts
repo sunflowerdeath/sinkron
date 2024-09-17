@@ -75,6 +75,8 @@ const createSinkronEditor = (): ReactEditor => {
 
     editor.isInline = (elem) => elem.type === "link"
 
+    editor.isVoid = (elem) => elem.type === "image"
+
     editor.normalizeNode = (entry) => {
         const [node, path] = entry
 

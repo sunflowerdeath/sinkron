@@ -65,11 +65,13 @@ type CheckPermissionProps = {
     user: string
 }
 
-type ChangedDocuments = {
+type SyncCollectionResult = {
     col: string
     colrev: number
     documents: Document[]
 }
+
+type Colrevs = Array<{ id: string; colrev: string }>
 
 export type RequestError = { code: ErrorCode; details?: string }
 
@@ -106,6 +108,7 @@ class Sinkron {
         return {
             documents: m.getRepository("document"),
             collections: m.getRepository("collection"),
+            refs: m.getRepository("ref"),
             groups: m.getRepository("group"),
             members: m.getRepository("group_member")
         }
@@ -154,20 +157,14 @@ class Sinkron {
         return Result.ok(col as Collection)
     }
 
-    async syncCollectionTr(
+    async syncDocCollectionTr(
         m: EntityManager,
-        col: string,
+        colEntity: Collection,
         colrev?: number
-    ): Promise<ResultType<ChangedDocuments, RequestError>> {
+    ): Promise<ResultType<SyncCollectionResult, RequestError>> {
         const models = this.getModels(m)
 
-        const colEntity = await models.collections.findOne({
-            where: { id: col },
-            select: { colrev: true }
-        })
-        if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
-
-        const result = { col, colrev: colEntity.colrev }
+        const result = { col: colEntity.id, colrev: colEntity.colrev }
 
         const select = {
             id: true,
@@ -180,7 +177,7 @@ class Sinkron {
         if (colrev === undefined) {
             // Get all documents except deleted
             const documents = (await models.documents.find({
-                where: { colId: col, isDeleted: false },
+                where: { colId: colEntity.id, isDeleted: false },
                 select
             })) as Document[]
             return Result.ok({ ...result, documents })
@@ -199,7 +196,7 @@ class Sinkron {
 
         // Get documents since provided colrev including deleted
         const documentsRows = (await models.documents.find({
-            where: { colId: col, colrev: MoreThan(colrev) },
+            where: { colId: colEntity.id, colrev: MoreThan(colrev) },
             select: { ...select, isDeleted: true }
         })) as Document[]
         const documents = documentsRows.map((d) =>
@@ -214,6 +211,82 @@ class Sinkron {
                 : d
         )
         return Result.ok({ ...result, documents })
+    }
+
+    async syncRefCollectionTr(
+        m: EntityManager,
+        colEntity: Collection,
+        colrev?: number
+    ): Promise<ResultType<SyncCollectionResult, RequestError>> {
+        const models = this.getModels(m)
+
+        const result = { col: colEntity.id, colrev: colEntity.colrev }
+
+        const select = {
+            colrev: true,
+            doc: {
+                id: true,
+                data: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        }
+
+        if (colrev === undefined) {
+            // Get all refs except removed
+            const refs = await models.refs.find({
+                where: { colId: colEntity.id, isRemoved: false },
+                select,
+                relations: { doc: true }
+            })
+            const documents = refs.map((ref) => ({
+                ...ref.doc,
+                col: colEntity.id
+            }))
+            return Result.ok({ ...result, documents })
+        }
+
+        if (colrev < 0 || colrev > colEntity.colrev) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Invalid colrev"
+            })
+        }
+
+        if (colEntity.colrev === colrev) {
+            return Result.ok({ ...result, documents: [] })
+        }
+
+        // Get documents since provided colrev including removed
+        const refs = await models.refs.find({
+            where: { coldId: colEntity.id, colrev: MoreThan(colrev) },
+            select,
+            relations: { doc: true }
+        })
+        const documents = refs.map((ref) =>
+            ref.isRemoved
+                ? { id: ref.docId, data: null, col: colEntity.id }
+                : { ...ref.doc, col: colEntity.id }
+        )
+        return Result.ok({ ...result, documents })
+    }
+
+    async syncCollectionTr(
+        m: EntityManager,
+        col: string,
+        colrev?: number
+    ): Promise<ResultType<SyncCollectionResult, RequestError>> {
+        const models = this.getModels(m)
+
+        const colEntity = await models.collections.findOne({
+            where: { id: col },
+            select: { colrev: true, ref: true }
+        })
+        if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
+
+        return colEntity.ref
+            ? this.syncRefCollectionTr(m, colEntity as Collection, colrev)
+            : this.syncDocCollectionTr(m, colEntity as Collection, colrev)
     }
 
     async createDocumentTr(
@@ -234,12 +307,18 @@ class Sinkron {
 
         const colEntity = await models.collections.findOne({
             where: { id: col },
-            select: { colrev: true, permissions: true }
+            select: { colrev: true, permissions: true, ref: true }
         })
         if (colEntity === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
                 details: "Collection not found"
+            })
+        }
+        if (colEntity.ref === true) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Ref collections don't support creating documents"
             })
         }
 
@@ -274,12 +353,101 @@ class Sinkron {
         return Result.ok(result)
     }
 
+    async addDocumentToCollectionTr(
+        m: EntityManager,
+        col: string,
+        doc: string
+    ): Promise<ResultType<true, RequestError>> {
+        const models = this.getModels(m)
+
+        const colEntity = await models.collections.findOne({
+            where: { id: col },
+            select: { colrev: true, permissions: true, ref: true }
+        })
+        if (colEntity === null) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Collection not found"
+            })
+        }
+        if (colEntity.ref !== true) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Only ref collections support adding documents"
+            })
+        }
+
+        const nextColrev = colEntity.colrev + 1
+        await models.collections.update(col, { colrev: nextColrev })
+        await models.refs.insert({
+            docId: doc,
+            colId: col,
+            removed: false,
+            colrev: nextColrev
+        })
+        return Result.ok(true)
+    }
+
+    async removeDocumentFromCollectionTr(
+        m: EntityManager,
+        col: string,
+        doc: string
+    ) {
+        const models = this.getModels(m)
+
+        const ref = await models.collections.findOne({
+            where: { colId: col, docId: doc },
+            select: { id: true, col: { colrev: true } },
+            relations: { col: true }
+        })
+        if (ref === null) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Document ref not found"
+            })
+        }
+
+        const nextColrev = ref.col.colrev + 1
+        await models.collections.update(col, { colrev: nextColrev })
+        await models.refs.update(ref.id, {
+            colrev: nextColrev,
+            isRemoved: true
+        })
+        return Result.ok(true)
+    }
+
+    async incrementRefColrevsTr(
+        m: EntityManager,
+        id: string
+    ): Promise<ResultType<Colrevs, RequestError>> {
+        const models = this.getModels(m)
+
+        const colrevs = []
+        const refs = await models.refs.find({
+            where: { docId: id },
+            select: { id: true, col: { id: true, colrev: true } },
+            relations: { col: true }
+        })
+        for (let i in refs) {
+            const ref = refs[i]
+            const nextColrev = ref.col.colrev + 1
+            await models.refs.update(ref.id, { colrev: nextColrev })
+            await models.collections.update(ref.col.id, { colrev: nextColrev })
+            colrevs.push({ id: ref.col.id, colrev: nextColrev })
+        }
+
+        return Result.ok(colrevs)
+    }
+
     async incrementColrevTr(
         m: EntityManager,
         id: string
     ): Promise<ResultType<number, RequestError>> {
         const models = this.getModels(m)
-        const col = await models.collections.findOneBy({ id })
+        const col = await models.collections.findOneBy({
+            id,
+            select: { colrev: true }
+        })
         if (col === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
@@ -298,15 +466,25 @@ class Sinkron {
     ): Promise<ResultType<Document, RequestError>> {
         const models = this.getModels(m)
 
-        const incrementColrevResult = await this.incrementColrevTr(m, doc.colId)
-        if (!incrementColrevResult.isOk) return incrementColrevResult
-        const nextColrev = incrementColrevResult.value
+        const incrementColrevRes = await this.incrementColrevTr(m, doc.colId)
+        if (!incrementColrevRes.isOk) return incrementColrevRes
+        const nextColrev = incrementColrevRes.value
 
         await models.documents.update(doc.id, { ...update, colrev: nextColrev })
         const { updatedAt } = (await models.documents.findOne({
             where: { id: doc.id },
             select: { updatedAt: true }
         }))!
+
+        const incrementRefColrevsRes = await this.incrementRefColrevsTr(
+            m,
+            doc.id
+        )
+        if (!incrementRefColrevsRes.isOk) return incrementRefColrevsRes
+        const colrevs = [
+            { col: doc.colId, colrev: nextColrev },
+            ...incrementRefColrevsRes.value
+        ]
 
         return Result.ok({ ...doc, ...update, colrev: nextColrev, updatedAt })
     }
@@ -531,7 +709,7 @@ class Sinkron {
     syncCollection(
         col: string,
         colrev?: number
-    ): Promise<ResultType<ChangedDocuments, RequestError>> {
+    ): Promise<ResultType<SyncCollectionResult, RequestError>> {
         return this.db.transaction((m) => this.syncCollectionTr(m, col, colrev))
     }
 

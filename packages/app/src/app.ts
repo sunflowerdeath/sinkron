@@ -878,7 +878,9 @@ class App {
                         return
                     }
 
-                    reply.send(res.value)
+                    reply
+                       .header("Content-type", "image/jpeg")
+                       .send(res.value)
                 })
             }
         )

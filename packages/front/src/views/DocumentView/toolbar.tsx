@@ -8,7 +8,7 @@ import { Col, Row } from "oriente"
 
 import { LinkElement } from "../../types"
 
-import { useSpace } from "../../store"
+import { useSpace, SpaceStore } from "../../store"
 import { Button, Icon, Input } from "../../ui"
 
 import formatBoldSvg from "@material-design-icons/svg/outlined/format_bold.svg"
@@ -36,8 +36,6 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
     const { store } = props
     const editor = useSlate() as ReactEditor
     const isMobile = useMedia("(max-width: 1023px)")
-
-    const spaceStore = useSpace()
 
     const blockNodes = [
         { type: "heading", label: "Heading" },
@@ -70,12 +68,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             preventFocusSteal
             onClick={() => {
                 if (type === "image") {
-                    console.log("FILE")
-                    openFileDialog((files) => {
-                        console.log("UPLOAD", files)
-                        spaceStore.upload(files[0])
-                        // spaceStore.upload(files[0])
-                    })
+                    store.addImage()
                 } else if (type === "link") {
                     if (isNodeActive(editor, "link")) {
                         store.view = "edit_link"
@@ -295,14 +288,13 @@ type ToolbarView = "toolbar" | "create_link" | "edit_link"
 
 class ToolbarStore {
     editor: ReactEditor
-
     view: ToolbarView = "toolbar"
+    spaceStore: SpaceStore
 
-    selection?: Selection = undefined
-
-    constructor(editor: ReactEditor) {
+    constructor(editor: ReactEditor, spaceStore: SpaceStore) {
         this.editor = editor
-        makeAutoObservable(this, { editor: false })
+        this.spaceStore = spaceStore
+        makeAutoObservable(this, { editor: false, spaceStore: false })
     }
 
     getLinkNode(editor: ReactEditor): NodeEntry<LinkElement> | undefined {
@@ -360,18 +352,30 @@ class ToolbarStore {
         }
         this.view = "toolbar"
     }
+
+    addImage() {
+        openFileDialog((files) => {
+            const { selection } = this.editor
+            if (selection) {
+                const id = this.spaceStore.upload(files[0])
+                const image = { type: "image", id, children: [{ text: "" }] }
+                Transforms.insertNodes(this.editor, [image])
+            }
+        })
+    }
 }
 
 const Toolbar = observer(() => {
     const editor = useSlate() as ReactEditor
-    const store = useMemo(() => new ToolbarStore(editor), [])
+    const spaceStore = useSpace()
+    const toolbarStore = useMemo(() => new ToolbarStore(editor, spaceStore), [])
 
-    if (store.view === "toolbar") {
-        return <ToolbarButtonsView store={store} />
-    } else if (store.view === "create_link") {
-        return <ToolbarCreateLinkView store={store} />
-    } else if (store.view === "edit_link") {
-        return <ToolbarEditLinkView store={store} />
+    if (toolbarStore.view === "toolbar") {
+        return <ToolbarButtonsView store={toolbarStore} />
+    } else if (toolbarStore.view === "create_link") {
+        return <ToolbarCreateLinkView store={toolbarStore} />
+    } else if (toolbarStore.view === "edit_link") {
+        return <ToolbarEditLinkView store={toolbarStore} />
     }
     return null
 })

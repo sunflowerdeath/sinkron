@@ -6,7 +6,6 @@ export type Document = {
     updatedAt: Date
     rev: number
     data: Uint8Array | null
-    owner: string
     permissions: string
     isDeleted: boolean
     colId: string
@@ -14,13 +13,23 @@ export type Document = {
     colrev: number
 }
 
+export type Ref = {
+    id: string
+    colId: string
+    col: Collection
+    colrev: string
+    docId: string
+    doc: Document
+    isRemoved: boolean
+}
+
 export type Collection = {
     id: string
     createdAt: Date
     updatedAt: Date
     colrev: number
-    owner: string
     permissions: string
+    ref: boolean
 }
 
 export type Group = {
@@ -49,8 +58,22 @@ const DocumentEntity = new EntitySchema<Document>({
         colId: { type: String } // index ?
     },
     relations: {
-        // owner: { type: "many-to-one", target: "user" },
         col: { type: "many-to-one", target: "collection" }
+    }
+})
+
+const RefEntity = new EntitySchema<Ref>({
+    name: "ref",
+    columns: {
+        id: { type: String, primary: true },
+        isRemoved: { type: Boolean },
+        colrev: { type: Number },
+        colId: { type: String },
+        docId: { type: String }
+    },
+    relations: {
+        col: { type: "many-to-one", target: "collection" },
+        doc: { type: "many-to-one", target: "document" }
     }
 })
 
@@ -61,11 +84,9 @@ const CollectionEntity = new EntitySchema<Collection>({
         createdAt: { type: Date, createDate: true },
         updatedAt: { type: Date, updateDate: true },
         colrev: { type: Number },
-        permissions: { type: String }
+        permissions: { type: String },
+        ref: { type: Boolean, default: false }
     }
-    // relations: {
-    // entries: { type: "one-to-many", target: "entry" },
-    // },
 })
 
 const GroupEntity = new EntitySchema<Group>({

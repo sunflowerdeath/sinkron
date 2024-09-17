@@ -10,16 +10,19 @@ import {
     RenderLeafProps
 } from "slate-react"
 import { Popup, mergeRefs } from "oriente"
+import { observer } from "mobx-react"
 
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
+import { useSpace, SpaceStore } from "../../store"
 import { Button, Icon } from "../../ui"
 import {
     SinkronTextElement,
     TitleElement,
     HeadingElement,
     CheckListItemElement,
+    ImageElement,
     LinkElement
 } from "../../types"
 
@@ -189,6 +192,23 @@ const CheckListItem = (
     )
 }
 
+const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
+    const { attributes, element, children } = props
+    const { id } = element
+
+    const spaceStore = useSpace()
+    // const status = spaceStore.uploadQueue.get(id)
+    return (
+        <div contentEditable={false} {...attributes}>
+            {children}
+            <img
+                src={`${spaceStore.api.baseUrl}/spaces/${spaceStore.space.id}/files/${id}`}
+                style={{ maxWidth: 300, maxHeight: 300 }}
+            />
+        </div>
+    )
+})
+
 const EditorElement = (props: RenderElementProps) => {
     switch (props.element.type) {
         case "paragraph":
@@ -206,6 +226,10 @@ const EditorElement = (props: RenderElementProps) => {
         case "link":
             return (
                 <Link {...(props as CustomRenderElementProps<LinkElement>)} />
+            )
+        case "image":
+            return (
+                <Image {...(props as CustomRenderElementProps<ImageElement>)} />
             )
         case "code":
             return (
