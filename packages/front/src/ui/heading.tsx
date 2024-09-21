@@ -7,7 +7,7 @@ interface HeadingProps extends StyleProps<[HeadingProps]> {
 }
 
 const headingStyles: StyleMap = {
-    root: { fontSize: 24, fontWeight: 'bold', margin: 0 }
+    root: { fontSize: 24, fontWeight: 600, margin: 0 }
 }
 
 const Heading = forwardRef<HTMLHeadingElement, HeadingProps>((props, ref) => {

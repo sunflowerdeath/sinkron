@@ -56,6 +56,14 @@ export type Invite = {
     isHidden: boolean
 }
 
+export type File = {
+    id: string
+    spaceId: string
+    space: Space
+    size: number
+    createdAt: Date
+}
+
 const UserEntity = new EntitySchema<User>({
     name: "user",
     columns: {
@@ -134,12 +142,26 @@ const InviteEntity = new EntitySchema<Invite>({
     indices: [{ columns: ["fromId"] }, { columns: ["toId"] }]
 })
 
+const FileEntity = new EntitySchema<File>({
+    name: "file",
+    columns: {
+        id: { type: String, primary: true, generated: "uuid" },
+        spaceId: { type: String },
+        createdAt: { type: Date, createDate: true },
+        size: { type: Number }
+    },
+    relations: {
+        space: { type: "many-to-one", target: "space" },
+    }
+})
+
 const entities = [
     UserEntity,
     AuthTokenEntity,
     SpaceEntity,
     SpaceMemberEntity,
-    InviteEntity
+    InviteEntity,
+    FileEntity
 ]
 
 export { entities }

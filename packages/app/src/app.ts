@@ -11,7 +11,7 @@ import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 
 import dataSource from "./db/app"
 import { dbPath as sinkronDbPath } from "./db/sinkron"
-import { User, AuthToken, Space, SpaceMember, Invite } from "./entities"
+import { User, AuthToken, Space, SpaceMember, Invite, File } from "./entities"
 
 import { LocalObjectStorage } from "./files/local"
 import { UserService } from "./services/user"
@@ -35,6 +35,7 @@ export type AppModels = {
     spaces: Repository<Space>
     members: Repository<SpaceMember>
     invites: Repository<Invite>
+    files: Repository<File>
 }
 
 type AppProps = {
@@ -730,7 +731,8 @@ class App {
             tokens: this.db.getRepository<AuthToken>("token"),
             spaces: this.db.getRepository<Space>("space"),
             members: this.db.getRepository<SpaceMember>("space_member"),
-            invites: this.db.getRepository<Invite>("invite")
+            invites: this.db.getRepository<Invite>("invite"),
+            files: this.db.getRepository<File>("file")
         }
 
         this.sinkron = new Sinkron({ dbPath: sinkronDbPath })
@@ -748,7 +750,8 @@ class App {
                 tokens: m.getRepository<AuthToken>("token"),
                 spaces: m.getRepository<Space>("space"),
                 members: m.getRepository<SpaceMember>("space_member"),
-                invites: m.getRepository<Invite>("invite")
+                invites: m.getRepository<Invite>("invite"),
+                files: m.getRepository<File>("file")
             }
             return cb(models)
         })

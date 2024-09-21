@@ -23,7 +23,7 @@ import {
     DocMessage,
     ClientMessage
 } from "./protocol"
-import { MessageQueue, WsMessage } from "./messageQueue"
+// import { MessageQueue, WsMessage } from "./messageQueue"
 
 const enableProfiling = process.env.ENABLE_PROFILING === "1"
 
@@ -129,15 +129,19 @@ const initialProfilerSegment = () => ({
     sentMessages: 0
 })
 
+type Client = {
+    id: string
+    subscriptions: Set<string>
+}
+
 class SinkronServer {
     sinkron: Sinkron
     ws: WebSocketServer
 
-    clients = new Map<WebSocket, { subscriptions: Set<string>; id: string }>()
+    clients = new Map<WebSocket, Client>()
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
 
     logger: Logger<string>
-    messageQueue: MessageQueue
 
     profile?: ProfilerSegment
 
@@ -153,26 +157,6 @@ class SinkronServer {
         if (enableProfiling) {
             this.profile = initialProfilerSegment()
         }
-
-        this.messageQueue = new MessageQueue(async (msg: WsMessage) => {
-            try {
-                let now
-                if (this.profile) {
-                    now = performance.now()
-                }
-                await this.handleMessage(msg)
-                if (this.profile) {
-                    const duration = performance.now() - now!
-                    this.profile.handledMessages += 1
-                    this.profile.handlerDuration += duration
-                }
-            } catch (e) {
-                this.logger.error(
-                    "Unhandled exception while handling message, %o",
-                    e
-                )
-            }
-        })
 
         this.ws = new WebSocketServer({ noServer: true })
         this.ws.on("connection", this.onConnect.bind(this))
@@ -195,22 +179,46 @@ class SinkronServer {
         client: { id: string }
     ) {
         this.logger.debug("Client connected, id: " + client.id)
-        this.clients.set(ws, { subscriptions: new Set(), id: client.id })
+        this.clients.set(ws, {
+            subscriptions: new Set(),
+            id: client.id
+        })
         setTimeout(() => {
             const client = this.clients.get(ws)
             if (client === undefined) return
             if (client.subscriptions.size === 0) ws.close()
         }, clientDisconnectTimeout)
-        ws.on("message", (msg: Buffer) => this.messageQueue.push([ws, msg]))
+        ws.on("message", (msg: Buffer) => this.onMessage(ws, msg))
         ws.on("close", () => this.onDisconnect(ws))
     }
 
-    async handleMessage([ws, msg]: WsMessage) {
-        const str = msg.toString("utf-8")
+    async onMessage(ws: WebSocket, msg: Buffer) {
+        try {
+            let now
+            if (this.profile) {
+                now = performance.now()
+            }
+            await this.handleMessage(ws, msg)
+            if (this.profile) {
+                const duration = performance.now() - now!
+                this.profile.handledMessages += 1
+                this.profile.handlerDuration += duration
+            }
+        } catch (e) {
+            this.logger.error(
+                "Unhandled exception while handling message, %o, %s",
+                e,
+                typeof e === "object" && e !== null && "message" in e
+                    ? e.message
+                    : ""
+            )
+        }
+    }
 
+    async handleMessage(ws: WebSocket, msg: Buffer) {
         let parsed: ClientMessage
         try {
-            parsed = JSON.parse(str.toString())
+            parsed = JSON.parse(msg.toString("utf-8"))
         } catch (e) {
             this.logger.debug("Invalid JSON in message")
             return
@@ -239,10 +247,11 @@ class SinkronServer {
     async handleSyncMessage(ws: WebSocket, msg: SyncMessage) {
         const { col, colrev } = msg
 
-        // TODO error if second sync message
-
         const client = this.clients.get(ws)
         if (!client) return
+
+        // TODO error if second sync message
+
         const checkRes = await this.sinkron.checkCollectionPermission({
             id: col,
             user: client.id,
@@ -292,7 +301,7 @@ class SinkronServer {
         ws.send(JSON.stringify(syncCompleteMsg))
         if (this.profile) this.profile.sentMessages += 1
 
-        this.addSubscriber(msg.col, ws)
+        this.addSubscriber(col, ws)
         this.logger.debug("Client subscribed to collection %s", msg.col)
     }
 
@@ -335,8 +344,9 @@ class SinkronServer {
             if (msg.op === Op.Create) {
                 response.createdAt = serializeDate(createdAt)
             }
-            collection.subscribers.forEach((sub) => {
-                sub.send(JSON.stringify(response))
+            const reponseMsg = JSON.stringify(response)
+            collection.subscribers.forEach((ws) => {
+                ws.send(reponseMsg)
                 if (this.profile) this.profile.sentMessages += 1
             })
         }
@@ -400,15 +410,14 @@ class SinkronServer {
             user: client.id,
             action: Action.update
         })
-        if (!checkRes.isOk || !checkRes.value === true) {
+        if (!checkRes.isOk || !checkRes.value) {
             return Result.err({ code: ErrorCode.AccessDenied })
         }
 
-        const doc = await this.sinkron.updateDocument(
+        return await this.sinkron.updateDocument(
             id,
             data.map((c) => Buffer.from(c, "base64"))
         )
-        return doc
     }
 
     onDisconnect(ws: WebSocket) {

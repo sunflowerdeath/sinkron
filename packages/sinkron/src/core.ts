@@ -13,7 +13,7 @@ import pino from "pino"
 
 import { createDataSource } from "./db"
 import { entities } from "./entities"
-import type { Document, Collection, Group, GroupMember } from "./entities"
+import type { Document, Collection, Ref, Group, GroupMember } from "./entities"
 import { Result, ResultType } from "./result"
 import {
     Permissions,
@@ -39,6 +39,7 @@ import {
 type CreateCollectionProps = {
     id: string
     permissions: PermissionsTable
+    ref?: boolean
 }
 
 type CreateDocumentProps = {
@@ -86,6 +87,7 @@ class Sinkron {
         this.models = {
             documents: this.db.getRepository("document"),
             collections: this.db.getRepository("collection"),
+            refs: this.db.getRepository("ref"),
             groups: this.db.getRepository("group"),
             members: this.db.getRepository("group_member")
         }
@@ -96,6 +98,7 @@ class Sinkron {
     models: {
         documents: Repository<Document>
         collections: Repository<Collection>
+        refs: Repository<Ref>
         groups: Repository<Group>
         members: Repository<GroupMember>
     }
@@ -135,7 +138,7 @@ class Sinkron {
         m: EntityManager,
         props: CreateCollectionProps
     ): Promise<ResultType<Collection, RequestError>> {
-        const { id, permissions } = props
+        const { id, permissions, ref = false } = props
 
         const models = this.getModels(m)
         const count = await models.collections.countBy({ id })
@@ -149,7 +152,8 @@ class Sinkron {
         await models.collections.insert({
             id,
             colrev: 1,
-            permissions: JSON.stringify(permissions)
+            permissions: JSON.stringify(permissions),
+            ref
         })
         // TODO generated fields
         const col = { id, colrev: 1 }
@@ -257,7 +261,7 @@ class Sinkron {
             return Result.ok({ ...result, documents: [] })
         }
 
-        // Get documents since provided colrev including removed
+        // Get refs since provided colrev including removed
         const refs = await models.refs.find({
             where: { coldId: colEntity.id, colrev: MoreThan(colrev) },
             select,
@@ -280,7 +284,7 @@ class Sinkron {
 
         const colEntity = await models.collections.findOne({
             where: { id: col },
-            select: { colrev: true, ref: true }
+            select: { id: true, colrev: true, ref: true }
         })
         if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
 
@@ -377,14 +381,33 @@ class Sinkron {
             })
         }
 
+        const docCount = await models.documents.countBy({ id: doc })
+        if (docCount === 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Document not found"
+            })
+        }
+
+        const refCount = await models.refs.countBy({ docId: doc, colId: col })
+        if (refCount !== 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Document is already in collection"
+            })
+        }
+
         const nextColrev = colEntity.colrev + 1
-        await models.collections.update(col, { colrev: nextColrev })
+        const id = uuidv4()
         await models.refs.insert({
+            id,
             docId: doc,
             colId: col,
             removed: false,
-            colrev: nextColrev
+            colrev: nextColrev,
+            isRemoved: false
         })
+        await models.collections.update(col, { colrev: nextColrev })
         return Result.ok(true)
     }
 
@@ -392,10 +415,10 @@ class Sinkron {
         m: EntityManager,
         col: string,
         doc: string
-    ) {
+    ): Promise<ResultType<true, RequestError>> {
         const models = this.getModels(m)
 
-        const ref = await models.collections.findOne({
+        const ref = await models.refs.findOne({
             where: { colId: col, docId: doc },
             select: { id: true, col: { colrev: true } },
             relations: { col: true }
@@ -403,7 +426,7 @@ class Sinkron {
         if (ref === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: "Document ref not found"
+                details: "Ref not found"
             })
         }
 
@@ -418,7 +441,8 @@ class Sinkron {
 
     async incrementRefColrevsTr(
         m: EntityManager,
-        id: string
+        id: string,
+        isRemoved: boolean
     ): Promise<ResultType<Colrevs, RequestError>> {
         const models = this.getModels(m)
 
@@ -428,10 +452,10 @@ class Sinkron {
             select: { id: true, col: { id: true, colrev: true } },
             relations: { col: true }
         })
-        for (let i in refs) {
+        for (const i in refs) {
             const ref = refs[i]
             const nextColrev = ref.col.colrev + 1
-            await models.refs.update(ref.id, { colrev: nextColrev })
+            await models.refs.update(ref.id, { colrev: nextColrev, isRemoved })
             await models.collections.update(ref.col.id, { colrev: nextColrev })
             colrevs.push({ id: ref.col.id, colrev: nextColrev })
         }
@@ -444,8 +468,8 @@ class Sinkron {
         id: string
     ): Promise<ResultType<number, RequestError>> {
         const models = this.getModels(m)
-        const col = await models.collections.findOneBy({
-            id,
+        const col = await models.collections.findOne({
+            where: { id },
             select: { colrev: true }
         })
         if (col === null) {
@@ -478,7 +502,8 @@ class Sinkron {
 
         const incrementRefColrevsRes = await this.incrementRefColrevsTr(
             m,
-            doc.id
+            doc.id,
+            /* isRemoved */ update.data === null
         )
         if (!incrementRefColrevsRes.isOk) return incrementRefColrevsRes
         const colrevs = [
@@ -528,6 +553,7 @@ class Sinkron {
         const updateResult = await this.updateDocumentEntityTr(m, doc, {
             data: nextData
         })
+
         return updateResult
     }
 
@@ -744,6 +770,27 @@ class Sinkron {
 
     deleteDocument(id: string): Promise<ResultType<Document, RequestError>> {
         return this.updateDocument(id, null)
+    }
+
+    // Refs
+    // ----
+
+    async addDocumentToCollection(
+        col: string,
+        doc: string
+    ): Promise<ResultType<true, RequestError>> {
+        return this.db.transaction((m) =>
+            this.addDocumentToCollectionTr(m, col, doc)
+        )
+    }
+
+    async removeDocumentFromCollection(
+        col: string,
+        doc: string
+    ): Promise<ResultType<true, RequestError>> {
+        return this.db.transaction((m) =>
+            this.removeDocumentFromCollectionTr(m, col, doc)
+        )
     }
 
     // Permissions

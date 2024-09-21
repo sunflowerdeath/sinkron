@@ -176,4 +176,32 @@ describe("Sinkron", () => {
         assert(res6.isOk)
         assert.strictEqual(res6.value, true)
     })
+
+    it("refs", async () => {
+        const res = await sinkron.createCollection({
+            id: "ref_test",
+            permissions: emptyPermissionsTable,
+            ref: true
+        })
+        assert(res.isOk, "res")
+
+        const id = uuidv4()
+        const doc = makeDoc()
+        const res2 = await sinkron.createDocument(
+            id,
+            "test",
+            Automerge.save(doc)
+        )
+        assert(res2.isOk, "res2")
+
+        const res3 = await sinkron.addDocumentToCollection("ref_test", id)
+        assert(res3.isOk, "res3")
+
+        // already added
+        const res4 = await sinkron.addDocumentToCollection("ref_test", id)
+        assert(!res4.isOk, "res4")
+
+        const res5 = await sinkron.removeDocumentFromCollection("ref_test", id)
+        assert(res5.isOk, "res5")
+    })
 })

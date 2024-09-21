@@ -54,12 +54,15 @@ const DocumentEntity = new EntitySchema<Document>({
         updatedAt: { type: Date, updateDate: true },
         isDeleted: { type: Boolean },
         permissions: { type: String },
-        colrev: { type: Number }, // index ?
-        colId: { type: String } // index ?
+        colrev: { type: Number },
+        colId: { type: String }
     },
     relations: {
         col: { type: "many-to-one", target: "collection" }
-    }
+    },
+    indices: [
+        { columns: ["colId", "colrev"] }
+    ]
 })
 
 const RefEntity = new EntitySchema<Ref>({
@@ -74,7 +77,11 @@ const RefEntity = new EntitySchema<Ref>({
     relations: {
         col: { type: "many-to-one", target: "collection" },
         doc: { type: "many-to-one", target: "document" }
-    }
+    },
+    indices: [
+        { columns: ["docId"] },
+        { columns: ["colId", "colrev"] }
+    ]
 })
 
 const CollectionEntity = new EntitySchema<Collection>({
@@ -105,12 +112,16 @@ const GroupMemberEntity = new EntitySchema<GroupMember>({
     },
     relations: {
         group: { type: "many-to-one", target: "group" }
-    }
+    },
+    indices: [
+        { columns: ["user"] }
+    ]
 })
 
 const entities = [
     DocumentEntity,
     CollectionEntity,
+    RefEntity,
     GroupEntity,
     GroupMemberEntity
 ]
