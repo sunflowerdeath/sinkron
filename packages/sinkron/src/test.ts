@@ -201,7 +201,16 @@ describe("Sinkron", () => {
         const res4 = await sinkron.addDocumentToCollection("ref_test", id)
         assert(!res4.isOk, "res4")
 
-        const res5 = await sinkron.removeDocumentFromCollection("ref_test", id)
+        const res5 = await sinkron.syncCollection("ref_test")
         assert(res5.isOk, "res5")
+        assert.strictEqual(res5.value.documents?.[0]?.id, id)
+
+        const res6 = await sinkron.removeDocumentFromCollection("ref_test", id)
+        assert(res6.isOk, "res6")
+
+        const res7 = await sinkron.syncCollection("ref_test")
+        assert(res7.isOk, "res7")
+        assert.strictEqual(res7.value.documents?.length, 0)
+        assert(res7.value.colrev > res5.value.colrev)
     })
 })

@@ -3,9 +3,13 @@ import { EntitySchema } from "typeorm"
 export type User = {
     id: string
     createdAt: Date
-    isDisabled: boolean
     name: string
     password: string
+    email: string | null
+    emailIsConfirmed: boolean
+    emailConfirmationsSent: number
+    emailConfirmationSentAt: Date | null
+    isDisabled: boolean
     hasUnreadNotifications: boolean
 }
 
@@ -69,18 +73,26 @@ const UserEntity = new EntitySchema<User>({
     columns: {
         id: { type: String, primary: true, generated: "uuid" },
         createdAt: { type: Date, createDate: true },
-        isDisabled: { type: Boolean },
         name: { type: String, unique: true },
         password: { type: String },
+        email: { type: String, nullable: true },
+        emailIsConfirmed: { type: Boolean, default: false },
+        emailConfirmationsSent: { type: Number, default: 0 },
+        emailConfirmationSentAt: { type: Date, nullable: true },
+        isDisabled: { type: Boolean },
         hasUnreadNotifications: { type: Boolean }
-    }
+    },
+    relations: {
+        email: { type: "one-to-one", target: "email" }
+    },
+    indices: [{ columns: ["name"] }, { columns: ["email"] }]
 })
 
 const AuthTokenEntity = new EntitySchema<AuthToken>({
     name: "token",
     columns: {
         token: { type: String, primary: true, generated: "uuid" },
-        userId: { type: String }, // index?
+        userId: { type: String },
         createdAt: { type: Date, createDate: true },
         expiresAt: { type: Date, nullable: true },
         lastAccess: { type: Date, createDate: true },
@@ -151,7 +163,7 @@ const FileEntity = new EntitySchema<File>({
         size: { type: Number }
     },
     relations: {
-        space: { type: "many-to-one", target: "space" },
+        space: { type: "many-to-one", target: "space" }
     }
 })
 

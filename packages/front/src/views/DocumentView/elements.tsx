@@ -196,6 +196,7 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
     const { attributes, element, children } = props
     const { id } = element
 
+    const isSelected = useSelected()
     const spaceStore = useSpace()
     // const status = spaceStore.uploadQueue.get(id)
     return (
@@ -203,7 +204,11 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
             {children}
             <img
                 src={`${spaceStore.api.baseUrl}/spaces/${spaceStore.space.id}/files/${id}`}
-                style={{ maxWidth: 300, maxHeight: 300 }}
+                style={{
+                    maxWidth: 300,
+                    maxHeight: 300,
+                    outline: isSelected ? "4px solid var(--color-link)" : "none"
+                }}
             />
         </div>
     )
