@@ -10,22 +10,27 @@ export interface Space {
 
 export type SpaceRole = "readonly" | "editor" | "admin" | "owner"
 
-export type InviteStatus = "sent" | "cancelled" | "accepted" | "declined" | "rejected"
+export type InviteStatus =
+    | "sent"
+    | "cancelled"
+    | "accepted"
+    | "declined"
+    | "rejected"
 
 export type Invite = {
     id: string
     createAt: string
     updatedAt: string
     status: InviteStatus
-    to: { id: string; name: string }
-    from: { id: string; name: string }
+    to: { id: string; email: string }
+    from: { id: string; email: string }
     space: { id: string; name: string }
     role: SpaceRole
 }
 
 export type SpaceMember = {
     role: string
-    name: string
+    email: string
     id: string
 }
 
@@ -36,7 +41,7 @@ export type Credentials = {
 
 export type User = {
     id: string
-    name: string
+    email: string
     spaces: Space[]
     hasUnreadNotifications: boolean
 }

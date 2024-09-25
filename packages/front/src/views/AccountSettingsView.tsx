@@ -13,12 +13,11 @@ const AccountSettingsView = observer(() => {
     return (
         <Container title="Account settings" onClose={() => navigate("/")}>
             <Row gap={8} align="center">
-                <Avatar name={store.user!.name} />
-                <div>{store.user!.name}</div>
+                <Avatar name={store.user!.email} />
+                <div>{store.user!.email}</div>
             </Row>
             <ButtonsGrid>
                 <Button>Change image</Button>
-                <Button>Change password</Button>
                 <LinkButton to="/account/sessions">Active sessions</LinkButton>
             </ButtonsGrid>
         </Container>

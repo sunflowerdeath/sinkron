@@ -92,8 +92,8 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
-                    <Avatar name={store.user!.name} />
-                    <div>{store.user!.name}</div>
+                    <Avatar name={store.user!.email} />
+                    <div>{store.user!.email}</div>
                 </Row>
                 <ButtonsGrid>
                     <LinkButton to="/account/settings">

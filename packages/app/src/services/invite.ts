@@ -12,7 +12,7 @@ import { ErrorCode, RequestError } from "../error"
 export type CreateInviteProps = {
     spaceId: string
     fromId: string
-    toName: string
+    toEmail: string
     role: "readonly" | "editor" | "admin"
 }
 
@@ -28,8 +28,8 @@ const inviteFindOptions = {
         createdAt: true,
         updatedAt: true,
         role: true,
-        from: { id: true, name: true },
-        to: { id: true, name: true },
+        from: { id: true, email: true },
+        to: { id: true, email: true },
         space: { id: true, name: true },
         isHidden: true
     },
@@ -90,7 +90,7 @@ class InviteService {
         models: AppModels,
         props: CreateInviteProps
     ): Promise<ResultType<Invite, RequestError>> {
-        const { fromId, toName, spaceId, role } = props
+        const { fromId, toEmail, spaceId, role } = props
 
         const fromMember = await models.members.findOne({
             where: { spaceId, userId: fromId },
@@ -109,13 +109,13 @@ class InviteService {
         }
 
         const toUser = await models.users.findOne({
-            where: { name: toName },
+            where: { email: toEmail },
             select: { id: true }
         })
         if (toUser === null) {
             return Result.err({
                 code: ErrorCode.NotFound,
-                message: `User "${toName}" not found`
+                message: `User "${toEmail}" not found`
             })
         }
 
@@ -126,7 +126,7 @@ class InviteService {
         if (count !== 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                message: `User "${toName}" is already a member of the space`
+                message: `User "${toEmail}" is already a member of the space`
             })
         }
 

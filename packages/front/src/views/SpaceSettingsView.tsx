@@ -92,7 +92,7 @@ const SpaceSettingsView = observer(() => {
             </Row>
             <ButtonsGrid>
                 <Button>Change image</Button>
-                <Button onClick={() => renameDialog.open()}>Change name</Button>
+                <Button onClick={() => renameDialog.open()}>Rename space</Button>
                 <Button onClick={() => deleteDialog.open()}>
                     Delete space
                 </Button>

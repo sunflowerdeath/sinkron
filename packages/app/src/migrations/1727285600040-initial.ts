@@ -1,10 +1,13 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class Initial1710591074633 implements MigrationInterface {
-    name = 'Initial1710591074633'
+export class Initial1727285600040 implements MigrationInterface {
+    name = 'Initial1727285600040'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE TABLE "user" ("id" varchar PRIMARY KEY NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "isDisabled" boolean NOT NULL, "name" varchar NOT NULL, "password" varchar NOT NULL, CONSTRAINT "UQ_065d4d8f3b5adb4a08841eae3c8" UNIQUE ("name"))`);
+        await queryRunner.query(`CREATE TABLE "user" ("id" varchar PRIMARY KEY NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "email" varchar NOT NULL, "name" varchar NOT NULL, "registrationIsCompleted" boolean NOT NULL, "isDisabled" boolean NOT NULL, "hasUnreadNotifications" boolean NOT NULL)`);
+        await queryRunner.query(`CREATE INDEX "IDX_e12875dfb3b1d92d7d7c5377e2" ON "user" ("email") `);
+        await queryRunner.query(`CREATE TABLE "otp" ("id" varchar PRIMARY KEY NOT NULL, "code" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "email" varchar NOT NULL, "attempts" integer NOT NULL)`);
+        await queryRunner.query(`CREATE INDEX "IDX_463cf01e0ea83ad57391fd4e1d" ON "otp" ("email") `);
         await queryRunner.query(`CREATE TABLE "token" ("token" varchar PRIMARY KEY NOT NULL, "userId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "expiresAt" datetime, "lastAccess" datetime NOT NULL DEFAULT (datetime('now')), "client" varchar)`);
         await queryRunner.query(`CREATE INDEX "IDX_94f168faad896c0786646fa3d4" ON "token" ("userId") `);
         await queryRunner.query(`CREATE TABLE "space" ("id" varchar PRIMARY KEY NOT NULL, "name" varchar NOT NULL, "ownerId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')))`);
@@ -14,6 +17,7 @@ export class Initial1710591074633 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "invite" ("id" varchar PRIMARY KEY NOT NULL, "spaceId" varchar NOT NULL, "role" varchar NOT NULL, "fromId" varchar NOT NULL, "toId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "status" varchar NOT NULL, "isHidden" boolean NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_0d683af0f9844ed115756f559f" ON "invite" ("fromId") `);
         await queryRunner.query(`CREATE INDEX "IDX_9f0e8951f9decd5a33d34f3357" ON "invite" ("toId") `);
+        await queryRunner.query(`CREATE TABLE "file" ("id" varchar PRIMARY KEY NOT NULL, "spaceId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "size" integer NOT NULL)`);
         await queryRunner.query(`DROP INDEX "IDX_94f168faad896c0786646fa3d4"`);
         await queryRunner.query(`CREATE TABLE "temporary_token" ("token" varchar PRIMARY KEY NOT NULL, "userId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "expiresAt" datetime, "lastAccess" datetime NOT NULL DEFAULT (datetime('now')), "client" varchar, CONSTRAINT "FK_94f168faad896c0786646fa3d4a" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "temporary_token"("token", "userId", "createdAt", "expiresAt", "lastAccess", "client") SELECT "token", "userId", "createdAt", "expiresAt", "lastAccess", "client" FROM "token"`);
@@ -40,9 +44,17 @@ export class Initial1710591074633 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "temporary_invite" RENAME TO "invite"`);
         await queryRunner.query(`CREATE INDEX "IDX_0d683af0f9844ed115756f559f" ON "invite" ("fromId") `);
         await queryRunner.query(`CREATE INDEX "IDX_9f0e8951f9decd5a33d34f3357" ON "invite" ("toId") `);
+        await queryRunner.query(`CREATE TABLE "temporary_file" ("id" varchar PRIMARY KEY NOT NULL, "spaceId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "size" integer NOT NULL, CONSTRAINT "FK_ac699fb1056331a8cee125ce91f" FOREIGN KEY ("spaceId") REFERENCES "space" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_file"("id", "spaceId", "createdAt", "size") SELECT "id", "spaceId", "createdAt", "size" FROM "file"`);
+        await queryRunner.query(`DROP TABLE "file"`);
+        await queryRunner.query(`ALTER TABLE "temporary_file" RENAME TO "file"`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "file" RENAME TO "temporary_file"`);
+        await queryRunner.query(`CREATE TABLE "file" ("id" varchar PRIMARY KEY NOT NULL, "spaceId" varchar NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "size" integer NOT NULL)`);
+        await queryRunner.query(`INSERT INTO "file"("id", "spaceId", "createdAt", "size") SELECT "id", "spaceId", "createdAt", "size" FROM "temporary_file"`);
+        await queryRunner.query(`DROP TABLE "temporary_file"`);
         await queryRunner.query(`DROP INDEX "IDX_9f0e8951f9decd5a33d34f3357"`);
         await queryRunner.query(`DROP INDEX "IDX_0d683af0f9844ed115756f559f"`);
         await queryRunner.query(`ALTER TABLE "invite" RENAME TO "temporary_invite"`);
@@ -69,6 +81,7 @@ export class Initial1710591074633 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "token"("token", "userId", "createdAt", "expiresAt", "lastAccess", "client") SELECT "token", "userId", "createdAt", "expiresAt", "lastAccess", "client" FROM "temporary_token"`);
         await queryRunner.query(`DROP TABLE "temporary_token"`);
         await queryRunner.query(`CREATE INDEX "IDX_94f168faad896c0786646fa3d4" ON "token" ("userId") `);
+        await queryRunner.query(`DROP TABLE "file"`);
         await queryRunner.query(`DROP INDEX "IDX_9f0e8951f9decd5a33d34f3357"`);
         await queryRunner.query(`DROP INDEX "IDX_0d683af0f9844ed115756f559f"`);
         await queryRunner.query(`DROP TABLE "invite"`);
@@ -78,6 +91,9 @@ export class Initial1710591074633 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "space"`);
         await queryRunner.query(`DROP INDEX "IDX_94f168faad896c0786646fa3d4"`);
         await queryRunner.query(`DROP TABLE "token"`);
+        await queryRunner.query(`DROP INDEX "IDX_463cf01e0ea83ad57391fd4e1d"`);
+        await queryRunner.query(`DROP TABLE "otp"`);
+        await queryRunner.query(`DROP INDEX "IDX_e12875dfb3b1d92d7d7c5377e2"`);
         await queryRunner.query(`DROP TABLE "user"`);
     }
 

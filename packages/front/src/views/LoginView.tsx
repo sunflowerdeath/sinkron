@@ -5,31 +5,131 @@ import { Col } from "oriente"
 
 import logoSvg from "../logo.svg"
 import { AuthStore } from "../store"
-import { Button, LinkButton, Input, Icon, Heading } from "../ui"
+import { Button, Input, Icon } from "../ui"
+
+const validateEmail = (s: string) => s.match(/^.+@.+\..+$/g) !== null // a@a.a
+
+interface EmailStepProps {
+    store: AuthStore
+    onComplete: (id: string) => void
+}
+
+const EmailStep = observer((props: EmailStepProps) => {
+    const { store, onComplete } = props
+
+    const [email, setEmail] = useState("")
+    const isValid = validateEmail(email)
+    const [state, setState] = useState<IPromiseBasedObservable<any>>(
+        fromPromise.resolve()
+    )
+
+    const login = () => {
+        const state = store.login(email)
+        state.then(({ id }) => onComplete(id))
+        setState(fromPromise(state))
+    }
+
+    const onKeyPress = (event: KeyboardEvent) => {
+        if (event.key === "Enter") {
+            if (isValid) login()
+        }
+    }
+
+    return (
+        <>
+            {state.state === "rejected" && (
+                <div style={{ color: "var(--color-error)" }}>
+                    {state.value.message}
+                </div>
+            )}
+            <Col gap={4}>
+                Enter your email address
+                <Input
+                    value={email}
+                    onChange={setEmail}
+                    style={{ width: "100%" }}
+                    onKeyPress={onKeyPress}
+                />
+            </Col>
+            <Button
+                style={{ alignSelf: "stretch" }}
+                onClick={login}
+                isDisabled={!isValid || state.state === "pending"}
+            >
+                Continue
+            </Button>
+        </>
+    )
+})
+
+interface CodeStepProps {
+    store: AuthStore
+    id: string
+    onGoBack: () => void
+}
+
+const CodeStep = observer((props: CodeStepProps) => {
+    const { store, id, onGoBack } = props
+
+    const [code, setCode] = useState("")
+    const isValid = code.length === 6
+    const [state, setState] = useState<IPromiseBasedObservable<any>>(
+        fromPromise.resolve()
+    )
+
+    const sendCode = () => {
+        const state = store.code(id, code)
+        setState(fromPromise(state))
+    }
+
+    const onKeyPress = (event: KeyboardEvent) => {
+        if (event.key === "Enter") {
+            if (isValid) sendCode()
+        }
+    }
+
+    return (
+        <>
+            {state.state === "rejected" && (
+                <div style={{ color: "var(--color-error)" }}>
+                    {state.value.message}
+                </div>
+            )}
+            <Col gap={4}>
+                Enter code from your email
+                <Input
+                    value={code}
+                    onChange={setCode}
+                    style={{ width: "100%" }}
+                    onKeyPress={onKeyPress}
+                />
+            </Col>
+            <Button
+                style={{ alignSelf: "stretch" }}
+                onClick={sendCode}
+                isDisabled={!isValid || state.state === "pending"}
+            >
+                Continue
+            </Button>
+            <Button
+                style={{ alignSelf: "stretch" }}
+                onClick={onGoBack}
+                kind="transparent"
+            >
+                Go back
+            </Button>
+        </>
+    )
+})
 
 interface LoginViewProps {
     store: AuthStore
 }
 
 const LoginView = observer((props: LoginViewProps) => {
-    const [login, setLogin] = useState("")
-    const [password, setPassword] = useState("")
-
-    const isValid = login.length > 0 && password.length > 0
-
-    const [authState, setAuthState] = useState<IPromiseBasedObservable<any>>(
-        fromPromise.resolve()
-    )
-    const auth = () => {
-        const state = props.store.login({ name: login, password })
-        setAuthState(fromPromise(state))
-    }
-
-    const onKeyPress = (event) => {
-        if (event.key === "Enter") {
-            if (isValid) auth()
-        }
-    }
+    const { store } = props
+    const [step, setStep] = useState<"email" | "code">("email")
+    const [id, setId] = useState("")
 
     return (
         <Col
@@ -53,107 +153,23 @@ const LoginView = observer((props: LoginViewProps) => {
                 }}
                 fill="var(--color-secondary)"
             />
-            <Heading style={{ alignSelf: "center" }}>Log In</Heading>
-            {authState.state === "rejected" && (
-                <div style={{ color: "var(--color-error)" }}>
-                    {authState.value.message}
-                </div>
+            {step === "email" ? (
+                <EmailStep
+                    store={store}
+                    onComplete={(id) => {
+                        setId(id)
+                        setStep("code")
+                    }}
+                />
+            ) : (
+                <CodeStep
+                    id={id}
+                    store={store}
+                    onGoBack={() => setStep("email")}
+                />
             )}
-            <Col gap={4}>
-                Username
-                <Input
-                    value={login}
-                    onChange={setLogin}
-                    style={{ width: "100%" }}
-                />
-            </Col>
-            <Col gap={4}>
-                Password
-                <Input
-                    value={password}
-                    onChange={setPassword}
-                    style={{ width: "100%" }}
-                    onKeyPress={onKeyPress}
-                />
-            </Col>
-            <Button
-                style={{ alignSelf: "stretch" }}
-                onClick={auth}
-                isDisabled={!isValid || authState.state === "pending"}
-            >
-                Log in
-            </Button>
-            <LinkButton kind="transparent" to="/signup">
-                Create account
-            </LinkButton>
         </Col>
     )
 })
 
-const SignupView = observer((props: LoginViewProps) => {
-    const [login, setLogin] = useState("")
-    const [password, setPassword] = useState("")
-
-    const isValid = login.length > 0 && password.length > 0
-
-    const [signupState, setSignupState] = useState<
-        IPromiseBasedObservable<any>
-    >(fromPromise.resolve())
-    const signup = () => {
-        const state = props.store.signup({ name: login, password })
-        setSignupState(fromPromise(state))
-    }
-
-    return (
-        <Col
-            align="normal"
-            justify="center"
-            style={{
-                height: "100%",
-                width: 320,
-                margin: "auto",
-                paddingTop: 40
-            }}
-            gap={16}
-        >
-            <Heading style={{ alignSelf: "center" }}>Create Account</Heading>
-
-            {signupState.state === "rejected" && (
-                <div style={{ color: "var(--color-error)" }}>
-                    {signupState.value.message}
-                </div>
-            )}
-            <Col gap={4}>
-                Username
-                <Input
-                    value={login}
-                    onChange={setLogin}
-                    style={{ width: "100%" }}
-                />
-                <div style={{ color: "var(--color-secondary)" }}>
-                    Can contain latin letters and numbers
-                </div>
-            </Col>
-            <Col gap={4}>
-                Password
-                <Input
-                    value={password}
-                    onChange={setPassword}
-                    style={{ width: "100%" }}
-                />
-            </Col>
-            <Button
-                style={{ alignSelf: "stretch" }}
-                onClick={signup}
-                isDisabled={!isValid || signupState.state === "pending"}
-            >
-                Create account
-            </Button>
-            <LinkButton kind="transparent" to="/">
-                Log in to existing account
-            </LinkButton>
-        </Col>
-    )
-})
-
-export { LoginView, SignupView }
+export { LoginView }

@@ -11,8 +11,17 @@ import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 
 import dataSource from "./db/app"
 import { dbPath as sinkronDbPath } from "./db/sinkron"
-import { User, AuthToken, Space, SpaceMember, Invite, File } from "./entities"
+import {
+    User,
+    Otp,
+    AuthToken,
+    Space,
+    SpaceMember,
+    Invite,
+    File
+} from "./entities"
 
+import { EmailSender, FakeEmailSender } from "./email"
 import { LocalObjectStorage } from "./files/local"
 import { UserService } from "./services/user"
 import { AuthService } from "./services/auth"
@@ -29,8 +38,23 @@ declare module "fastify" {
     }
 }
 
+// type AppConfig = {
+// s3_url: string
+// s3_access_key: string
+// postgres_host: string
+// postgres_post: string
+// postgres_user: string
+// postgres_password: string
+// smtp_host: string
+// smtp_port: number
+// smtp_secure: boolean
+// smtp_user: string
+// smtp_password: string
+// }
+
 export type AppModels = {
     users: Repository<User>
+    otps: Repository<Otp>
     tokens: Repository<AuthToken>
     spaces: Repository<Space>
     members: Repository<SpaceMember>
@@ -65,42 +89,56 @@ const parseClient = (request: FastifyRequest) => {
     return `${browser} / ${os}`
 }
 
-type LoginRouteBody = {
-    name: string
-    password: string
-}
-
 const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
-    fastify.post<{ Body: LoginRouteBody }>("/login", async (request, reply) => {
-        const { name, password } = request.body
-        await app.transaction(async (models) => {
-            const authRes = await app.services.auth.authorizeWithPassword(
-                models,
-                {
-                    credentials: { name, password },
-                    client: parseClient(request)
+    fastify.post<{ Body: { email: string } }>(
+        "/login",
+        async (request, reply) => {
+            const { email } = request.body
+            await app.transaction(async (models) => {
+                const res = await app.services.auth.sendCode(models, email)
+                if (!res.isOk) {
+                    reply.code(500).send({ error: res.error })
+                    return
                 }
-            )
-            if (!authRes.isOk) {
-                reply.code(500).send({ error: authRes.error })
-                return
-            }
+                reply.send(res.value)
+            })
+        }
+    )
 
-            const token = authRes.value
-            const profileRes = await app.services.users.getProfile(
-                models,
-                token.userId
-            )
-            if (!profileRes.isOk) {
-                reply
-                    .code(500)
-                    .send({ error: { message: "Couldn't authorize" } })
-                return
-            }
+    fastify.post<{ Body: { id: string; code: string } }>(
+        "/code",
+        async (request, reply) => {
+            const { id, code } = request.body
+            await app.transaction(async (models) => {
+                const authRes = await app.services.auth.authorizeWithCode(
+                    models,
+                    {
+                        id,
+                        code,
+                        client: parseClient(request)
+                    }
+                )
+                if (!authRes.isOk) {
+                    reply.code(500).send({ error: authRes.error })
+                    return
+                }
+                const token = authRes.value
 
-            reply.send({ user: profileRes.value, token: token.token })
-        })
-    })
+                const profileRes = await app.services.users.getProfile(
+                    models,
+                    token.userId
+                )
+                if (!profileRes.isOk) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Couldn't authorize" } })
+                    return
+                }
+
+                reply.send({ user: profileRes.value, token: token.token })
+            })
+        }
+    )
 
     fastify.post("/logout", async (request, reply) => {
         const token = request.headers[authTokenHeader]
@@ -113,47 +151,6 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         }
         reply.send()
     })
-
-    fastify.post<{ Body: LoginRouteBody }>(
-        "/signup",
-        async (request, reply) => {
-            const { name, password } = request.body
-            // await timeout(1500)
-            await app.transaction(async (models) => {
-                const createRes = await app.services.users.create(models, {
-                    name,
-                    password
-                })
-                if (!createRes.isOk) {
-                    reply.code(500).send({ error: createRes.error })
-                    return
-                }
-                const userId = createRes.value.id
-
-                const issueTokenRes = await app.services.auth.issueAuthToken(
-                    models,
-                    { userId }
-                )
-                if (!issueTokenRes.isOk) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Unknown error" } })
-                    return
-                }
-                const token = issueTokenRes.value
-
-                const getProfileRes = await app.services.users.getProfile(
-                    models,
-                    userId
-                )
-                if (!getProfileRes.isOk) {
-                    reply.code(500)
-                    return
-                }
-                reply.send({ user: getProfileRes.value, token: token.token })
-            })
-        }
-    )
 }
 
 const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
@@ -381,14 +378,12 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     spaceId
                 })
                 if (!res.isOk) {
-                    reply
-                        .code(500)
-                        .send({
-                            error: {
-                                message: "Couldn't upload",
-                                details: res.error
-                            }
-                        })
+                    reply.code(500).send({
+                        error: {
+                            message: "Couldn't upload",
+                            details: res.error
+                        }
+                    })
                     return
                 }
 
@@ -396,7 +391,6 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             })
         }
     )
-
 }
 
 type InviteCreateBody = {
@@ -700,6 +694,7 @@ type Services = {
 class App {
     sinkron: Sinkron
     sinkronServer: SinkronServer
+    emailSender: EmailSender
     channels: ChannelServer
     fastify: FastifyInstance
     host: string
@@ -715,9 +710,12 @@ class App {
 
         this.db = dataSource
 
+        this.emailSender = new FakeEmailSender()
+
         const storage = new LocalObjectStorage(
             path.join(process.cwd(), "temp/files")
         )
+
         this.services = {
             users: new UserService(this),
             auth: new AuthService(this),
@@ -728,6 +726,7 @@ class App {
 
         this.models = {
             users: this.db.getRepository<User>("user"),
+            otps: this.db.getRepository<Otp>("otp"),
             tokens: this.db.getRepository<AuthToken>("token"),
             spaces: this.db.getRepository<Space>("space"),
             members: this.db.getRepository<SpaceMember>("space_member"),
@@ -747,6 +746,7 @@ class App {
         return this.db.transaction((m) => {
             const models = {
                 users: m.getRepository<User>("user"),
+                otps: m.getRepository<Otp>("otp"),
                 tokens: m.getRepository<AuthToken>("token"),
                 spaces: m.getRepository<Space>("space"),
                 members: m.getRepository<SpaceMember>("space_member"),
@@ -850,7 +850,6 @@ class App {
         })
         fastify.register(loginRoutes(this))
 
-
         fastify.get<{ Params: { spaceId: string; fileId: string } }>(
             "/spaces/:spaceId/files/:fileId",
             async (request, reply) => {
@@ -881,9 +880,7 @@ class App {
                         return
                     }
 
-                    reply
-                       .header("Content-type", "image/jpeg")
-                       .send(res.value)
+                    reply.header("Content-type", "image/jpeg").send(res.value)
                 })
             }
         )

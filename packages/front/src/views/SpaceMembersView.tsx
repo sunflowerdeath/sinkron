@@ -50,13 +50,13 @@ class SpaceMembersStore {
     }
 
     removeMember(member: SpaceMember) {
-        const { id, name } = member
+        const { id, email } = member
         const state = this.space.removeMember(member.id)
         state.then(
             () => {
                 const idx = this.members.findIndex((m) => m.id === id)
                 this.members.splice(idx, 1)
-                this.toast.success(<>Member @{name} is removed from space</>)
+                this.toast.success(<>Member {email} is removed from space</>)
             },
             (error) => {
                 this.toast.error(<>Can't remove member: {error.message}</>)
@@ -72,7 +72,7 @@ class SpaceMembersStore {
                 const idx = this.invites.findIndex((i) => i.id === invite.id)
                 this.invites.splice(idx, 1)
                 this.toast.success(
-                    <>Invite for user @{invite.to.name} has beed cancelled</>
+                    <>Invite for user {invite.to.email} has beed cancelled</>
                 )
             },
             (error) => {
@@ -133,9 +133,9 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
 
     return (
         <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
-            <Avatar name={member.name} />
+            <Avatar name={member.email} />
             <Col style={{ flexGrow: 1 }}>
-                <div>{member.name}</div>
+                <div>{member.email}</div>
                 <div style={{ opacity: ".6" }}>
                     {member.role}
                     {isCurrentUser && " (You)"}
@@ -183,9 +183,9 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
 
     return (
         <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
-            <Avatar name={invite.to.name} />
+            <Avatar name={invite.to.email} />
             <Col style={{ flexGrow: 1 }}>
-                <div>{invite.to.name}</div>
+                <div>{invite.to.email}</div>
                 <div style={{ opacity: ".6" }}>
                     Invited to join with role {invite.role}
                 </div>

@@ -61,7 +61,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
             content = (
                 <>
                     <div>
-                        You invited user @{invite.to.name} to join space "
+                        You invited user {invite.to.email} to join space "
                         {invite.space.name}" with a role {invite.role}.
                     </div>
                     <Button
@@ -77,7 +77,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
             content = (
                 <>
                     <div>
-                        User @{invite.to.name} {text} your invite to join space
+                        User {invite.to.email} {text} your invite to join space
                         "{invite.space.name}" with a role {invite.role}.
                     </div>
                     <Button onClick={() => runAction("hide")}>Hide</Button>
@@ -89,7 +89,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
         content = (
             <>
                 <div>
-                    User @{invite.from.name} invites you to join space "
+                    User {invite.from.email} invites you to join space "
                     {invite.space.name}" with a role {invite.role}.
                 </div>
                 <ButtonsGrid>

@@ -2,7 +2,7 @@ import { makeAutoObservable } from "mobx"
 import { IndexedDbCollectionStore } from "sinkron-client"
 
 import env from "../env"
-import { Credentials, User } from "../entities"
+import { User } from "../entities"
 import { Api } from "../api"
 
 import UserStore from "./UserStore"
@@ -38,30 +38,25 @@ class AuthStore {
         makeAutoObservable(this)
     }
 
-    async login(credentials: Credentials) {
-        const { user, token } = await this.api.fetch<AuthResponse>({
+    async login(email: string) {
+        return await this.api.fetch<{ id: string }>({
             method: "POST",
             url: "/login",
-            data: credentials
+            data: { email }
         })
-        localStorage.setItem("token", token)
-        localStorage.setItem("user", JSON.stringify(user))
-        this.token = token
-        this.store = new UserStore({ authStore: this, user })
-        console.log(`Logged in as "${user.name}"`)
     }
 
-    async signup(credentials: Credentials) {
+    async code(id: string, code: string) {
         const { user, token } = await this.api.fetch<AuthResponse>({
             method: "POST",
-            url: "/signup",
-            data: credentials
+            url: "/code",
+            data: { id, code }
         })
         localStorage.setItem("token", token)
         localStorage.setItem("user", JSON.stringify(user))
         this.token = token
         this.store = new UserStore({ authStore: this, user })
-        console.log(`Signed up as ${user.name}`)
+        console.log(`Logged in as "${user.email}"`)
     }
 
     logout() {

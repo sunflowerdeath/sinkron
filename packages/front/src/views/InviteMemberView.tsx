@@ -101,17 +101,19 @@ const InviteMemberView = observer(() => {
     const toast = useStateToast()
     const space = useSpace()
 
-    const [name, setName] = useState("")
+    const [email, setEmail] = useState("")
     const [role, setRole] = useState<string | undefined>()
 
     const [sendInviteState, setSendInviteState] = useActionState()
     const sendInvite = () => {
-        const state = space.sendInvite(name, role!)
+        const state = space.sendInvite(email, role!)
         setSendInviteState(state)
         state.then(
             () => {
                 navigate("/")
-                toast.success(<>You have sent an invite to the user "{name}"</>)
+                toast.success(
+                    <>You have sent an invite to the user "{email}"</>
+                )
             },
             (e) => {
                 toast.error(<>Couldn't send invite: {e.message}</>)
@@ -127,13 +129,13 @@ const InviteMemberView = observer(() => {
         options.push({ value: "admin", label: "Admin" })
     }
 
-    const isValid = name.length > 0 && role !== undefined
+    const isValid = email.length > 0 && role !== undefined
 
     return (
         <Container title="Invite member" onClose={() => navigate("/")}>
             <Col gap={8} style={{ alignSelf: "stretch" }} align="normal">
-                Username
-                <Input autoFocus value={name} onChange={setName} />
+                Email
+                <Input autoFocus value={email} onChange={setEmail} />
             </Col>
             <Col gap={8} style={{ alignSelf: "stretch" }}>
                 Role

@@ -5,10 +5,10 @@ const run = async () => {
     await app.init()
 
     let user
-    const createUserRes = await app.services.users.create(app.models, {
-        name: "test",
-        password: "password"
-    })
+    const createUserRes = await app.services.users.create(
+        app.models,
+        "test@sinkron.xyz"
+    )
     if (createUserRes.isOk) {
         user = createUserRes.value
         console.log("Created user", user)

@@ -7,7 +7,7 @@ import { OrienteProvider } from 'oriente'
 
 import { AuthStore, StoreContext } from './store'
 import SpaceView from './views/SpaceView'
-import { LoginView, SignupView } from './views/LoginView'
+import { LoginView } from './views/LoginView'
 
 const Root = observer(() => {
     const authStore = useMemo(() => {
@@ -31,10 +31,6 @@ const Root = observer(() => {
                         <Route
                             path="/"
                             children={() => <LoginView store={authStore} />}
-                        />
-                        <Route
-                            path="/signup"
-                            children={() => <SignupView store={authStore} />}
                         />
                         <Redirect to="/" />
                     </Switch>

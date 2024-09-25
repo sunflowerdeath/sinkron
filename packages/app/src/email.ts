@@ -1,8 +1,11 @@
 import { createTransport, Transporter } from "nodemailer"
 
+import { Result, ResultType } from "./utils/result"
+import { ErrorCode, RequestError } from "./error"
+
 export interface SendEmailProps {
     from: string
-    name: string
+    sender: string
     to: string
     subject: string
     text: string
@@ -10,7 +13,7 @@ export interface SendEmailProps {
 }
 
 export interface EmailSender {
-    send(props: SendEmailProps): Promise<void>
+    send(props: SendEmailProps): Promise<ResultType<true, RequestError>>
 }
 
 interface SmtpEmailSenderProps {
@@ -34,20 +37,35 @@ class SmtpEmailSender implements EmailSender {
         })
     }
 
-    async send(props: SendEmailProps) {
-        const { from, name, to, subject, text, html } = props
+    async send(props: SendEmailProps): Promise<ResultType<true, RequestError>> {
+        const { from, sender, to, subject, text, html } = props
 
-        const info = await this.transport.sendMail({
-            from: `"${name}" <${from}>`,
-            to,
-            subject,
-            text,
-            html
-        })
+        try {
+            const info = await this.transport.sendMail({
+                from: `"${sender}" <${from}>`,
+                to,
+                subject,
+                text,
+                html
+            })
 
-        console.log("Message sent: %s", info.messageId)
-        // Message sent: <d786aa62-4e0a-070a-47ed-0b0666549519@ethereal.email>
+            console.log("Message sent: %s", info.messageId)
+            return Result.ok(true)
+        } catch (e) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Email transport error"
+            })
+        }
     }
 }
 
-export { SmtpEmailSender }
+class FakeEmailSender implements EmailSender {
+    async send(props: SendEmailProps): Promise<ResultType<true, RequestError>> {
+        console.log("Email sent")
+        console.log(props)
+        return Result.ok(true)
+    }
+}
+
+export { SmtpEmailSender, FakeEmailSender }

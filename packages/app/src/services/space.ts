@@ -122,6 +122,7 @@ class SpaceService {
         spaceId: string,
         name: string
     ): Promise<ResultType<true, RequestError>> {
+        // TODO validate name
         await models.spaces.update(spaceId, { name })
         return Result.ok(true)
     }
@@ -130,7 +131,7 @@ class SpaceService {
         const res = await models.members.find({
             where: { spaceId },
             relations: { user: true },
-            select: { user: { id: true, name: true }, role: true }
+            select: { user: { id: true, email: true }, role: true }
         })
         const members = res.map((m) => ({ role: m.role, ...m.user }))
         return members
