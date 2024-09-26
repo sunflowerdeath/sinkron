@@ -10,15 +10,46 @@ const migrations = ctx.keys().map((key: string) => {
     return Object.values(module)[0]
 })
 
-const createDataSource = (dbPath: string) => {
-    return new DataSource({
-        type: "better-sqlite3",
-        database: dbPath,
-        synchronize: dbPath === ":memory:",
-        entities,
-        logging: ["error"],
-        migrations
-    })
+export type SqliteConfig = {
+    type: "sqlite"
+    database: string
+}
+
+export type PostgresConfig = {
+    type: "postgres"
+    host: string
+    port: number
+    username: string
+    password: string
+    database: string
+}
+
+export type DbConfig = SqliteConfig | PostgresConfig
+
+const createDataSource = (config: DbConfig) => {
+    if (config.type === "sqlite") {
+        return new DataSource({
+            type: "better-sqlite3",
+            database: config.database,
+            synchronize: config.database === ":memory:",
+            entities,
+            logging: ["error"],
+            migrations
+        })
+    } else {
+        const { host, port, username, password, database } = config
+        return new DataSource({
+            type: "postgres",
+            host,
+            port,
+            username,
+            password,
+            database,
+            entities,
+            logging: ["error"],
+            migrations
+        })
+    }
 }
 
 export { createDataSource }

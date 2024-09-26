@@ -5,10 +5,9 @@
     "description": "",
     "scripts": {
         "migrate": "typeorm migration:run -d ./build/app-db.js && typeorm migration:run -d ./build/sinkron-db.js",
-        "start": "node ./build/main.js",
+        "start": "SINKRON_CONFIG=$(cat config.dev.json) pnpm migrate && SINKRON_CONFIG=$(cat config.dev.json) node ./build/main.js",
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
-        "test": "rspack --config=rspack.config.test.js && SINKRON_SQLITE_MEMORY_DB=1 mocha ./build/test.js",
-        "dev": "rspack && node ./build/main.js"
+        "test": "rspack --config=rspack.config.test.js && SINKRON_CONFIG=$(cat config.test.json) mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

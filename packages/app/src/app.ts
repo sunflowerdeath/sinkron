@@ -10,7 +10,7 @@ import cors from "@fastify/cors"
 import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 
 import dataSource from "./db/app"
-import { dbPath as sinkronDbPath } from "./db/sinkron"
+import { config } from "./config"
 import {
     User,
     Otp,
@@ -774,7 +774,7 @@ class App {
             files: this.db.getRepository<File>("file")
         }
 
-        this.sinkron = new Sinkron({ dbPath: sinkronDbPath })
+        this.sinkron = new Sinkron({ db: config.db.sinkron })
         this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
 
         this.channels = new ChannelServer({})

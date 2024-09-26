@@ -1,15 +1,7 @@
-import path from "node:path"
 import { DataSource } from "typeorm"
 
 import { entities } from "../entities"
-
-const dbDir =
-    process.env.SINKRON_SQLITE_DB_DIR || path.join(__dirname, "../temp")
-
-const dbPath =
-    process.env.SINKRON_SQLITE_MEMORY_DB === "1"
-        ? ":memory:"
-        : path.join(dbDir, "paper.sqlite")
+import { config } from "../config"
 
 // @ts-expect-error require.context
 const ctx = require.context("../migrations", true, /\.ts$/)
@@ -18,14 +10,31 @@ const migrations = ctx.keys().map((key: string) => {
     return Object.values(module)[0]
 })
 
-const dataSource = new DataSource({
-    type: "better-sqlite3",
-    database: dbPath,
-    synchronize: dbPath === ":memory:",
-    entities,
-    // logging: true,
-    logging: ["error"],
-    migrations
-})
+let dataSource: DataSource
+
+const db = config.db.app
+if (db.type === "sqlite") {
+    dataSource = new DataSource({
+        type: "better-sqlite3",
+        database: db.database,
+        synchronize: db.database === ":memory:",
+        entities,
+        logging: ["error"],
+        migrations
+    })
+} else {
+    const { host, port, username, password, database } = db
+    dataSource = new DataSource({
+        type: "postgres",
+        host,
+        port,
+        username,
+        password,
+        database,
+        entities,
+        logging: ["error"],
+        migrations
+    })
+}
 
 export default dataSource

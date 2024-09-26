@@ -10,7 +10,6 @@ type Doc = {
     num: number
 }
 
-
 const makeDoc = () => {
     let doc = Automerge.init<Doc>()
     doc = Automerge.change(doc, (doc) => {
@@ -28,7 +27,7 @@ describe("Sinkron", () => {
     })
 
     beforeEach(async () => {
-        sinkron = new Sinkron({ dbPath: ":memory:" })
+        sinkron = new Sinkron({ db: { type: "sqlite", database: ":memory:" } })
         await sinkron.init()
         await sinkron.createCollection({
             id: "test",

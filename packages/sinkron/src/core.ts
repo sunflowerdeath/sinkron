@@ -35,6 +35,7 @@ import {
     DocMessage,
     ClientMessage
 } from "./protocol"
+import type { DbConfig } from "./db"
 
 type CreateCollectionProps = {
     id: string
@@ -77,13 +78,13 @@ type Colrevs = Array<{ id: string; colrev: string }>
 export type RequestError = { code: ErrorCode; details?: string }
 
 interface SinkronProps {
-    dbPath: string
+    db: DbConfig
 }
 
 class Sinkron {
     constructor(props: SinkronProps) {
-        const { dbPath } = props
-        this.db = createDataSource(dbPath)
+        const { db } = props
+        this.db = createDataSource(db)
         this.models = {
             documents: this.db.getRepository("document"),
             collections: this.db.getRepository("collection"),

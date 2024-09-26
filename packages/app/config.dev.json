@@ -1,0 +1,13 @@
+{
+    "env": "development",
+    "db": {
+        "app": {
+            "type": "sqlite",
+            "database": "./temp/app.sqlite"
+        },
+        "sinkron": {
+            "type": "sqlite",
+            "database": "./temp/sinkron.sqlite"
+        }
+    }
+}

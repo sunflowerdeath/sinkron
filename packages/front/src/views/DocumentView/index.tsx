@@ -29,7 +29,7 @@ import { Button, LinkButton, Icon, Menu, MenuItem } from "../../ui"
 
 import { createSinkronEditor } from "./editor"
 import { EditorElement, EditorLeaf } from "./elements"
-import { checkSelectionPoint, isNodeActive, isAtEndOfNode } from "./helpers"
+import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
 import { Toolbar } from "./toolbar"
 
 const useForceUpdate = () => {
@@ -178,16 +178,34 @@ const EditorView = observer((props: EditorViewProps) => {
         </Menu>
     )
 
-    const onKeyDown = useCallback((event: React.KeyboardEvent) => {
-        if (event.key === "Enter" && isNodeActive(editor, "image")) {
-            event.preventDefault()
-            Transforms.insertNodes(editor, {
-                type: "paragraph",
-                children: [{ text: "" }]
-            })
-            return
-        }
-    }, [editor])
+    const onKeyDown = useCallback(
+        (event: React.KeyboardEvent) => {
+            if (event.key == "b" && event.ctrlKey) {
+                toggleMark(editor, "bold")
+                return
+            }
+
+            if (event.key == "u" && event.ctrlKey) {
+                toggleMark(editor, "underline")
+                return
+            }
+
+            if (event.key == "i" && event.ctrlKey) {
+                toggleMark(editor, "italic")
+                return
+            }
+
+            if (event.key === "Enter" && isNodeActive(editor, "image")) {
+                event.preventDefault()
+                Transforms.insertNodes(editor, {
+                    type: "paragraph",
+                    children: [{ text: "" }]
+                })
+                return
+            }
+        },
+        [editor]
+    )
 
     const readOnly = space.space.role === "readonly"
     const editorElem = (

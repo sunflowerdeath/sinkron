@@ -4,7 +4,7 @@
     "description": "",
     "scripts": {
         "build-app": "pnpm --F=sinkron-app... build",
-        "start-app": "pnpm build-app && cd packages/app && pnpm migrate && pnpm start",
+        "start-app": "pnpm build-app && cd packages/app && pnpm start",
         "build-front": "pnpm --F=sinkron-front... build",
         "start-front": "cd packages/front && pnpm start",
         "test": "pnpm -r run test"

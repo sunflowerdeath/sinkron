@@ -1,0 +1,13 @@
+{
+    "env": "development",
+    "db": {
+        "app": {
+            "type": "sqlite",
+            "database": ":memory:"
+        },
+        "sinkron": {
+            "type": "sqlite",
+            "database": ":memory:"
+        }
+    }
+}
