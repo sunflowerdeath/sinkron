@@ -14,6 +14,7 @@ import {
 import { Row, Col } from "oriente"
 import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
+import { Transforms } from "slate"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
@@ -28,7 +29,7 @@ import { Button, LinkButton, Icon, Menu, MenuItem } from "../../ui"
 
 import { createSinkronEditor } from "./editor"
 import { EditorElement, EditorLeaf } from "./elements"
-import { checkSelectionPoint } from "./helpers"
+import { checkSelectionPoint, isNodeActive, isAtEndOfNode } from "./helpers"
 import { Toolbar } from "./toolbar"
 
 const useForceUpdate = () => {
@@ -177,6 +178,17 @@ const EditorView = observer((props: EditorViewProps) => {
         </Menu>
     )
 
+    const onKeyDown = useCallback((event: React.KeyboardEvent) => {
+        if (event.key === "Enter" && isNodeActive(editor, "image")) {
+            event.preventDefault()
+            Transforms.insertNodes(editor, {
+                type: "paragraph",
+                children: [{ text: "" }]
+            })
+            return
+        }
+    }, [editor])
+
     const readOnly = space.space.role === "readonly"
     const editorElem = (
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
@@ -184,6 +196,7 @@ const EditorView = observer((props: EditorViewProps) => {
                 renderElement={renderElement}
                 renderLeaf={renderLeaf}
                 readOnly={readOnly}
+                onKeyDown={onKeyDown}
                 style={{
                     padding: isMobile ? 10 : 40,
                     paddingTop: 20,

@@ -15,7 +15,7 @@ import { observer } from "mobx-react"
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
-import { useSpace, SpaceStore } from "../../store"
+import { useSpace } from "../../store"
 import { Button, Icon } from "../../ui"
 import {
     SinkronTextElement,

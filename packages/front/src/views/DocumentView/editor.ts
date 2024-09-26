@@ -1,6 +1,20 @@
-import { createEditor, Node, Transforms, Editor, Element, Text } from "slate"
+import {
+    createEditor,
+    Path,
+    Node,
+    Transforms,
+    MoveUnit,
+    Editor,
+    Element,
+    Text
+} from "slate"
 import { withReact, ReactEditor } from "slate-react"
-import { isAtEndOfNode, isNodeActive, toggleBlock } from "./helpers"
+import {
+    isAtEndOfNode,
+    isAfterNode,
+    isNodeActive,
+    toggleBlock
+} from "./helpers"
 
 const createSinkronEditor = (): ReactEditor => {
     const editor = withReact(createEditor())
@@ -45,6 +59,24 @@ const createSinkronEditor = (): ReactEditor => {
 
     editor.deleteBackward = (unit) => {
         if (unit === "character") {
+            if (isAfterNode(editor, "image")) {
+                const parentPath = Path.parent(editor.selection!.anchor.path)
+                const parentNode = Node.get(editor, parentPath)
+                const parentIsEmpty =
+                    Element.isElement(parentNode) &&
+                    Editor.isEmpty(editor, parentNode)
+                if (parentIsEmpty) {
+                    Transforms.removeNodes(editor)
+                    return
+                } else {
+                    Transforms.move(editor, {
+                        unit: "block" as MoveUnit,
+                        reverse: true
+                    })
+                    return
+                }
+            }
+
             if (isAtEndOfNode(editor, "list")) {
                 const listItem = isAtEndOfNode(editor, "list-item")
                 if (listItem && Editor.isEmpty(editor, listItem)) {

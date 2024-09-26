@@ -10,11 +10,14 @@ export type BlockType =
 
 export type TextMarkType = "bold" | "italic" | "underline" | "strikethrough"
 
-export const isNodeActive = (editor: Editor, type: string) => {
+export const isNodeActive = (editor: Editor, type: string, at?: Path) => {
     const { selection } = editor
     if (!selection) return false
     const nodes = Array.from(
-        Editor.nodes(editor, { match: (n) => Element.isElementType(n, type) })
+        Editor.nodes(editor, {
+            match: (n) => Element.isElementType(n, type),
+            at
+        })
     )
     return nodes.length > 0
 }
@@ -70,6 +73,14 @@ export const isAtEndOfNode = (
     if (!Element.isElement(node)) return
     const end = Editor.end(editor, path)
     return Point.equals(selection.anchor, end) ? node : undefined
+}
+
+export const isAfterNode = (editor: Editor, type: string): boolean => {
+    const { selection } = editor
+    if (!selection || !Range.isCollapsed(selection)) return false
+    if (selection.anchor.offset !== 0) return false
+    const before = Editor.before(editor, selection.anchor.path)
+    return before !== undefined && isNodeActive(editor, type, before.path)
 }
 
 // This fixes selection when elements may be deleted by remote user
