@@ -1,14 +1,10 @@
 import assert from "node:assert"
-import cookie from "@fastify/cookie"
 
 import { App } from "../app"
-import { User } from "../entities"
+import { Profile } from "../services/user"
 
-const createUser = async (app: App, name: string) => {
-    const res = await app.services.users.create(app.models, {
-        name,
-        password: "password"
-    })
+const createUser = async (app: App, email: string) => {
+    const res = await app.services.users.create(app.models, email)
     assert(res.isOk)
     const res2 = await app.services.users.getProfile(app.models, res.value.id)
     assert(res2.isOk)
@@ -18,20 +14,22 @@ const createUser = async (app: App, name: string) => {
 const getAuthHeaders = async (app: App, userId: string) => {
     const res = await app.services.auth.issueAuthToken(app.models, { userId })
     assert(res.isOk)
-    return { Cookie: cookie.serialize("token", res.value.token) }
+    return { 'x-sinkron-auth-token': res.value.token }
 }
 
 describe("Invites", () => {
     let app: App
-    let owner: User
-    let user: User
+    let owner: Profile
+    let user: Profile
+
+    const ownerEmail = "owner@sinkron.xyz" 
+    const userEmail = "user@sinkron.xyz"
 
     beforeEach(async () => {
         app = new App({})
         await app.init()
-
-        owner = await createUser(app, "owner")
-        user = await createUser(app, "user")
+        owner = await createUser(app, ownerEmail)
+        user = await createUser(app, userEmail)
     })
 
     afterEach(async () => {
@@ -47,7 +45,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: { toName: "ERROR", spaceId, role: "readonly" }
+            payload: { toEmail: "ERROR", spaceId, role: "readonly" }
         })
         assert(res1.statusCode !== 200, "user not found")
 
@@ -55,7 +53,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: { toName: "owner", spaceId, role: "readonly" }
+            payload: { toEmail: ownerEmail, spaceId, role: "readonly" }
         })
         assert(res2.statusCode !== 200, "already member")
 
@@ -63,7 +61,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: { toName: "user", spaceId, role: "editor" }
+            payload: { toEmail: userEmail, spaceId, role: "editor" }
         })
         assert.strictEqual(res3.statusCode, 200, "send invite")
         const invite = JSON.parse(res3.payload)
@@ -95,7 +93,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: { toName: "user", spaceId, role: "editor" }
+            payload: { toEmail: userEmail, spaceId, role: "editor" }
         })
         assert.strictEqual(res.statusCode, 200, "send invite")
         const invite = JSON.parse(res.payload)
@@ -119,7 +117,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: { toName: "user", spaceId, role: "editor" }
+            payload: { toEmail: userEmail, spaceId, role: "editor" }
         })
         assert.strictEqual(res.statusCode, 200, "send invite")
         const invite = JSON.parse(res.payload)
@@ -143,7 +141,7 @@ describe("Invites", () => {
             method: "POST",
             url: "/invites/new",
             headers: ownerHeaders,
-            payload: { toName: "user", spaceId, role: "editor" }
+            payload: { toEmail: userEmail, spaceId, role: "editor" }
         })
         assert.strictEqual(res.statusCode, 200, "send invite")
         const invite = JSON.parse(res.payload)

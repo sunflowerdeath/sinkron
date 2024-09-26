@@ -89,9 +89,41 @@ const parseClient = (request: FastifyRequest) => {
     return `${browser} / ${os}`
 }
 
+const loginSchema = {
+    type: "object",
+    properties: {
+        email: {
+            type: "string",
+            minLength: 5,
+            maxLength: 100
+        }
+    },
+    required: ["email"],
+    additionalProperties: false
+}
+
+const checkCodeSchema = {
+    type: "object",
+    properties: {
+        id: {
+            type: "string",
+            format: "uuid"
+        },
+        code: {
+            type: "string",
+            minLength: 6,
+            maxLength: 6,
+            pattern: "^\\d+$"
+        }
+    },
+    required: ["id", "code"],
+    additionalProperties: false
+}
+
 const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Body: { email: string } }>(
         "/login",
+        { schema: { body: loginSchema } },
         async (request, reply) => {
             const { email } = request.body
             await app.transaction(async (models) => {
@@ -107,6 +139,7 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.post<{ Body: { id: string; code: string } }>(
         "/code",
+        { schema: { body: checkCodeSchema } },
         async (request, reply) => {
             const { id, code } = request.body
             await app.transaction(async (models) => {
@@ -179,17 +212,23 @@ const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
             reply.send(sessions)
         })
     })
-
-    fastify.post("/account/reset_password", async (/*_request, _reply*/) => {
-        // TODO
-    })
 }
 
 type SpaceCreateBody = { name: string }
 
+const spaceCreateRenameSchema = {
+    type: "object",
+    properties: {
+        name: { type: "string", minLength: 1 }
+    },
+    required: ["name"],
+    additionalProperties: false
+}
+
 const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Body: SpaceCreateBody }>(
         "/spaces/new",
+        { schema: { body: spaceCreateRenameSchema } },
         async (request, reply) => {
             const { name } = request.body
             await app.transaction(async (models) => {
@@ -208,6 +247,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.post<{ Params: { id: string }; Body: { name: string } }>(
         "/spaces/:id/rename",
+        { schema: { body: spaceCreateRenameSchema } },
         async (request, reply) => {
             const { id } = request.params
             const { name } = request.body
@@ -395,7 +435,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
 type InviteCreateBody = {
     spaceId: string
-    toName: string
+    toEmail: string
     role: "readonly" | "editor" | "admin"
 }
 
@@ -403,10 +443,10 @@ const inviteCreateBodySchema = {
     type: "object",
     properties: {
         spaceId: { type: "string", minLength: 1 },
-        toName: { type: "string", minLength: 1 },
+        toEmail: { type: "string", minLength: 1 },
         role: { type: "string", minLength: 1 } // TODO one of
     },
-    required: ["spaceId", "toName", "role"],
+    required: ["spaceId", "toEmail", "role"],
     additionalProperties: false
 }
 
@@ -426,12 +466,12 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/invites/new",
         { schema: { body: inviteCreateBodySchema } },
         async (request, reply) => {
-            const { spaceId, toName, role } = request.body
+            const { spaceId, toEmail, role } = request.body
             await app.transaction(async (models) => {
                 const res = await app.services.invites.create(models, {
                     fromId: request.token.userId,
                     spaceId,
-                    toName,
+                    toEmail,
                     role
                 })
                 if (!res.isOk) {

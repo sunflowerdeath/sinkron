@@ -23,8 +23,8 @@ const dataSource = new DataSource({
     database: dbPath,
     synchronize: dbPath === ":memory:",
     entities,
-    logging: true,
-    // logging: ["error"],
+    // logging: true,
+    logging: ["error"],
     migrations
 })
 

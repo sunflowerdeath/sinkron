@@ -37,11 +37,13 @@ const EmailStep = observer((props: EmailStepProps) => {
 
     return (
         <>
-            {state.state === "rejected" && (
-                <div style={{ color: "var(--color-error)" }}>
-                    {state.value.message}
-                </div>
-            )}
+            <div style={{ height: "3rem" }}>
+                {state.state === "rejected" && (
+                    <div style={{ color: "var(--color-error)" }}>
+                        {state.value.message}
+                    </div>
+                )}
+            </div>
             <Col gap={4}>
                 Enter your email address
                 <Input
@@ -90,11 +92,13 @@ const CodeStep = observer((props: CodeStepProps) => {
 
     return (
         <>
-            {state.state === "rejected" && (
-                <div style={{ color: "var(--color-error)" }}>
-                    {state.value.message}
-                </div>
-            )}
+            <div style={{ height: "3rem" }}>
+                {state.state === "rejected" && (
+                    <div style={{ color: "var(--color-error)" }}>
+                        {state.value.message}
+                    </div>
+                )}
+            </div>
             <Col gap={4}>
                 Enter code from your email
                 <Input

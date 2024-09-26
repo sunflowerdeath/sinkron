@@ -34,6 +34,7 @@ const maxTokensPerUser = 10
 
 class AuthService {
     app: App
+    lastCode: string = "" // for testing
 
     constructor(app: App) {
         this.app = app
@@ -101,6 +102,7 @@ class AuthService {
 
         const code = randomInt(100000, 999999).toString()
         const html = `Enter this code on the sign-in page:<br/><b>${code}</b>`
+        this.lastCode = code
         const text = `Enter this code on the sign-in page:\n${code}`
         const res = await this.app.emailSender.send({
             from: "admin@mail.sinkron.xyz",
@@ -151,7 +153,6 @@ class AuthService {
         }
 
         if (otp.code !== code) {
-            console.log(otp.attempts)
             if (otp.attempts + 1 >= maxOtpAttempts) {
                 await models.otps.delete({ id })
                 return Result.err({

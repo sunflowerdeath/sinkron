@@ -14,10 +14,10 @@ describe("Spaces", () => {
         app = new App({})
         await app.init()
 
-        const res = await app.services.users.create(app.models, {
-            name: "test",
-            password: "password"
-        })
+        const res = await app.services.users.create(
+            app.models,
+            "test@sinkron.xyz"
+        )
         assert(res.isOk)
         user = res.value
 
@@ -34,7 +34,7 @@ describe("Spaces", () => {
             userId: user.id
         })
         assert(tokenRes.isOk)
-        headers = { Cookie: cookie.serialize("token", tokenRes.value.token) }
+        headers = { 'x-sinkron-auth-token': tokenRes.value.token }
     })
 
     afterEach(async () => {

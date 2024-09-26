@@ -1,5 +1,4 @@
 import assert from "node:assert"
-import cookie from "@fastify/cookie"
 
 import { App } from "../app"
 
@@ -15,135 +14,108 @@ describe("Users", () => {
         await app.destroy()
     })
 
-    it("signup", async () => {
-        const res = await app.fastify.inject({
-            url: "/signup",
-            method: "POST",
-            payload: {
-                name: "test",
-                password: "password"
-            }
-        })
-        assert.strictEqual(res.statusCode, 200, "signup is 200")
-        const tokenCookie = res.cookies.find((c) => c.name === "token")!
-        assert(tokenCookie !== undefined, "set token cookie")
-        const token = tokenCookie.value
-        const user = JSON.parse(res.payload)
-        const headers = { Cookie: cookie.serialize("token", token) }
-
-        const res2 = await app.fastify.inject({
-            method: "GET",
-            url: "/profile",
-            headers
-        })
-        assert.strictEqual(res2.statusCode, 200, "profile is 200")
-        const profile = JSON.parse(res2.payload)
-        assert.strictEqual(profile.id, user.id, "user id")
-
-        const res3 = await app.services.users.delete(app.models, user.id)
-        assert(res3.isOk, "user deleted")
-
-        const res4 = await app.fastify.inject({
-            method: "GET",
-            url: "/profile",
-            headers
-        })
-        assert.strictEqual(res4.statusCode, 401, "profile is 401")
-    })
-
     it("login", async () => {
-        const res = await app.services.users.create(app.models, {
-            name: "test",
-            password: "password"
+        const res = await app.fastify.inject({
+            url: "/login",
+            method: "POST",
+            payload: { email: "test@sinkron.xyz" }
         })
-        assert(res.isOk, "user created")
+        assert.strictEqual(res.statusCode, 200, "login is 200")
+        const { id } = JSON.parse(res.payload)
 
+        const code = app.services.auth.lastCode
         const res2 = await app.fastify.inject({
             method: "POST",
-            url: "/login",
-            payload: { name: "ERROR", password: "password" }
+            url: "/code",
+            payload: { id, code: code.split("").reverse().join("") }
         })
-        assert(res2.statusCode !== 200, "invalid username")
+        assert.strictEqual(res2.statusCode, 500, "incorrect code")
 
         const res3 = await app.fastify.inject({
             method: "POST",
-            url: "/login",
-            payload: { name: "test", password: "ERROR" }
+            url: "/code",
+            payload: { id, code }
         })
-        assert(res3.statusCode !== 200, "invalid password")
+        assert.strictEqual(res3.statusCode, 200, "correct code")
+        const { token, user } = JSON.parse(res3.payload)
+        assert(token !== undefined, "set auth token")
+        const headers = { 'x-sinkron-auth-token': token }
 
         const res4 = await app.fastify.inject({
-            method: "POST",
-            url: "/login",
-            payload: { name: "test", password: "password" }
-        })
-        assert.strictEqual(res4.statusCode, 200, "authorized")
-        const tokenCookie = res4.cookies.find((c) => c.name === "token")!
-        assert(tokenCookie !== undefined, "set token cookie")
-        const token = tokenCookie.value
-        const headers = { Cookie: cookie.serialize("token", token) }
-
-        const res5 = await app.fastify.inject({
             method: "GET",
             url: "/profile",
             headers
         })
-        assert.strictEqual(res5.statusCode, 200, "profile ok")
+        assert.strictEqual(res4.statusCode, 200, "profile is 200")
+        const profile = JSON.parse(res4.payload)
+        assert.strictEqual(profile.id, user.id, "user id")
+
+        const res5 = await app.services.users.delete(app.models, user.id)
+        assert(res5.isOk, "user deleted")
 
         const res6 = await app.fastify.inject({
-            method: "POST",
-            url: "/logout",
-            headers
-        })
-        assert.strictEqual(res6.statusCode, 200, "logout ok")
-
-        const res7 = await app.fastify.inject({
             method: "GET",
             url: "/profile",
             headers
         })
-        assert.strictEqual(res7.statusCode, 401, "profile not ok")
+        assert.strictEqual(res6.statusCode, 401, "profile is 401")
+    })
+
+    const login = async () => {
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/login",
+            payload: { email: "test@sinkron.xyz" }
+        })
+        const { id } = JSON.parse(res.payload)
+        const res2 = await app.fastify.inject({
+            method: "POST",
+            url: "/code",
+            payload: { id, code: app.services.auth.lastCode }
+        })
+        const { token } = JSON.parse(res2.payload)
+        const headers = { 'x-sinkron-auth-token': token }
+        return { headers }
+    }
+
+    it("logout", async () => {
+        const session = await login()
+
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/logout",
+            headers: session.headers
+        })
+        assert.strictEqual(res.statusCode, 200, "logout ok")
+
+        const res2 = await app.fastify.inject({
+            method: "GET",
+            url: "/profile",
+            headers: session.headers
+        })
+        assert.strictEqual(res2.statusCode, 401, "profile not ok")
     })
 
     it("sessions", async () => {
-        const res = await app.services.users.create(app.models, {
-            name: "test",
-            password: "password"
-        })
-        assert(res.isOk, "user created")
+        await login()
+        const session2 = await login()
 
-        await app.fastify.inject({
-            method: "POST",
-            url: "/login",
-            payload: { name: "test", password: "password" }
+        const res = await app.fastify.inject({
+            method: "GET",
+            url: "/account/sessions",
+            headers: session2.headers
         })
+        assert.strictEqual(res.statusCode, 200, "get sessions")
+        const sessions = JSON.parse(res.payload)
+        assert(Array.isArray(sessions) && sessions.length === 2, "2 sessions")
 
         const res2 = await app.fastify.inject({
             method: "POST",
-            url: "/login",
-            payload: { name: "test", password: "password" }
-        })
-        const tokenCookie = res2.cookies.find((c) => c.name === "token")!
-        assert(tokenCookie !== undefined, "set token cookie")
-        const token = tokenCookie.value
-        const headers = { Cookie: cookie.serialize("token", token) }
-
-        const res3 = await app.fastify.inject({
-            method: "GET",
-            url: "/account/sessions",
-            headers
-        })
-        assert.strictEqual(res3.statusCode, 200, "get sessions")
-        const sessions = JSON.parse(res3.payload)
-        assert(Array.isArray(sessions) && sessions.length === 2, "2 sessions")
-
-        const res4 = await app.fastify.inject({
-            method: "POST",
             url: "/account/sessions/terminate",
-            headers
+            headers: session2.headers
         })
-        assert.strictEqual(res3.statusCode, 200, "terminate")
-        const terminated = JSON.parse(res4.payload)
+        assert.strictEqual(res2.statusCode, 200, "terminate")
+        const terminated = JSON.parse(res2.payload)
         assert(
             Array.isArray(terminated) && terminated.length === 1,
             "1 session"
