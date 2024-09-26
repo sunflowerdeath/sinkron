@@ -5,7 +5,7 @@
     "description": "",
     "scripts": {
         "migrate": "typeorm migration:run -d ./build/app-db.js && typeorm migration:run -d ./build/sinkron-db.js",
-        "start": "SINKRON_CONFIG=$(cat config.dev.json) pnpm migrate && SINKRON_CONFIG=$(cat config.dev.json) node ./build/main.js",
+        "start": "pnpm migrate && node ./build/main.js",
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
         "test": "rspack --config=rspack.config.test.js && SINKRON_CONFIG=$(cat config.test.json) mocha ./build/test.js"
     },
