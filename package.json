@@ -4,8 +4,9 @@
     "description": "",
     "scripts": {
         "build-app": "pnpm --F=sinkron-app... build",
+        "start-app": "cd packages/app && pnpm start",
+        "dev-app": "pnpm build-app && cd packages/app && SINKRON_CONFIG=$(cat config.dev.json) pnpm start",
         "build-front": "pnpm --F=sinkron-front... build",
-        "start-app": "pnpm build-app && cd packages/app && SINKRON_CONFIG=$(cat config.dev.json) pnpm start",
         "start-front": "cd packages/front && pnpm start",
         "test": "pnpm -r run test"
     },
