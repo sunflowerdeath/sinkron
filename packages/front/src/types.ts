@@ -63,6 +63,7 @@ export type CodeElement = {
 export type ImageElement = {
     type: "image"
     id: string
+    isPlaceholder: boolean
 }
 
 export type SinkronElement =

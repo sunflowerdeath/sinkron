@@ -375,11 +375,11 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         }
     )
 
-    fastify.post<{ Body: Buffer; Params: { spaceId: string } }>(
-        "/spaces/:spaceId/upload",
+    fastify.post<{ Body: Buffer; Params: { spaceId: string; fileId: string } }>(
+        "/spaces/:spaceId/upload_image/:fileId",
         async (request, reply) => {
             await app.transaction(async (models) => {
-                const { spaceId } = request.params
+                const { spaceId, fileId } = request.params
 
                 const member = await models.members.findOne({
                     where: { spaceId, userId: request.token.userId },
@@ -398,9 +398,10 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                const res = await app.services.file.upload(models, {
-                    content: request.body,
-                    spaceId
+                const res = await app.services.file.uploadImage(models, {
+                    data: request.body,
+                    spaceId,
+                    fileId
                 })
                 if (!res.isOk) {
                     reply.code(500).send({
@@ -412,7 +413,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                reply.send({ id: res.value })
+                reply.send({})
             })
         }
     )
@@ -678,21 +679,6 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
         reply.code(401).send({ error: { message: "Unauthorized" } })
     })
 
-    fastify.get<{ Params: { spaceId: string; fileId: string } }>(
-        "/files/:fileId",
-        async (request, reply) => {
-            const { fileId } = request.params
-
-            const res = await app.services.file.storage.get(fileId)
-            if (!res.isOk) {
-                reply.code(404).send({ error: { message: "File not found" } })
-                return
-            }
-
-            reply.header("Content-type", "image/jpeg").send(res.value)
-        }
-    )
-
     fastify.get("/profile", async (request, reply) => {
         const userId = request.token.userId
         await app.transaction(async (models) => {
@@ -882,6 +868,22 @@ class App {
         fastify.get("/", (request, reply) => {
             reply.send("Sinkron API")
         })
+
+        fastify.get<{ Params: { spaceId: string; fileId: string } }>(
+            "/files/:fileId",
+            async (request, reply) => {
+                const { fileId } = request.params
+                const res = await this.services.file.storage.get(fileId)
+                if (!res.isOk) {
+                    reply
+                        .code(404)
+                        .send({ error: { message: "File not found" } })
+                    return
+                }
+                reply.header("Content-type", "image/jpeg").send(res.value)
+            }
+        )
+
         fastify.register(loginRoutes(this))
 
         fastify.register(appRoutes(this))

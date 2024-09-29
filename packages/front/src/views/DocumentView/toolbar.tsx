@@ -6,7 +6,7 @@ import { ReactEditor, useSlate } from "slate-react"
 import { makeAutoObservable } from "mobx"
 import { Col, Row } from "oriente"
 
-import { LinkElement } from "../../types"
+import { LinkElement, ImageElement } from "../../types"
 
 import { useSpace, SpaceStore } from "../../store"
 import { Button, Icon, Input } from "../../ui"
@@ -357,11 +357,30 @@ class ToolbarStore {
         openFileDialog((files) => {
             const { selection } = this.editor
             if (selection) {
-                const id = this.spaceStore.upload(files[0])
-                const image = { type: "image", id, children: [{ text: "" }] }
-                Transforms.insertNodes(this.editor, [image])
+                const { id, state } = this.spaceStore.upload(files[0])
+                state.then(() => this.onImageUpload(id))
+                const image = {
+                    type: "image",
+                    id,
+                    isPlaceholder: true,
+                    children: [{ text: "" }]
+                }
+                Transforms.insertNodes(this.editor, [image as ImageElement])
             }
         })
+    }
+
+    onImageUpload(id: string) {
+        const nodes = Array.from(
+            Editor.nodes(this.editor, {
+                match: (n) =>
+                    Element.isElementType(n, "image") &&
+                    (n as ImageElement).id === id
+            })
+        )
+        for (const [_, at] of nodes) {
+            Transforms.setNodes(this.editor, { isPlaceholder: false }, { at })
+        }
     }
 }
 

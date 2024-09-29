@@ -41,7 +41,7 @@ export type DocumentListItemData = {
 type UploadState = {
     id: string
     content: Blob
-    state: Promise<object>
+    state: IPromiseBasedObservable<object>
 }
 
 // Implementation of Node.nodes that works with Automerge doc
@@ -413,7 +413,7 @@ class SpaceStore {
 
     uploadQueue: Map<string, UploadState> = new Map()
 
-    upload(content: Blob): string {
+    upload(content: Blob): UploadState {
         const id = uuidv4()
         const state = this.api.fetch({
             method: "POST",
@@ -428,8 +428,9 @@ class SpaceStore {
                 // toast
             }
         )
-        this.uploadQueue.set(id, { id, content, state })
-        return id
+        const uploadState = { id, content, state: fromPromise(state) }
+        this.uploadQueue.set(id, uploadState)
+        return uploadState
     }
 }
 

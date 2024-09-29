@@ -1,4 +1,5 @@
-import { v4 as uuidv4 } from "uuid"
+// import { v4 as uuidv4 } from "uuid"
+import sharp from "sharp"
 // import { difference, sum } from "lodash"
 // import { In } from "typeorm"
 
@@ -13,14 +14,16 @@ export interface ObjectStorage {
     // batchDelete(ids: string[]): Promise<ResultType<true, RequestError>>
 }
 
-
 type UploadFileProps = {
     spaceId: string
+    fileId: string
     data: Buffer
 }
 
 const spaceStorageLimit = 100 * 1024 * 1024 // 100Mb
 const maxUploadFileSize = 5 * 1024 * 1024 // 5Mb
+
+const maxImageDimensions = 2048
 
 type FileServiceProps = {
     app: App
@@ -39,8 +42,8 @@ class FileService {
     async uploadFile(
         models: AppModels,
         props: UploadFileProps
-    ): Promise<ResultType<string, RequestError>> {
-        const { data, spaceId } = props
+    ): Promise<ResultType<true, RequestError>> {
+        const { data, spaceId, fileId } = props
 
         const space = await models.spaces.findOne({
             where: { id: spaceId },
@@ -66,21 +69,18 @@ class FileService {
         if (fileSize > availableStorage) {
             return Result.err({
                 code: ErrorCode.UnprocessableRequest,
-                message: "Not enough storage space"
+                message: "Not enough storage space in the space"
             })
         }
 
-        const id = uuidv4()
-        const res = await this.storage.put(id, data)
+        const res = await this.storage.put(fileId, data)
         if (!res.isOk) return res
 
-        await models.files.create({ id, spaceId, size: fileSize })
-
+        await models.files.create({ id: fileId, spaceId, size: fileSize })
         await models.spaces.update(spaceId, {
-            usedStorage: () => `used_storage + ${fileSize}`
+            usedStorage: () => `usedStorage + ${fileSize}`
         })
-
-        return Result.ok(id)
+        return Result.ok(true)
     }
 
     async deleteFile(
@@ -108,6 +108,45 @@ class FileService {
         })
 
         return Result.ok(true)
+    }
+
+    async processImage(
+        data: Buffer
+    ): Promise<ResultType<Buffer, RequestError>> {
+        try {
+            let image = sharp(data)
+            const { width, height } = await image.metadata()
+            if (width === undefined || height === undefined) {
+                return Result.err({
+                    code: ErrorCode.InvalidRequest,
+                    message: "Couldn't process image file"
+                })
+            }
+            if (width > maxImageDimensions || height > maxImageDimensions) {
+                const largerDimension = width > height ? "width" : "height"
+                image = image.resize({ [largerDimension]: maxImageDimensions })
+            }
+            const res = await image.jpeg({ quality: 87 }).toBuffer()
+            return Result.ok(res)
+        } catch (e) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Couldn't process image file"
+            })
+        }
+    }
+
+    async uploadImage(
+        models: AppModels,
+        props: UploadFileProps
+    ): Promise<ResultType<true, RequestError>> {
+        const res = await this.processImage(props.data)
+        if (!res.isOk) return res
+        const uploadRes = await this.uploadFile(models, {
+            ...props,
+            data: res.value
+        })
+        return uploadRes
     }
 
     /*

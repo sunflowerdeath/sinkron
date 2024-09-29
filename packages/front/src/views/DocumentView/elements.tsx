@@ -194,22 +194,65 @@ const CheckListItem = (
 
 const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
     const { attributes, element, children } = props
-    const { id } = element
+    const { id, isPlaceholder } = element
 
     const isSelected = useSelected()
     const spaceStore = useSpace()
-    // const status = spaceStore.uploadQueue.get(id)
-    return (
-        <div contentEditable={false} {...attributes}>
-            {children}
+
+    let image
+    if (isPlaceholder) {
+        const status = spaceStore.uploadQueue.get(id)
+
+        let statusText = ""
+        if (status === undefined) {
+            statusText = "Uploading image..."
+        } else if (status.state.state === "pending") {
+            statusText = "Uploading image..."
+        } else if (status.state.state === "rejected") {
+            statusText = "Error uploading image"
+        }
+
+        image = (
+            <div
+                style={{
+                    width: 240,
+                    height: 160,
+                    boxSizing: "border-box",
+                    border: "4px solid var(--color-elem)",
+                    outline: isSelected
+                        ? "4px solid var(--color-link)"
+                        : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+            >
+                {statusText}
+            </div>
+        )
+    } else {
+        image = (
             <img
                 src={`${spaceStore.api.baseUrl}/files/${id}`}
                 style={{
-                    maxWidth: 300,
-                    maxHeight: 300,
+                    minHeight: 100,
+                    minWidth: 100,
+                    maxWidth: "100%",
+                    maxHeight: "min(50vh, 500px)",
                     outline: isSelected ? "4px solid var(--color-link)" : "none"
                 }}
             />
+        )
+    }
+
+    return (
+        <div
+            contentEditable={false}
+            {...attributes}
+            style={{ margin: "1rem 0" }}
+        >
+            {children}
+            {image}
         </div>
     )
 })
