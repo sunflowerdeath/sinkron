@@ -6,7 +6,7 @@ import WebSocket from "ws"
 import { Collection, WebSocketTransport } from "sinkron-client"
 import pino, { Logger } from "pino"
 
-const numCols = 200
+const numCols = 100
 const numUsers = numCols * 2
 const port = 8081
 
@@ -43,7 +43,9 @@ const client = (userid: string, colid: string) => {
         } else if (n === 3) {
             // 5% to delete document
             const id = sample(Array.from(col.items.keys()))!
-            col.delete(id)
+            if (col.items.get(id)!.local !== null) {
+                col.delete(id)
+            }
         } else {
             // change document
             const id = sample(Array.from(col.items.keys()))!

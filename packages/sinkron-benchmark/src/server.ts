@@ -3,12 +3,26 @@ import { createServer } from "node:http"
 import { Sinkron, SinkronServer, Permissions, Role, Action } from "sinkron"
 import pino, { Logger } from "pino"
 
-const numCols = 200
+const numCols = 100
 const numUsers = numCols * 2
 const port = 8081
 
 const startServer = async () => {
-    const sinkron = new Sinkron({ dbPath: ":memory:" })
+    const sinkron = new Sinkron({
+        db: {
+            type: "postgres",
+            host: "0.0.0.0",
+            port: 5432,
+            username: "postgres",
+            password: "password",
+            database: "sinkron_benchmark",
+            dropSchema: true,
+            synchronize: true
+        }
+    })
+    // const sinkron = new Sinkron({
+        // db: { type: "sqlite", database: ":memory:", synchronize: true }
+    // })
     await sinkron.init()
 
     await sinkron.createGroup("benchmark")
@@ -33,8 +47,8 @@ const startServer = async () => {
     const logger: Logger<string> = pino({
         transport: { target: "pino-pretty" }
     })
-    logger.level = "warn"
-    const sinkronServer = new SinkronServer({ sinkron, logger })
+    logger.level = "debug"
+    const sinkronServer = new SinkronServer({ sinkron, logger, sync: false })
     const http = createServer()
     http.on("upgrade", (request, socket, head) => {
         const userId = request.url!.slice(1)

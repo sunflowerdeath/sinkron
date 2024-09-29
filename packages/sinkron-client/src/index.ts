@@ -28,6 +28,7 @@ import type {
     CreateMessage,
     ChangeMessage,
     ModifyMessage,
+    ErrorMessage,
     ClientMessage,
     ServerMessage
 } from "sinkron/types/protocol.d.ts"
@@ -430,7 +431,16 @@ class Collection<T extends object> {
             this.status = ConnectionStatus.Disconnected
             this.flushDebounced.cancel()
         })
-        this.transport.emitter.on("message", this.onMessage.bind(this))
+        this.transport.emitter.on("message", (msg: string) => {
+            try {
+                this.onMessage(msg)
+            } catch (e) {
+                this.logger.error(
+                    "Unhandled exception in message handler, %o",
+                    e
+                )
+            }
+        })
 
         if (!this.isDestroyed) {
             this.stopAutoReconnect = autoReconnect(this.transport)
@@ -493,9 +503,9 @@ class Collection<T extends object> {
             this.handleSyncError(parsed)
         } else if (parsed.kind === "change") {
             this.handleChangeMessage(parsed)
+        } else if (parsed.kind === "error") {
+            this.handleErrorMessage(parsed)
         }
-        // TODO
-        // error
     }
 
     onSyncComplete(msg: SyncCompleteMessage) {
@@ -511,6 +521,20 @@ class Collection<T extends object> {
         this.status = ConnectionStatus.Error
         this.stopAutoReconnect?.()
         this.errorHandler?.(msg)
+    }
+
+    handleErrorMessage(msg: ErrorMessage) {
+        const { id, changeid } = msg
+
+        if (this.items.has(id)) {
+            const item = this.items.get(id)!
+            if (item.sentChanges.has(changeid)) {
+                this.logger.debug("Rejected own change: %s", changeid)
+                item.sentChanges.delete(changeid)
+            }
+        }
+
+        this.transport.send(JSON.stringify({ kind: "get", id }))
     }
 
     handleChangeMessage(msg: ChangeMessage) {
@@ -596,20 +620,26 @@ class Collection<T extends object> {
         const item = this.items.get(id)
         if (!item) {
             this.logger.warn("Can't apply changes, unknown doc: %s", id)
-            // TODO request full document
+            this.transport.send(JSON.stringify({ kind: "get", id }))
             return
         }
-        const changes = data.map(Base64.toUint8Array)
         if (item.remote === null) {
             this.logger.warn("Can't apply changes, doc is not created: %s", id)
-            // TODO request full document
+            this.transport.send(JSON.stringify({ kind: "get", id }))
             return
-        } else {
+        }
+
+        const changes = data.map(Base64.toUint8Array)
+        try {
             ;[item.remote] = Automerge.applyChanges(item.remote, changes)
+            if (item.local !== null) {
+                ;[item.local] = Automerge.applyChanges(item.local, changes)
+            }
+        } catch (e) {
+            this.logger.warn("Can't apply changes, automerge error: %s", id)
+            return
         }
-        if (item.local !== null) {
-            ;[item.local] = Automerge.applyChanges(item.local, changes)
-        }
+
         if (msg.updatedAt !== undefined) {
             item.updatedAt = parseISO(msg.updatedAt)
         }
@@ -670,12 +700,12 @@ class Collection<T extends object> {
             }
 
             let change
-            if (item.remote === null) {
+            if (item.remote === null && item.local !== null) {
                 msg.op = Op.Create
-                msg.data = Base64.fromUint8Array(Automerge.save(item.local!))
-            } else if (item.local === null) {
+                msg.data = Base64.fromUint8Array(Automerge.save(item.local))
+            } else if (item.local === null && item.remote !== null) {
                 msg.op = Op.Delete
-            } else {
+            } else if (item.local !== null && item.remote !== null) {
                 msg.op = Op.Modify
                 const changes = Automerge.getChanges(item.remote, item.local)
                 msg.data = changes.map((c) => Base64.fromUint8Array(c))
@@ -692,8 +722,12 @@ class Collection<T extends object> {
         this.backupQueue.add(id)
         this.flushQueue.add(id)
         if (this.status === ConnectionStatus.Ready) {
-            if (flushImmediate) this.flush()
-            else this.flushDebounced()
+            if (flushImmediate) {
+                this.flushDebounced.cancel()
+                this.flush()
+            } else {
+                this.flushDebounced()
+            }
         }
     }
 
@@ -741,6 +775,10 @@ class Collection<T extends object> {
     delete(id: string) {
         const item = this.items.get(id)
         if (!item) throw new Error(`No item with such id: "${id}"`)
+        if (item.remote === null) {
+            this.items.delete(id)
+            return
+        }
         item.local = null
         item.state = ItemState.Changed
         this.onChangeItem(id, true)

@@ -1,13 +1,20 @@
 {
-    "env": "development",
     "db": {
-        "app": {
-            "type": "sqlite",
-            "database": "./temp/app.sqlite"
-        },
-        "sinkron": {
-            "type": "sqlite",
-            "database": "./temp/sinkron.sqlite"
+        "type": "postgres",
+        "host": "0.0.0.0",
+        "port": 5432,
+        "username": "postgres",
+        "password": "password",
+        "database": "sinkron_app"
+    },
+    "sinkron": {
+        "db": {
+            "type": "postgres",
+            "host": "0.0.0.0",
+            "port": 5432,
+            "username": "postgres",
+            "password": "password",
+            "database": "sinkron"
         }
     }
 }

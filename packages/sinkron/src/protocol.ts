@@ -33,6 +33,12 @@ export type DocMessage = {
     updatedAt: string // iso8601 time
 }
 
+export type GetMessage = {
+    kind: "get"
+    id: string
+    col?: string
+}
+
 export type SyncErrorMessage = {
     kind: "sync_error"
     col: string
@@ -88,7 +94,7 @@ export type ErrorMessage = {
     changeid: string
 }
 
-export type ClientMessage = SyncMessage | ChangeMessage
+export type ClientMessage = SyncMessage | ChangeMessage | GetMessage
 
 export type ServerMessage =
     | SyncErrorMessage

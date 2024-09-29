@@ -27,7 +27,7 @@ import { UserService } from "./services/user"
 import { AuthService } from "./services/auth"
 import { SpaceService } from "./services/space"
 import { InviteService } from "./services/invite"
-import { FileUploadService } from "./services/fileUpload"
+import { FileService } from "./services/file"
 
 const authTokenHeader = "x-sinkron-auth-token"
 
@@ -37,20 +37,6 @@ declare module "fastify" {
         token: AuthToken
     }
 }
-
-// type AppConfig = {
-// s3_url: string
-// s3_access_key: string
-// postgres_host: string
-// postgres_post: string
-// postgres_user: string
-// postgres_password: string
-// smtp_host: string
-// smtp_port: number
-// smtp_secure: boolean
-// smtp_user: string
-// smtp_password: string
-// }
 
 export type AppModels = {
     users: Repository<User>
@@ -389,11 +375,11 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         }
     )
 
-    fastify.post<{ Body: Buffer; Params: { spaceId: string; fileId: string } }>(
-        "/spaces/:spaceId/upload/:fileId",
+    fastify.post<{ Body: Buffer; Params: { spaceId: string } }>(
+        "/spaces/:spaceId/upload",
         async (request, reply) => {
             await app.transaction(async (models) => {
-                const { spaceId, fileId } = request.params
+                const { spaceId } = request.params
 
                 const member = await models.members.findOne({
                     where: { spaceId, userId: request.token.userId },
@@ -412,8 +398,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                const res = await app.services.fileUpload.upload(models, {
-                    id: fileId,
+                const res = await app.services.file.upload(models, {
                     content: request.body,
                     spaceId
                 })
@@ -427,7 +412,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                reply.send({})
+                reply.send({ id: res.value })
             })
         }
     )
@@ -693,6 +678,21 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
         reply.code(401).send({ error: { message: "Unauthorized" } })
     })
 
+    fastify.get<{ Params: { spaceId: string; fileId: string } }>(
+        "/files/:fileId",
+        async (request, reply) => {
+            const { fileId } = request.params
+
+            const res = await app.services.file.storage.get(fileId)
+            if (!res.isOk) {
+                reply.code(404).send({ error: { message: "File not found" } })
+                return
+            }
+
+            reply.header("Content-type", "image/jpeg").send(res.value)
+        }
+    )
+
     fastify.get("/profile", async (request, reply) => {
         const userId = request.token.userId
         await app.transaction(async (models) => {
@@ -728,7 +728,7 @@ type Services = {
     auth: AuthService
     spaces: SpaceService
     invites: InviteService
-    fileUpload: FileUploadService
+    file: FileService
 }
 
 class App {
@@ -737,17 +737,11 @@ class App {
     emailSender: EmailSender
     channels: ChannelServer
     fastify: FastifyInstance
-    host: string
-    port: number
     db: DataSource
     models: AppModels
     services: Services
 
-    constructor(props: AppProps) {
-        const { host, port } = { ...defaultAppProps, ...props }
-        this.host = host
-        this.port = port
-
+    constructor() {
         this.db = dataSource
 
         this.emailSender = new FakeEmailSender()
@@ -761,7 +755,7 @@ class App {
             auth: new AuthService(this),
             spaces: new SpaceService(this),
             invites: new InviteService(this),
-            fileUpload: new FileUploadService(this, storage)
+            file: new FileService({ app: this, storage })
         }
 
         this.models = {
@@ -774,7 +768,7 @@ class App {
             files: this.db.getRepository<File>("file")
         }
 
-        this.sinkron = new Sinkron({ db: config.db.sinkron })
+        this.sinkron = new Sinkron({ db: config.sinkron.db })
         this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
 
         this.channels = new ChannelServer({})
@@ -803,8 +797,8 @@ class App {
     }
 
     async destroy() {
-        // this.sinkron.destroy()
         await this.db.destroy()
+        this.channels.dispose()
     }
 
     async handleUpgrade(
@@ -890,41 +884,6 @@ class App {
         })
         fastify.register(loginRoutes(this))
 
-        fastify.get<{ Params: { spaceId: string; fileId: string } }>(
-            "/spaces/:spaceId/files/:fileId",
-            async (request, reply) => {
-                await this.transaction(async (models) => {
-                    const { spaceId, fileId } = request.params
-
-                    /*
-                    const member = await models.members.findOne({
-                        where: { spaceId, userId: request.token.userId },
-                        select: { role: true }
-                    })
-                    if (!member) {
-                        reply
-                            .code(500)
-                            .send({ error: { message: "Space not found" } })
-                        return
-                    }
-                    */
-
-                    const res = await this.services.fileUpload.get(models, {
-                        spaceId,
-                        fileId
-                    })
-                    if (!res.isOk) {
-                        reply
-                            .code(404)
-                            .send({ error: { message: "File not found" } })
-                        return
-                    }
-
-                    reply.header("Content-type", "image/jpeg").send(res.value)
-                })
-            }
-        )
-
         fastify.register(appRoutes(this))
         fastify.register(cors, {
             origin: [
@@ -938,13 +897,14 @@ class App {
         return fastify
     }
 
-    start() {
-        this.fastify.listen({ host: this.host, port: this.port }, (err) => {
+    start(props: AppProps) {
+        const { host, port } = { ...defaultAppProps, ...props }
+        this.fastify.listen({ host, port }, (err) => {
             if (err) {
                 console.log("Error while starting server:")
                 console.log(err)
             } else {
-                console.log(`Server started at ${this.host}:${this.port}`)
+                console.log(`Server started at ${host}:${port}`)
             }
         })
     }

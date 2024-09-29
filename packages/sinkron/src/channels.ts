@@ -1,8 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws"
 import pino from "pino"
 
-import { MessageQueue, WsMessage } from "./messageQueue"
-
 const pingInterval = 30000
 
 interface ChannelServerProps {
@@ -12,7 +10,6 @@ interface ChannelServerProps {
 class ChannelServer {
     logger?: ReturnType<typeof pino>
     ws: WebSocketServer
-    messageQueue: MessageQueue
     clients = new Map<WebSocket, { channels: Set<string> }>()
     channels = new Map<string, { subscribers: Set<WebSocket> }>()
     dispose: () => void
@@ -23,17 +20,6 @@ class ChannelServer {
         this.logger = logger
         this.ws = new WebSocketServer({ noServer: true })
         this.ws.on("connection", this.onConnect.bind(this))
-
-        this.messageQueue = new MessageQueue(async (msg: WsMessage) => {
-            try {
-                await this.handleMessage(msg)
-            } catch (e) {
-                this.logger?.error(
-                    "Unhandled exception while handling message, %o",
-                    e
-                )
-            }
-        })
 
         const timeout = setInterval(() => {
             // TODO handle many clients?
@@ -57,11 +43,20 @@ class ChannelServer {
             // @ts-ignore
             ws.isAlive = true
         })
-        ws.on("message", (msg: Buffer) => this.messageQueue.push([ws, msg]))
+        ws.on("message", async (msg: Buffer) => {
+            try {
+                await this.handleMessage(ws, msg)
+            } catch (e) {
+                this.logger?.error(
+                    "Unhandled exception while handling message, %o",
+                    e
+                )
+            }
+        })
         ws.on("close", () => this.onDisconnect(ws))
     }
 
-    handleMessage([ws, msg]: WsMessage) {
+    handleMessage(ws: WebSocket, msg: Buffer) {
         const str = msg.toString("utf-8")
         const match = str.match(/^subscribe:(.+)$/)
         if (match) this.addSubscriber(ws, match[1])

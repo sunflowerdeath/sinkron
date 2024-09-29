@@ -1,13 +1,15 @@
 {
     "env": "development",
     "db": {
-        "app": {
+        "type": "sqlite",
+        "database": ":memory:",
+        "synchronize": true
+    },
+    "sinkron": {
+        "db": {
             "type": "sqlite",
-            "database": ":memory:"
-        },
-        "sinkron": {
-            "type": "sqlite",
-            "database": ":memory:"
+            "database": ":memory:",
+            "synchronize": true
         }
     }
 }

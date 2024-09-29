@@ -152,7 +152,7 @@ class UserStore {
         if (!this.spaceId) return
         await this.api.fetch({
             method: "POST",
-            url: "/spaces/${this.spaceId}/leave"
+            url: `/spaces/${this.spaceId}/leave`
         })
         const idx = this.user.spaces.findIndex((s) => s.id === this.spaceId)
         this.user.spaces.splice(idx, 1)

@@ -21,11 +21,27 @@ import {
     DeleteMessage,
     ErrorMessage,
     DocMessage,
+    GetMessage,
     ClientMessage
 } from "./protocol"
-// import { MessageQueue, WsMessage } from "./messageQueue"
+import {
+    MessageQueue,
+    SequentialMessageQueue,
+    AsyncMessageQueue,
+    WsMessage
+} from "./messageQueue"
 
 const enableProfiling = process.env.ENABLE_PROFILING === "1"
+
+const getMessageSchema = {
+    type: "object",
+    properties: {
+        kind: { const: "get" },
+        id: { type: "string" }
+    },
+    required: ["kind", "id"],
+    additionalProperties: false
+}
 
 const syncMessageSchema = {
     type: "object",
@@ -80,7 +96,7 @@ const changeMessageSchema = {
 }
 
 const clientMessageSchema = {
-    oneOf: [syncMessageSchema, changeMessageSchema]
+    oneOf: [getMessageSchema, syncMessageSchema, changeMessageSchema]
 }
 
 const createValidator = () => {
@@ -97,6 +113,7 @@ const clientDisconnectTimeout = 10000
 
 interface SinkronServerOptions {
     sinkron: Sinkron
+    sync?: boolean
     logger?: Logger<string>
     host?: string
     port?: number
@@ -120,13 +137,15 @@ type ProfilerSegment = {
     handledMessages: number
     handlerDuration: number
     sentMessages: number
+    failedMessages: number
 }
 
 const initialProfilerSegment = () => ({
     start: performance.now(),
     handledMessages: 0,
     handlerDuration: 0,
-    sentMessages: 0
+    sentMessages: 0,
+    failedMessages: 0
 })
 
 type Client = {
@@ -140,13 +159,14 @@ class SinkronServer {
 
     clients = new Map<WebSocket, Client>()
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
+    queue?: MessageQueue<WsMessage>
 
     logger: Logger<string>
 
     profile?: ProfilerSegment
 
     constructor(options: SinkronServerOptions) {
-        const { sinkron, host, port, logger } = {
+        const { sinkron, host, port, logger, sync } = {
             ...defaultServerOptions,
             ...options
         }
@@ -156,6 +176,10 @@ class SinkronServer {
 
         if (enableProfiling) {
             this.profile = initialProfilerSegment()
+        }
+
+        if (sync) {
+            this.queue = new SequentialMessageQueue(this.onMessage.bind(this))
         }
 
         this.ws = new WebSocketServer({ noServer: true })
@@ -186,13 +210,24 @@ class SinkronServer {
         setTimeout(() => {
             const client = this.clients.get(ws)
             if (client === undefined) return
-            if (client.subscriptions.size === 0) ws.close()
+            if (client.subscriptions.size === 0) {
+                ws.close()
+            }
         }, clientDisconnectTimeout)
-        ws.on("message", (msg: Buffer) => this.onMessage(ws, msg))
+
+        if (this.queue) {
+            ws.on("message", (msg: Buffer) => {
+                this.queue!.push([ws, msg])
+            })
+        } else {
+            ws.on("message", (msg: Buffer) => {
+                this.onMessage([ws, msg])
+            })
+        }
         ws.on("close", () => this.onDisconnect(ws))
     }
 
-    async onMessage(ws: WebSocket, msg: Buffer) {
+    async onMessage([ws, msg]: WsMessage) {
         try {
             let now
             if (this.profile) {
@@ -205,8 +240,10 @@ class SinkronServer {
                 this.profile.handlerDuration += duration
             }
         } catch (e) {
+            if (this.profile) this.profile.failedMessages += 1
+            this.logger.error("Unhandled exception while handling message")
             this.logger.error(
-                "Unhandled exception while handling message, %o, %s",
+                "%o, %s",
                 e,
                 typeof e === "object" && e !== null && "message" in e
                     ? e.message
@@ -221,27 +258,62 @@ class SinkronServer {
             parsed = JSON.parse(msg.toString("utf-8"))
         } catch (e) {
             this.logger.debug("Invalid JSON in message")
+            if (this.profile) this.profile.failedMessages += 1
             return
         }
 
-        this.logger.trace("Message recieved: %o", parsed)
+        // this.logger.trace("Message recieved: %o", parsed)
 
         const isValid = validateMessage(parsed)
         if (!isValid) {
-            // TODO react something
             this.logger.debug(
                 "Invalid message schema: %o",
                 validateMessage.errors
             )
+            if (this.profile) this.profile.failedMessages += 1
             return
         }
 
         if (parsed.kind === "sync") {
             await this.handleSyncMessage(ws, parsed)
-        } else {
-            // parsed.kind === "change"
+        } else if (parsed.kind === "change") {
             await this.handleChangeMessage(parsed, ws)
+        } else if (parsed.kind === "get") {
+            await this.handleGetMessage(ws, parsed)
         }
+    }
+
+    async handleGetMessage(ws: WebSocket, msg: GetMessage) {
+        const { col, id } = msg
+
+        const client = this.clients.get(ws)
+        if (!client) return
+
+        const checkRes = await this.sinkron.checkDocumentPermission({
+            id,
+            user: client.id,
+            action: Action.read
+        })
+        if (!checkRes.isOk || !checkRes.value) {
+            // TODO access denied
+            return
+        }
+
+        const doc = await this.sinkron.getDocument(id)
+        if (doc === null) {
+            // doc not found
+            return
+        }
+
+        const response: DocMessage = {
+            kind: "doc",
+            id,
+            // @ts-ignore
+            data: doc.data ? doc.data.toString("base64") : null,
+            createdAt: serializeDate(doc.createdAt),
+            updatedAt: serializeDate(doc.updatedAt)
+        }
+        ws.send(JSON.stringify(response))
     }
 
     async handleSyncMessage(ws: WebSocket, msg: SyncMessage) {
@@ -301,8 +373,10 @@ class SinkronServer {
         ws.send(JSON.stringify(syncCompleteMsg))
         if (this.profile) this.profile.sentMessages += 1
 
-        this.addSubscriber(col, ws)
-        this.logger.debug("Client subscribed to collection %s", msg.col)
+        const subscribed = this.addSubscriber(col, ws)
+        if (subscribed) {
+            this.logger.debug("Client subscribed to collection %s", msg.col)
+        }
     }
 
     async handleChangeMessage(msg: ChangeMessage, ws: WebSocket) {
@@ -331,14 +405,15 @@ class SinkronServer {
                 code: res.error.code
             }
             ws.send(JSON.stringify(errorMsg))
+            if (this.profile) this.profile.failedMessages += 1
             return
         }
         const doc = res.value
-        this.logger.debug("Change applied, id: %s, op: %s", msg.id, msg.op)
+        // this.logger.trace("Change applied, id: %s, op: %s", msg.id, msg.op)
 
         const collection = this.collections.get(col)
         if (collection) {
-            const { colrev, updatedAt, createdAt } = doc!
+            const { colrev, updatedAt, createdAt } = doc
             const response: ChangeMessage = { ...msg, colrev }
             response.updatedAt = serializeDate(updatedAt)
             if (msg.op === Op.Create) {
@@ -359,7 +434,12 @@ class SinkronServer {
         const { id, col, changeid, data } = msg
 
         const client = this.clients.get(ws)
-        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
+        if (!client) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                details: "Client not found"
+            })
+        }
         const checkRes = await this.sinkron.checkCollectionPermission({
             id: col,
             user: client.id,
@@ -370,7 +450,7 @@ class SinkronServer {
         }
 
         return await this.sinkron.createDocument(
-            id!,
+            id,
             col,
             Buffer.from(data, "base64")
         )
@@ -383,7 +463,12 @@ class SinkronServer {
         const { col, id, changeid } = msg
 
         const client = this.clients.get(ws)
-        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
+        if (!client) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                details: "Client not found"
+            })
+        }
         const checkRes = await this.sinkron.checkCollectionPermission({
             id: col,
             user: client.id,
@@ -404,7 +489,12 @@ class SinkronServer {
         const { id, changeid, col, data } = msg
 
         const client = this.clients.get(ws)
-        if (!client) return Result.err({ code: ErrorCode.InternalServerError })
+        if (!client) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                details: "Client not found"
+            })
+        }
         const checkRes = await this.sinkron.checkDocumentPermission({
             id,
             user: client.id,
@@ -432,29 +522,37 @@ class SinkronServer {
         this.clients.delete(ws)
     }
 
-    addSubscriber(col: string, ws: WebSocket) {
-        const client = this.clients.get(ws)!
+    addSubscriber(col: string, ws: WebSocket): boolean {
+        const client = this.clients.get(ws)
+
+        if (!client) return false
 
         client.subscriptions.add(col)
-
         const collection = this.collections.get(col)
         if (collection) {
             collection.subscribers.add(ws)
         } else {
             this.collections.set(col, { subscribers: new Set([ws]) })
         }
+        return true
     }
 
     report() {
         if (!this.profile) return {}
-        const { start, handledMessages, handlerDuration, sentMessages } =
-            this.profile
+        const {
+            start,
+            handledMessages,
+            handlerDuration,
+            sentMessages,
+            failedMessages
+        } = this.profile
         const res = {
             time: performance.now() - start,
             clients: this.clients.size,
             handledMessages,
             duration: handlerDuration / handledMessages,
-            sentMessages
+            sentMessages,
+            failedMessages
         }
         this.profile = initialProfilerSegment()
         return res

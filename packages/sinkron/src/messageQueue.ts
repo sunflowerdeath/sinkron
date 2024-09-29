@@ -4,7 +4,23 @@ export type WsMessage = [WebSocket, Buffer]
 
 export type MessageQueueCallback<T> = (msg: T) => Promise<void>
 
-class MessageQueue<T = WsMessage> {
+export interface MessageQueue<T> {
+    push(msg: T): void
+}
+
+class AsyncMessageQueue<T = WsMessage> implements MessageQueue<T> {
+    constructor(callback: MessageQueueCallback<T>) {
+        this.callback = callback
+    }
+
+    callback: (msg: T) => Promise<void>
+
+    push(msg: T) {
+        this.callback(msg)
+    }
+}
+
+class SequentialMessageQueue<T = WsMessage> implements MessageQueue<T> {
     constructor(callback: MessageQueueCallback<T>) {
         this.callback = callback
     }
@@ -31,4 +47,4 @@ class MessageQueue<T = WsMessage> {
     }
 }
 
-export { MessageQueue }
+export { AsyncMessageQueue, SequentialMessageQueue }

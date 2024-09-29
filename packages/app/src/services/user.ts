@@ -41,8 +41,6 @@ class UserService {
 
         const data = {
             email,
-            name: "",
-            registrationIsCompleted: false,
             isDisabled: false,
             hasUnreadNotifications: false
         }
@@ -104,8 +102,6 @@ class UserService {
             select: {
                 id: true,
                 email: true,
-                name: true,
-                registrationIsCompleted: true,
                 hasUnreadNotifications: true
             }
         })

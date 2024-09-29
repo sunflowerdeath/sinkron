@@ -1,29 +1,30 @@
 import { v4 as uuidv4 } from "uuid"
-import { difference, sum } from "lodash"
-import { In } from "typeorm"
+// import { difference, sum } from "lodash"
+// import { In } from "typeorm"
 
 import { App, AppModels } from "../app"
 import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
 
-interface FileStorage {
+export interface ObjectStorage {
     put(id: string, data: Buffer): Promise<ResultType<true, RequestError>>
     get(id: string): Promise<ResultType<Buffer, RequestError>>
     delete(id: string): Promise<ResultType<true, RequestError>>
-    batchDelete(ids: string[]): Promise<ResultType<true, RequestError>>
+    // batchDelete(ids: string[]): Promise<ResultType<true, RequestError>>
 }
+
 
 type UploadFileProps = {
     spaceId: string
     data: Buffer
 }
 
-const storageLimit = 100 * 1024 * 1024 // 100Mb
+const spaceStorageLimit = 100 * 1024 * 1024 // 100Mb
 const maxUploadFileSize = 5 * 1024 * 1024 // 5Mb
 
 type FileServiceProps = {
     app: App
-    storage: FileStorage
+    storage: ObjectStorage
 }
 
 class FileService {
@@ -33,7 +34,7 @@ class FileService {
     }
 
     app: App
-    storage: FileStorage
+    storage: ObjectStorage
 
     async uploadFile(
         models: AppModels,
@@ -61,7 +62,7 @@ class FileService {
             })
         }
 
-        const availableStorage = storageLimit - space.usedStorage
+        const availableStorage = spaceStorageLimit - space.usedStorage
         if (fileSize > availableStorage) {
             return Result.err({
                 code: ErrorCode.UnprocessableRequest,
@@ -109,6 +110,7 @@ class FileService {
         return Result.ok(true)
     }
 
+    /*
     async batchDeleteFiles(
         models: AppModels,
         props: { spaceId: string; fileIds: string[] }
@@ -153,6 +155,7 @@ class FileService {
         const orphanIds = difference(uploadedFileIds, usedFileIds)
         await this.batchDeleteFiles(models, orphanIds)
     }
+    */
 }
 
 export { FileService }

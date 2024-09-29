@@ -122,7 +122,13 @@ class SpaceService {
         spaceId: string,
         name: string
     ): Promise<ResultType<true, RequestError>> {
-        // TODO validate name
+        if (!spaceNameSchema(name)) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Invalid name",
+                details: { errors: ajv.errorsText(spaceNameSchema.errors) }
+            })
+        }
         await models.spaces.update(spaceId, { name })
         return Result.ok(true)
     }
@@ -169,9 +175,9 @@ class SpaceService {
         const membersCount = await models.members
             .createQueryBuilder()
             .select("COUNT(1)", "count")
-            .addSelect("spaceId", "id")
+            .addSelect(`"spaceId"`, "id")
             .where({ spaceId: In(spaces.map((s) => s.id)) })
-            .groupBy("spaceId")
+            .groupBy(`"spaceId"`)
             .getRawMany()
         membersCount.forEach((item) => {
             spaces.find((s) => s.id === item.id)!.membersCount = item.count

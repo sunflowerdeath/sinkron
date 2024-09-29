@@ -9,10 +9,10 @@ import {
 import { without, remove, isEqual, uniq } from "lodash"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
-import pino from "pino"
+// import pino from "pino"
 
 import { createDataSource } from "./db"
-import { entities } from "./entities"
+// import { getEntities } from "./entities"
 import type { Document, Collection, Ref, Group, GroupMember } from "./entities"
 import { Result, ResultType } from "./result"
 import {
@@ -85,24 +85,9 @@ class Sinkron {
     constructor(props: SinkronProps) {
         const { db } = props
         this.db = createDataSource(db)
-        this.models = {
-            documents: this.db.getRepository("document"),
-            collections: this.db.getRepository("collection"),
-            refs: this.db.getRepository("ref"),
-            groups: this.db.getRepository("group"),
-            members: this.db.getRepository("group_member")
-        }
     }
 
     db: DataSource
-
-    models: {
-        documents: Repository<Document>
-        collections: Repository<Collection>
-        refs: Repository<Ref>
-        groups: Repository<Group>
-        members: Repository<GroupMember>
-    }
 
     async init() {
         await this.db.initialize()
@@ -146,7 +131,7 @@ class Sinkron {
         if (count > 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: "Duplicate id"
+                details: "Duplicate col id"
             })
         }
 
@@ -306,7 +291,7 @@ class Sinkron {
         if (docCnt > 0) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
-                details: "Duplicate id"
+                details: "Duplicate doc id: " + id
             })
         }
 
@@ -348,12 +333,8 @@ class Sinkron {
             colrev: nextColrev,
             permissions: JSON.stringify(docPermissions)
         }
-        await models.documents.insert(doc)
-
-        const generated = await models.documents.findOne({
-            where: { id },
-            select: { createdAt: true, updatedAt: true }
-        })
+        const insertRes = await models.documents.insert(doc)
+        const generated = insertRes.generatedMaps[0]
         const result = { ...doc, ...generated } as Document
         return Result.ok(result)
     }
@@ -495,7 +476,10 @@ class Sinkron {
         if (!incrementColrevRes.isOk) return incrementColrevRes
         const nextColrev = incrementColrevRes.value
 
-        await models.documents.update(doc.id, { ...update, colrev: nextColrev })
+        const updateRes = await models.documents.update(doc.id, {
+            ...update,
+            colrev: nextColrev
+        })
         const { updatedAt } = (await models.documents.findOne({
             where: { id: doc.id },
             select: { updatedAt: true }

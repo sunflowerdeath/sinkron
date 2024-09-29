@@ -1,43 +1,26 @@
-export type SqliteConfig = {
-    type: "sqlite"
-    database: string
-}
+import type { DbConfig } from "./db/dataSource"
 
-export type PostgresConfig = {
-    type: "postgres"
-    host: string
-    port: number
-    username: string
-    password: string
-    database: string
-}
-
-export type DbConfig = SqliteConfig | PostgresConfig
-
-type S3Config = {
+export type S3Config = {
     host: string
 }
 
-type SmtpConfig = {
+export type SmtpConfig = {
     host: string
 }
 
 export type SinkronConfig = {
-    env: "production" | "development",
-    db: {
-        app: DbConfig,
-        sinkron: DbConfig
-    }
-    s3?: S3Config,
+    db: DbConfig
+    sinkron: { db: DbConfig }
+    s3?: S3Config
     smtp?: SmtpConfig
 }
 
 const configStr = process.env.SINKRON_CONFIG
 if (configStr === undefined || configStr.length === 0) {
-    console.error("Config not found. Set env variable: 'SINKRON_CONFIG'")
+    console.error('Config not found. Set env variable "SINKRON_CONFIG"')
     process.exit(1)
 }
-let config : SinkronConfig
+let config: SinkronConfig
 try {
     config = JSON.parse(configStr)
 } catch (e) {

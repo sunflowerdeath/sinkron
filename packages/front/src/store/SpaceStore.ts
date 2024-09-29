@@ -365,12 +365,12 @@ class SpaceStore {
         )
     }
 
-    sendInvite(toName: string, role: string) {
+    sendInvite(toEmail: string, role: string) {
         return fromPromise(
             this.api.fetch({
                 method: "POST",
                 url: "/invites/new",
-                data: { spaceId: this.space.id, toName, role }
+                data: { spaceId: this.space.id, toEmail, role }
             })
         )
     }

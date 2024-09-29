@@ -51,6 +51,7 @@ const EmailStep = observer((props: EmailStepProps) => {
                     onChange={setEmail}
                     style={{ width: "100%" }}
                     onKeyPress={onKeyPress}
+                    autoFocus
                 />
             </Col>
             <Button
@@ -106,6 +107,7 @@ const CodeStep = observer((props: CodeStepProps) => {
                     onChange={setCode}
                     style={{ width: "100%" }}
                     onKeyPress={onKeyPress}
+                    autoFocus
                 />
             </Col>
             <Button

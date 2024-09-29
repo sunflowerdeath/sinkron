@@ -26,7 +26,7 @@ describe("Invites", () => {
     const userEmail = "user@sinkron.xyz"
 
     beforeEach(async () => {
-        app = new App({})
+        app = new App()
         await app.init()
         owner = await createUser(app, ownerEmail)
         user = await createUser(app, userEmail)

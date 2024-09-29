@@ -1,14 +1,6 @@
-import path from "node:path"
 import { DataSource } from "typeorm"
 
-import { getEntities } from "./entities"
-
-// @ts-ignore
-const ctx = require.context("./migrations", true, /\.ts$/)
-const migrations = ctx.keys().map((key: string) => {
-    const module = ctx(key)
-    return Object.values(module)[0]
-})
+import { entities } from "../entities"
 
 export type PostgresConfig = {
     type: "postgres"
@@ -17,41 +9,35 @@ export type PostgresConfig = {
     username: string
     password: string
     database: string
-    dropSchema?: boolean
-    synchronize?: boolean
 }
 
 export type SqliteConfig = {
     type: "sqlite"
     database: string
-    dropSchema?: boolean
     synchronize?: boolean
 }
 
 export type DbConfig = PostgresConfig | SqliteConfig
 
+// @ts-expect-error require.context
+const ctx = require.context("../migrations", true, /\.ts$/)
+const migrations = ctx.keys().map((key: string) => {
+    const module = ctx(key)
+    return Object.values(module)[0]
+})
+
 const createDataSource = (config: DbConfig) => {
-    const entities = getEntities(config.type)
     if (config.type === "sqlite") {
-        const { database, synchronize, dropSchema } = config
+        const { database, synchronize } = config
         return new DataSource({
             type: "better-sqlite3",
             database,
             synchronize,
-            dropSchema,
             entities,
             logging: ["error"]
         })
     } else {
-        const {
-            host,
-            port,
-            username,
-            password,
-            database,
-            synchronize,
-            dropSchema
-        } = config
+        const { host, port, username, password, database } = config
         return new DataSource({
             type: "postgres",
             host,
@@ -61,9 +47,7 @@ const createDataSource = (config: DbConfig) => {
             database,
             entities,
             logging: ["error"],
-            migrations,
-            synchronize,
-            dropSchema
+            migrations
         })
     }
 }

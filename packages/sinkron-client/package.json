@@ -7,14 +7,14 @@
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "eslint src",
-        "build": "NODE_ENV=production webpack --config rspack.config.js",
-        "build2": "NODE_ENV=production rspack --config rspack.config.js"
+        "build": "NODE_ENV=production rspack --config rspack.config.js",
+        "build2": "NODE_ENV=production webpack --config rspack.config.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
-        "@rspack/cli": "^1.0.0",
-        "@rspack/core": "^1.0.0",
+        "@rspack/cli": "^1.0.8",
+        "@rspack/core": "^1.0.8",
         "@types/lodash-es": "^4.17.6",
         "@types/uuid": "^9.0.0",
         "esbuild-loader": "^4.1.0",

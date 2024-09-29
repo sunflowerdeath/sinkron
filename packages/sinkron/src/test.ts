@@ -27,7 +27,9 @@ describe("Sinkron", () => {
     })
 
     beforeEach(async () => {
-        sinkron = new Sinkron({ db: { type: "sqlite", database: ":memory:" } })
+        sinkron = new Sinkron({
+            db: { type: "sqlite", database: ":memory:", synchronize: true }
+        })
         await sinkron.init()
         await sinkron.createCollection({
             id: "test",

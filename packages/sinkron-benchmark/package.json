@@ -4,13 +4,15 @@
     "description": "",
     "scripts": {
         "lint": "eslint src",
-        "build": "NODE_ENV=production webpack",
-        "run-client": "node ./build/benchmark_client.js",
-        "run-server": "ENABLE_PROFILING=1 node ./build/benchmark_server.js"
+        "build": "NODE_ENV=production rspack --config webpack.config.js",
+        "run-client": "NODE_ENV=production node ./build/benchmark_client.js",
+        "run-server": "NODE_ENV=production ENABLE_PROFILING=1 node ./build/benchmark_server.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
+        "@rspack/cli": "^1.0.8",
+        "@rspack/core": "^1.0.8",
         "@types/lodash": "^4.14.202",
         "@types/node": "^18.11.9",
         "@types/ws": "^8.5.7",

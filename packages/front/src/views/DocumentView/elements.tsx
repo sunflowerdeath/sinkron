@@ -203,7 +203,7 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
         <div contentEditable={false} {...attributes}>
             {children}
             <img
-                src={`${spaceStore.api.baseUrl}/spaces/${spaceStore.space.id}/files/${id}`}
+                src={`${spaceStore.api.baseUrl}/files/${id}`}
                 style={{
                     maxWidth: 300,
                     maxHeight: 300,

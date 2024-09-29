@@ -4,10 +4,11 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 COPY . /app
 WORKDIR /app
+RUN rm -rf packages/sinkron-benchmark
 RUN rm -rf packages/sinkron-client
 RUN rm -rf packages/front
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build-app
 WORKDIR /app
 EXPOSE 80
-CMD ["pnpm", "start-app"]
+CMD ["pnpm", "start-app-prod"]

@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto"
+import { isAfter, addSeconds } from "date-fns"
 
 import { Raw, Equal, Not } from "typeorm"
 
@@ -29,7 +30,7 @@ type Session = {
 }
 
 const maxOtpAttempts = 3
-const otpLifeSpan = 30 * 60 * 1000 // 30 min
+const otpLifeSpan = 30 * 60 // seconds
 const maxTokensPerUser = 10
 
 class AuthService {
@@ -48,7 +49,7 @@ class AuthService {
     async deleteExpiredTokens(models: AppModels, userId: string) {
         await models.tokens.delete({
             userId,
-            expiresAt: Raw((f) => `${f} NOT NULL AND ${f} < TIME('now')`)
+            expiresAt: Raw((f) => `${f} IS NOT NULL AND ${f} < NOW()`)
         })
     }
 
@@ -132,7 +133,12 @@ class AuthService {
 
         const otp = await models.otps.findOne({
             where: { id },
-            select: { email: true, code: true, createdAt: true, attempts: true }
+            select: {
+                email: true,
+                code: true,
+                createdAt: true,
+                attempts: true
+            }
         })
 
         if (otp === null) {
@@ -143,7 +149,8 @@ class AuthService {
             })
         }
 
-        if (Date.now() > otp.createdAt.getTime() + otpLifeSpan) {
+        const expiresAt = addSeconds(otp.createdAt, otpLifeSpan)
+        if (isAfter(new Date(), expiresAt)) {
             await models.otps.delete({ id })
             return Result.err({
                 code: ErrorCode.InvalidRequest,

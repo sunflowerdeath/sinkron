@@ -1,7 +1,5 @@
 import { EntitySchema } from "typeorm"
 
-const uuidType = String
-
 export type User = {
     id: string
     createdAt: Date
@@ -13,11 +11,9 @@ export type User = {
 const UserEntity = new EntitySchema<User>({
     name: "user",
     columns: {
-        id: { type: uuidType, primary: true, generated: "uuid" },
+        id: { type: "uuid", primary: true, generated: "uuid" },
         createdAt: { type: Date, createDate: true },
         email: { type: String },
-        name: { type: String },
-        registrationIsCompleted: { type: Boolean },
         isDisabled: { type: Boolean },
         hasUnreadNotifications: { type: Boolean }
     },
@@ -35,7 +31,7 @@ export type Otp = {
 const OtpEntity = new EntitySchema<Otp>({
     name: "otp",
     columns: {
-        id: { type: uuidType, primary: true, generated: "uuid" },
+        id: { type: "uuid", primary: true, generated: "uuid" },
         code: { type: String },
         createdAt: { type: Date, createDate: true },
         email: { type: String },
@@ -57,8 +53,8 @@ export type AuthToken = {
 const AuthTokenEntity = new EntitySchema<AuthToken>({
     name: "token",
     columns: {
-        token: { type: uuidType, primary: true, generated: "uuid" },
-        userId: { type: uuidType },
+        token: { type: "uuid", primary: true, generated: "uuid" },
+        userId: { type: "uuid" },
         createdAt: { type: Date, createDate: true },
         expiresAt: { type: Date, nullable: true },
         lastAccess: { type: Date, createDate: true },
@@ -76,15 +72,17 @@ export type Space = {
     owner: User
     ownerId: string // uuid
     createdAt: Date
+    usedStorage: number
 }
 
 const SpaceEntity = new EntitySchema<Space>({
     name: "space",
     columns: {
-        id: { type: uuidType, primary: true, generated: "uuid" },
+        id: { type: "uuid", primary: true, generated: "uuid" },
         name: { type: String },
-        ownerId: { type: uuidType },
-        createdAt: { type: Date, createDate: true }
+        ownerId: { type: "uuid" },
+        createdAt: { type: Date, createDate: true },
+        usedStorage: { type: Number, default: 0 }
     },
     relations: {
         owner: { type: "many-to-one", target: "user" }
@@ -106,9 +104,9 @@ export type SpaceMember = {
 const SpaceMemberEntity = new EntitySchema<SpaceMember>({
     name: "space_member",
     columns: {
-        id: { type: uuidType, primary: true, generated: "uuid" },
-        userId: { type: uuidType },
-        spaceId: { type: uuidType },
+        id: { type: "uuid", primary: true, generated: "uuid" },
+        userId: { type: "uuid" },
+        spaceId: { type: "uuid" },
         role: { type: String },
         createdAt: { type: Date, createDate: true }
     },
@@ -139,11 +137,11 @@ export type Invite = {
 const InviteEntity = new EntitySchema<Invite>({
     name: "invite",
     columns: {
-        id: { type: uuidType, primary: true, generated: "uuid" },
-        spaceId: { type: uuidType },
+        id: { type: "uuid", primary: true, generated: "uuid" },
+        spaceId: { type: "uuid" },
         role: { type: String },
-        fromId: { type: uuidType },
-        toId: { type: uuidType },
+        fromId: { type: "uuid" },
+        toId: { type: "uuid" },
         createdAt: { type: Date, createDate: true },
         updatedAt: { type: Date, updateDate: true },
         status: { type: String },
@@ -168,8 +166,8 @@ export type File = {
 const FileEntity = new EntitySchema<File>({
     name: "file",
     columns: {
-        id: { type: uuidType, primary: true, generated: "uuid" },
-        spaceId: { type: uuidType },
+        id: { type: "uuid", primary: true, generated: "uuid" },
+        spaceId: { type: "uuid" },
         createdAt: { type: Date, createDate: true },
         size: { type: Number }
     },
