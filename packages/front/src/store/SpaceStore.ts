@@ -415,20 +415,17 @@ class SpaceStore {
 
     upload(content: Blob): UploadState {
         const id = uuidv4()
-        const state = this.api.fetch({
-            method: "POST",
-            url: `/spaces/${this.space.id}/upload/${id}`,
-            data: content
-        })
-        state.then(
-            () => {
-                this.uploadQueue.delete(id)
-            },
-            () => {
-                // toast
-            }
+        const state = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/upload_image/${id}`,
+                data: content
+            })
         )
-        const uploadState = { id, content, state: fromPromise(state) }
+        state.then(() => {
+            this.uploadQueue.delete(id)
+        })
+        const uploadState = { id, content, state }
         this.uploadQueue.set(id, uploadState)
         return uploadState
     }

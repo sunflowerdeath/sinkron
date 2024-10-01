@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Row, Col } from "oriente"
 import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
+import { ceil } from "lodash-es"
 
 import { useStore, SpaceStore } from "../store"
 import { Button, Avatar, Input, Heading, useDialog, useStateToast } from "../ui"
@@ -84,6 +85,15 @@ const SpaceSettingsView = observer(() => {
         )
     })
 
+    const usedStorageMb = ceil(space.usedStorage / (1024 * 1024), 2)
+    const storage = (
+            <Col gap={16}>
+                <Heading>Storage</Heading>
+                <div>Used storage: {usedStorageMb} / 100Mb</div>
+                <Button isDisabled>Delete unused files</Button>
+            </Col>
+    )
+
     return (
         <Container title="Space settings" onClose={() => navigate("/")}>
             <Row gap={8} align="center">
@@ -97,6 +107,7 @@ const SpaceSettingsView = observer(() => {
                     Delete space
                 </Button>
             </ButtonsGrid>
+            {storage}
             {renameDialog.render()}
             {deleteDialog.render()}
         </Container>

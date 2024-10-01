@@ -1,5 +1,4 @@
 {
-    "env": "development",
     "db": {
         "type": "sqlite",
         "database": ":memory:",
@@ -11,5 +10,12 @@
             "database": ":memory:",
             "synchronize": true
         }
+    },
+    "mail": {
+        "type": "console"
+    },
+    "storage": {
+        "type": "local",
+        "path": "temp/files"
     }
 }

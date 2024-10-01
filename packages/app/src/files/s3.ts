@@ -8,7 +8,7 @@ import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
 import { ObjectStorage } from "../services/file"
 
-type S3Config = {
+export type S3Config = {
     region: string
     accessKeyId: string
     secretAccessKey: string
@@ -19,7 +19,13 @@ type S3Config = {
 class S3ObjectStorage implements ObjectStorage {
     constructor(config: S3Config) {
         this.config = config
-        this.client = new S3Client(config)
+
+        const { region, endpoint, accessKeyId, secretAccessKey } = config
+        this.client = new S3Client({
+            region,
+            endpoint,
+            credentials: { accessKeyId, secretAccessKey }
+        })
     }
 
     config: S3Config

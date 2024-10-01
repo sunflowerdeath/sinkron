@@ -15,6 +15,7 @@ import { observer } from "mobx-react"
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
+import { FetchError } from "../../utils/fetchJson"
 import { useSpace } from "../../store"
 import { Button, Icon } from "../../ui"
 import {
@@ -194,52 +195,51 @@ const CheckListItem = (
 
 const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
     const { attributes, element, children } = props
-    const { id, isPlaceholder } = element
+    const { id, status, error } = element
 
     const isSelected = useSelected()
-    const spaceStore = useSpace()
 
-    let image
-    if (isPlaceholder) {
-        const status = spaceStore.uploadQueue.get(id)
-
-        let statusText = ""
-        if (status === undefined) {
+    let content
+    if (status !== "ready") {
+        let statusText = null
+        if (status === "uploading") {
             statusText = "Uploading image..."
-        } else if (status.state.state === "pending") {
-            statusText = "Uploading image..."
-        } else if (status.state.state === "rejected") {
-            statusText = "Error uploading image"
+        } else if (status === "error") {
+            statusText = (
+                <span style={{ color: "var(--color-error)" }}>
+                    Image upload error:
+                    <br />
+                    {error ?? "Unknown error"}
+                </span>
+            )
         }
-
-        image = (
+        content = (
             <div
                 style={{
-                    width: 240,
-                    height: 160,
+                    width: 200,
+                    height: 200,
                     boxSizing: "border-box",
-                    border: "4px solid var(--color-elem)",
-                    outline: isSelected
-                        ? "4px solid var(--color-link)"
-                        : "none",
+                    border: "2px solid var(--color-elem)",
+                    background:
+                        "color-mix(in srgb, var(--color-elem) 33%, transparent)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "center",
+                    padding: 15
                 }}
             >
                 {statusText}
             </div>
         )
     } else {
-        image = (
+        // const src = `${spaceStore.api.baseUrl}/files/${id}`
+        const src = `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
+        content = (
             <img
-                src={`${spaceStore.api.baseUrl}/files/${id}`}
+                src={src}
                 style={{
-                    minHeight: 100,
-                    minWidth: 100,
                     maxWidth: "100%",
-                    maxHeight: "min(50vh, 500px)",
-                    outline: isSelected ? "4px solid var(--color-link)" : "none"
+                    maxHeight: "50vh"
                 }}
             />
         )
@@ -249,10 +249,29 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
         <div
             contentEditable={false}
             {...attributes}
-            style={{ margin: "1rem 0" }}
+            style={{
+                margin: "1rem 0",
+                display: "flex",
+                alignItems: "start"
+            }}
         >
             {children}
-            {image}
+            <div
+                style={{
+                    minHeight: 100,
+                    minWidth: 100,
+                    maxHeight: "50vh",
+                    maxWidth: "100%",
+                    outline: isSelected
+                        ? "4px solid var(--color-link)"
+                        : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+            >
+                {content}
+            </div>
         </div>
     )
 })

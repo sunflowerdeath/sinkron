@@ -145,17 +145,17 @@ const LoginView = observer((props: LoginViewProps) => {
                 height: "100%",
                 width: 320,
                 margin: "auto",
-                paddingTop: 36
+                paddingTop: "4rem"
             }}
             gap={16}
         >
             <Icon
                 svg={logoSvg}
                 style={{
-                    marginBottom: 32,
                     alignSelf: "center",
                     width: 200,
-                    opacity: 0.5
+                    opacity: 0.5,
+                    marginBottom: "2rem"
                 }}
                 fill="var(--color-secondary)"
             />

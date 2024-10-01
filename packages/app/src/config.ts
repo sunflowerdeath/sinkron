@@ -1,18 +1,22 @@
 import type { DbConfig } from "./db/dataSource"
+import type { S3Config } from "./files/s3"
 
-export type S3Config = {
-    host: string
-}
+export type StorageConfig =
+    | { type: "local"; path: string }
+    | ({ type: "s3" } & S3Config)
 
 export type SmtpConfig = {
+    type: "smtp"
     host: string
 }
+
+export type MailConfig = { type: "console" } | SmtpConfig
 
 export type SinkronConfig = {
     db: DbConfig
+    storage: StorageConfig
+    mail: MailConfig
     sinkron: { db: DbConfig }
-    s3?: S3Config
-    smtp?: SmtpConfig
 }
 
 const configStr = process.env.SINKRON_CONFIG

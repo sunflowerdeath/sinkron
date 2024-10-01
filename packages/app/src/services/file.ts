@@ -8,7 +8,11 @@ import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
 
 export interface ObjectStorage {
-    put(id: string, data: Buffer): Promise<ResultType<true, RequestError>>
+    put(
+        id: string,
+        data: Buffer,
+        contentType?: string
+    ): Promise<ResultType<true, RequestError>>
     get(id: string): Promise<ResultType<Buffer, RequestError>>
     delete(id: string): Promise<ResultType<true, RequestError>>
     // batchDelete(ids: string[]): Promise<ResultType<true, RequestError>>
@@ -18,6 +22,7 @@ type UploadFileProps = {
     spaceId: string
     fileId: string
     data: Buffer
+    contentType?: string
 }
 
 const spaceStorageLimit = 100 * 1024 * 1024 // 100Mb
@@ -43,7 +48,7 @@ class FileService {
         models: AppModels,
         props: UploadFileProps
     ): Promise<ResultType<true, RequestError>> {
-        const { data, spaceId, fileId } = props
+        const { data, spaceId, fileId, contentType } = props
 
         const space = await models.spaces.findOne({
             where: { id: spaceId },
@@ -73,7 +78,7 @@ class FileService {
             })
         }
 
-        const res = await this.storage.put(fileId, data)
+        const res = await this.storage.put(fileId, data, contentType)
         if (!res.isOk) return res
 
         await models.files.create({ id: fileId, spaceId, size: fileSize })
@@ -144,7 +149,8 @@ class FileService {
         if (!res.isOk) return res
         const uploadRes = await this.uploadFile(models, {
             ...props,
-            data: res.value
+            data: res.value,
+            contentType: "image/jpeg"
         })
         return uploadRes
     }

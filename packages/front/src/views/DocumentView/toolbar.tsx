@@ -7,7 +7,6 @@ import { makeAutoObservable } from "mobx"
 import { Col, Row } from "oriente"
 
 import { LinkElement, ImageElement } from "../../types"
-
 import { useSpace, SpaceStore } from "../../store"
 import { Button, Icon, Input } from "../../ui"
 
@@ -62,7 +61,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             style={{
                 width: "100%",
                 boxShadow: isNodeActive(editor, type)
-                    ? "0 0 0 2px #dfdfdf inset"
+                    ? "0 0 0 2px var(--color-link) inset"
                     : "none"
             }}
             preventFocusSteal
@@ -76,7 +75,11 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
                         store.view = "create_link"
                     }
                 } else {
-                    toggleBlock(editor, type as BlockType)
+                    if (isNodeActive(editor, "image")) {
+                        // TODO just insert node ?
+                    } else {
+                        toggleBlock(editor, type as BlockType)
+                    }
                 }
             }}
             size="s"
@@ -358,11 +361,14 @@ class ToolbarStore {
             const { selection } = this.editor
             if (selection) {
                 const { id, state } = this.spaceStore.upload(files[0])
-                state.then(() => this.onImageUpload(id))
+                state.then(
+                    () => this.onImageUpload(id, true),
+                    (error) => this.onImageUpload(id, false, error.message)
+                )
                 const image = {
                     type: "image",
                     id,
-                    isPlaceholder: true,
+                    status: "uploading",
                     children: [{ text: "" }]
                 }
                 Transforms.insertNodes(this.editor, [image as ImageElement])
@@ -370,7 +376,7 @@ class ToolbarStore {
         })
     }
 
-    onImageUpload(id: string) {
+    onImageUpload(id: string, success: boolean, error?: string) {
         const nodes = Array.from(
             Editor.nodes(this.editor, {
                 match: (n) =>
@@ -379,7 +385,11 @@ class ToolbarStore {
             })
         )
         for (const [_, at] of nodes) {
-            Transforms.setNodes(this.editor, { isPlaceholder: false }, { at })
+            Transforms.setNodes(
+                this.editor,
+                success ? { status: "ready" } : { status: "error", error },
+                { at }
+            )
         }
     }
 }

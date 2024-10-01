@@ -6,6 +6,7 @@ export interface Space {
     owner: User
     membersCount: number
     role: SpaceRole
+    usedStorage: number
 }
 
 export type SpaceRole = "readonly" | "editor" | "admin" | "owner"

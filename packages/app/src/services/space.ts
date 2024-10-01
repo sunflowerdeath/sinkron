@@ -26,6 +26,7 @@ export type SpaceView = {
     id: string
     name: string
     role: SpaceRole
+    usedStorage: number
     membersCount: number
     owner: { id: string }
 }
@@ -152,6 +153,44 @@ class SpaceService {
         await this.app.sinkron.addMemberToGroup(userId, group)
     }
 
+    async getUserSpace(
+        models: AppModels,
+        userId: string,
+        spaceId: string
+    ): Promise<ResultType<SpaceView, RequestError>> {
+        const res = await models.members.findOne({
+            where: { userId, spaceId },
+            relations: ["space"],
+            select: {
+                spaceId: true,
+                role: true,
+                space: {
+                    id: true,
+                    ownerId: true,
+                    name: true,
+                    usedStorage: true
+                }
+            }
+        })
+        if (res === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                mesasge: "Space not found",
+                details: { spaceId, userId }
+            })
+        }
+        const membersCount = await models.members.countBy({ spaceId })
+        const space = {
+            id: res.spaceId,
+            name: res.space.name,
+            usedStorage: res.space.usedStorage,
+            role: res.role,
+            membersCount,
+            owner: { id: res.space.ownerId }
+        }
+        return Result.ok(space)
+    }
+
     async getUserSpaces(
         models: AppModels,
         userId: string
@@ -162,12 +201,18 @@ class SpaceService {
             select: {
                 spaceId: true,
                 role: true,
-                space: { id: true, ownerId: true, name: true }
+                space: {
+                    id: true,
+                    ownerId: true,
+                    name: true,
+                    usedStorage: true
+                }
             }
         })
         const spaces: SpaceView[] = res.map((m) => ({
             id: m.spaceId,
             name: m.space.name,
+            usedStorage: m.space.usedStorage,
             role: m.role,
             membersCount: 0,
             owner: { id: m.space.ownerId }

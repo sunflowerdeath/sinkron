@@ -23,11 +23,12 @@ import {
 
 import { EmailSender, FakeEmailSender } from "./email"
 import { LocalObjectStorage } from "./files/local"
+import { S3ObjectStorage } from "./files/s3"
 import { UserService } from "./services/user"
 import { AuthService } from "./services/auth"
 import { SpaceService } from "./services/space"
 import { InviteService } from "./services/invite"
-import { FileService } from "./services/file"
+import { FileService, ObjectStorage } from "./services/file"
 
 const authTokenHeader = "x-sinkron-auth-token"
 
@@ -377,6 +378,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.post<{ Body: Buffer; Params: { spaceId: string; fileId: string } }>(
         "/spaces/:spaceId/upload_image/:fileId",
+        { bodyLimit: 5 * 1024 * 1024 /* 5Mb */ },
         async (request, reply) => {
             await app.transaction(async (models) => {
                 const { spaceId, fileId } = request.params
@@ -404,12 +406,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     fileId
                 })
                 if (!res.isOk) {
-                    reply.code(500).send({
-                        error: {
-                            message: "Couldn't upload",
-                            details: res.error
-                        }
-                    })
+                    reply.code(500).send({ error: res.error })
                     return
                 }
 
@@ -527,8 +524,10 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const id = request.params.id
             await app.transaction(async (models) => {
+                const userId = request.token.userId
+
                 const updateRes = await models.invites.update(
-                    { id, status: "sent", toId: request.token.userId },
+                    { id, status: "sent", toId: userId },
                     { status: "accepted" }
                 )
                 if (updateRes.affected === 0) {
@@ -545,16 +544,23 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 }
                 const invite = inviteRes.value
 
-                // @ts-expect-error TODO
-                invite.space.membersCount = await models.members.countBy({
-                    spaceId: invite.spaceId
-                })
-
                 await app.services.spaces.addMember(models, {
                     userId: invite.to.id,
                     spaceId: invite.space.id,
                     role: invite.role
                 })
+
+                const getSpaceRes = await app.services.spaces.getUserSpace(
+                    models,
+                    userId,
+                    invite.spaceId
+                )
+                if (!getSpaceRes.isOk) {
+                    reply.code(500).send(getSpaceRes.error)
+                    return
+                }
+                // @ts-expect-error SpaceView
+                invite.space = getSpaceRes.value
 
                 reply.send(invite)
             })
@@ -720,6 +726,7 @@ type Services = {
 class App {
     sinkron: Sinkron
     sinkronServer: SinkronServer
+    storage: ObjectStorage
     emailSender: EmailSender
     channels: ChannelServer
     fastify: FastifyInstance
@@ -732,16 +739,19 @@ class App {
 
         this.emailSender = new FakeEmailSender()
 
-        const storage = new LocalObjectStorage(
-            path.join(process.cwd(), "temp/files")
-        )
+        this.storage =
+            config.storage.type === "s3"
+                ? new S3ObjectStorage(config.storage)
+                : new LocalObjectStorage(
+                      path.join(process.cwd(), config.storage.path)
+                  )
 
         this.services = {
             users: new UserService(this),
             auth: new AuthService(this),
             spaces: new SpaceService(this),
             invites: new InviteService(this),
-            file: new FileService({ app: this, storage })
+            file: new FileService({ app: this, storage: this.storage })
         }
 
         this.models = {

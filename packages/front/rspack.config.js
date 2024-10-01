@@ -33,12 +33,12 @@ const rules = [
     {
         test: /\.svg$/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
-        type: 'asset/source'
+        type: "asset/source"
     },
     {
         test: /\.png/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
-        type: 'asset/resource'
+        type: "asset/resource"
     }
 ]
 
@@ -92,6 +92,13 @@ module.exports = {
                 target: "http://localhost:80",
                 pathRewrite: { "^/api": "" }
             }
-        ]
+        ],
+        client: {
+            overlay: {
+                errors: true,
+                warnings: false,
+                runtimeErrors: false
+            }
+        }
     }
 }
