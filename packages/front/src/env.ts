@@ -1,4 +1,6 @@
+// @ts-expect-error webpack var
 const isProductionEnv = IS_PRODUCTION
+// @ts-expect-error webpack var
 const isTauri = IS_TAURI
 
 const wsUrl = isProductionEnv

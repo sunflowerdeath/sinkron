@@ -11,11 +11,12 @@ import {
 } from "slate-react"
 import { Popup, mergeRefs } from "oriente"
 import { observer } from "mobx-react"
+import { Img } from "react-image"
 
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
-import { FetchError } from "../../utils/fetchJson"
+import env from "../../env"
 import { useSpace } from "../../store"
 import { Button, Icon } from "../../ui"
 import {
@@ -193,88 +194,105 @@ const CheckListItem = (
     )
 }
 
-const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
-    const { attributes, element, children } = props
-    const { id, status, error } = element
-
-    const isSelected = useSelected()
-
-    let content
-    if (status !== "ready") {
-        let statusText = null
-        if (status === "uploading") {
-            statusText = "Uploading image..."
-        } else if (status === "error") {
-            statusText = (
-                <span style={{ color: "var(--color-error)" }}>
-                    Image upload error:
-                    <br />
-                    {error ?? "Unknown error"}
-                </span>
-            )
-        }
-        content = (
-            <div
-                style={{
-                    width: 200,
-                    height: 200,
-                    boxSizing: "border-box",
-                    border: "2px solid var(--color-elem)",
-                    background:
-                        "color-mix(in srgb, var(--color-elem) 33%, transparent)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 15
-                }}
-            >
-                {statusText}
-            </div>
-        )
-    } else {
-        // const src = `${spaceStore.api.baseUrl}/files/${id}`
-        const src = `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
-        content = (
-            <img
-                src={src}
-                style={{
-                    maxWidth: "100%",
-                    maxHeight: "50vh"
-                }}
-            />
-        )
-    }
-
+const ImagePlaceholder = (props: { children: React.ReactNode }) => {
     return (
         <div
-            contentEditable={false}
-            {...attributes}
             style={{
-                margin: "1rem 0",
+                width: 300,
+                height: 200,
+                boxSizing: "border-box",
+                background:
+                    "color-mix(in srgb, var(--color-elem) 33%, transparent)",
                 display: "flex",
-                alignItems: "start"
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 15
             }}
         >
-            {children}
-            <div
-                style={{
-                    minHeight: 100,
-                    minWidth: 100,
-                    maxHeight: "50vh",
-                    maxWidth: "100%",
-                    outline: isSelected
-                        ? "4px solid var(--color-link)"
-                        : "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                }}
-            >
-                {content}
-            </div>
+            {props.children}
         </div>
     )
-})
+}
+
+const ImageComponent = observer(
+    (props: CustomRenderElementProps<ImageElement>) => {
+        const { attributes, element, children } = props
+        const { id, status, error } = element
+
+        const isSelected = useSelected()
+        const spaceStore = useSpace()
+
+        let content
+        if (status !== "ready") {
+            let statusText = null
+            if (status === "uploading") {
+                statusText = "Uploading image..."
+            } else if (status === "error") {
+                statusText = (
+                    <span style={{ color: "var(--color-error)" }}>
+                        Image upload error:
+                        <br />
+                        {error ?? "Unknown error"}
+                    </span>
+                )
+            }
+            content = <ImagePlaceholder>{statusText}</ImagePlaceholder>
+        } else {
+            const src = env.isProductionEnv
+                ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
+                : `${spaceStore.api.baseUrl}/files/${id}`
+            content = (
+                <Img
+                    src={src}
+                    style={{
+                        maxWidth: "100%",
+                        maxHeight: "50vh"
+                    }}
+                    loader={
+                        <ImagePlaceholder>Loading image...</ImagePlaceholder>
+                    }
+                    unloader={
+                        <ImagePlaceholder>
+                            <span style={{ color: "var(--color-error)" }}>
+                                Couldn't load image
+                            </span>
+                        </ImagePlaceholder>
+                    }
+                />
+            )
+        }
+
+        return (
+            <div
+                contentEditable={false}
+                {...attributes}
+                style={{
+                    margin: "1rem 0",
+                    display: "flex",
+                    alignItems: "start"
+                }}
+            >
+                {children}
+                <div
+                    style={{
+                        minHeight: 100,
+                        minWidth: 100,
+                        maxHeight: "50vh",
+                        maxWidth: "100%",
+                        outline: isSelected
+                            ? "4px solid var(--color-link)"
+                            : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                    }}
+                >
+                    {content}
+                </div>
+            </div>
+        )
+    }
+)
 
 const EditorElement = (props: RenderElementProps) => {
     switch (props.element.type) {
@@ -296,7 +314,9 @@ const EditorElement = (props: RenderElementProps) => {
             )
         case "image":
             return (
-                <Image {...(props as CustomRenderElementProps<ImageElement>)} />
+                <ImageComponent
+                    {...(props as CustomRenderElementProps<ImageElement>)}
+                />
             )
         case "code":
             return (

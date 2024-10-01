@@ -879,20 +879,22 @@ class App {
             reply.send("Sinkron API")
         })
 
-        fastify.get<{ Params: { spaceId: string; fileId: string } }>(
-            "/files/:fileId",
-            async (request, reply) => {
-                const { fileId } = request.params
-                const res = await this.services.file.storage.get(fileId)
-                if (!res.isOk) {
-                    reply
-                        .code(404)
-                        .send({ error: { message: "File not found" } })
-                    return
+        if (config.storage.type === "local") {
+            fastify.get<{ Params: { spaceId: string; fileId: string } }>(
+                "/files/:fileId",
+                async (request, reply) => {
+                    const { fileId } = request.params
+                    const res = await this.services.file.storage.get(fileId)
+                    if (!res.isOk) {
+                        reply
+                            .code(404)
+                            .send({ error: { message: "File not found" } })
+                        return
+                    }
+                    reply.header("Content-type", "image/jpeg").send(res.value)
                 }
-                reply.header("Content-type", "image/jpeg").send(res.value)
-            }
-        )
+            )
+        }
 
         fastify.register(loginRoutes(this))
 

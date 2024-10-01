@@ -16,5 +16,12 @@
             "password": "password",
             "database": "sinkron"
         }
+    },
+    "mail": {
+        "type": "console"
+    },
+    "storage": {
+        "type": "local",
+        "path": "./temp/files"
     }
 }
