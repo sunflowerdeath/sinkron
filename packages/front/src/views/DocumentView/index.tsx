@@ -27,7 +27,7 @@ import SelectCategoriesView from "../../views/SelectCategoriesView"
 import CategoriesList from "../../components/CategoriesList"
 import { Button, LinkButton, Icon, Menu, MenuItem } from "../../ui"
 
-import { createSinkronEditor } from "./editor"
+import { DocumentViewStore } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
 import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
 import { Toolbar } from "./toolbar"
@@ -50,11 +50,16 @@ type EditorViewProps = {
 const EditorView = observer((props: EditorViewProps) => {
     const { id, doc, onChange, onDelete } = props
 
-    const space = useSpace()
-    const canDelete = space.space.role !== "readonly"
+    const spaceStore = useSpace()
+    const canDelete = spaceStore.space.role !== "readonly"
+
+    const documentViewStore = useMemo(
+        () => new DocumentViewStore(spaceStore),
+        []
+    )
+    const editor = documentViewStore.editor
 
     const forceUpdate = useForceUpdate()
-    const editor = useMemo(() => createSinkronEditor(), [])
     const value = useMemo(() => {
         return (fromAutomerge(doc.content) as any).children
     }, [doc])
@@ -98,7 +103,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     borderTop: "2px solid var(--color-elem)"
                 }}
             >
-                <Toolbar />
+                <Toolbar document={documentViewStore} />
             </div>
         )
     } else {
@@ -109,10 +114,10 @@ const EditorView = observer((props: EditorViewProps) => {
                     <div style={{ overflow: "scroll" }}>
                         <CategoriesList
                             items={doc.categories.map(
-                                (id) => space.meta.categories[id]!
+                                (id) => spaceStore.meta.categories[id]!
                             )}
                             onRemove={(c) => {
-                                space.changeDoc(id, (doc) => {
+                                spaceStore.changeDoc(id, (doc) => {
                                     doc.categories = without(doc.categories, c)
                                 })
                             }}
@@ -207,7 +212,7 @@ const EditorView = observer((props: EditorViewProps) => {
         [editor]
     )
 
-    const readOnly = space.space.role === "readonly"
+    const readOnly = spaceStore.space.role === "readonly"
     const editorElem = (
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
             <Editable
@@ -266,11 +271,11 @@ const EditorView = observer((props: EditorViewProps) => {
                 <SelectCategoriesView
                     value={doc.categories}
                     onChange={(value) => {
-                        space.collection.change(id, (doc) => {
+                        spaceStore.collection.change(id, (doc) => {
                             doc.categories = value
                         })
                     }}
-                    categoryTree={space.categoryTree}
+                    categoryTree={spaceStore.categoryTree}
                     onClose={() => setShowSelect(false)}
                 />
             </div>

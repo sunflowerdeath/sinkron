@@ -16,9 +16,25 @@ import {
     toggleBlock
 } from "./helpers"
 
-const createSinkronEditor = (): ReactEditor => {
+export type CreateEditorProps = {
+    uploadImage: (file: File) => void
+}
+
+const createSinkronEditor = (props: CreateEditorProps): ReactEditor => {
     const editor = withReact(createEditor())
-    const { normalizeNode, insertBreak, deleteBackward } = editor
+    const { normalizeNode, insertBreak, insertData, deleteBackward } = editor
+
+    editor.insertData = (data) => {
+        const { files } = data
+        if (files && files.length > 0) {
+            for (const file of files) {
+                const [mime] = file.type.split("/")
+                if (mime === "image") props.uploadImage(file)
+            }
+        } else {
+            insertData(data)
+        }
+    }
 
     editor.insertBreak = () => {
         const heading = isAtEndOfNode(editor, "heading")

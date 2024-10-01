@@ -3,32 +3,23 @@ import { useMedia } from "react-use"
 import { observer } from "mobx-react-lite"
 import { Node, Range, Transforms, Editor, Element, NodeEntry } from "slate"
 import { ReactEditor, useSlate } from "slate-react"
-import { makeAutoObservable } from "mobx"
+import { makeObservable } from "mobx"
 import { Col, Row } from "oriente"
-
-import { LinkElement, ImageElement } from "../../types"
-import { useSpace, SpaceStore } from "../../store"
-import { Button, Icon, Input } from "../../ui"
 
 import formatBoldSvg from "@material-design-icons/svg/outlined/format_bold.svg"
 import formatItalicSvg from "@material-design-icons/svg/outlined/format_italic.svg"
 import formatUnderlinedSvg from "@material-design-icons/svg/outlined/format_underlined.svg"
 import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_strikethrough.svg"
 
+import { LinkElement } from "../../types"
+import { Button, Icon, Input } from "../../ui"
+
+import { DocumentViewStore } from "./store"
 import type { BlockType, TextMarkType } from "./helpers"
 import { isNodeActive, toggleBlock, isMarkActive, toggleMark } from "./helpers"
 
 interface ToolbarViewProps {
     store: ToolbarStore
-}
-
-const openFileDialog = (cb: (files: FileList) => void) => {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.addEventListener("change", () => {
-        if (input.files !== null) cb(input.files)
-    })
-    input.click()
 }
 
 const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
@@ -67,7 +58,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             preventFocusSteal
             onClick={() => {
                 if (type === "image") {
-                    store.addImage()
+                    store.document.openImageDialog()
                 } else if (type === "link") {
                     if (isNodeActive(editor, "link")) {
                         store.view = "edit_link"
@@ -289,15 +280,21 @@ const ToolbarEditLinkView = observer((props: ToolbarViewProps) => {
 
 type ToolbarView = "toolbar" | "create_link" | "edit_link"
 
+type ToolbarStoreProps = {
+    editor: ReactEditor
+    document: DocumentViewStore
+}
+
 class ToolbarStore {
     editor: ReactEditor
-    view: ToolbarView = "toolbar"
-    spaceStore: SpaceStore
+    document: DocumentViewStore
 
-    constructor(editor: ReactEditor, spaceStore: SpaceStore) {
-        this.editor = editor
-        this.spaceStore = spaceStore
-        makeAutoObservable(this, { editor: false, spaceStore: false })
+    view: ToolbarView = "toolbar"
+
+    constructor(props: ToolbarStoreProps) {
+        this.editor = props.editor
+        this.document = props.document
+        makeObservable(this, { view: true })
     }
 
     getLinkNode(editor: ReactEditor): NodeEntry<LinkElement> | undefined {
@@ -355,49 +352,24 @@ class ToolbarStore {
         }
         this.view = "toolbar"
     }
-
-    addImage() {
-        openFileDialog((files) => {
-            const { selection } = this.editor
-            if (selection) {
-                const { id, state } = this.spaceStore.upload(files[0])
-                state.then(
-                    () => this.onImageUpload(id, true),
-                    (error) => this.onImageUpload(id, false, error.message)
-                )
-                const image = {
-                    type: "image",
-                    id,
-                    status: "uploading",
-                    children: [{ text: "" }]
-                }
-                Transforms.insertNodes(this.editor, [image as ImageElement])
-            }
-        })
-    }
-
-    onImageUpload(id: string, success: boolean, error?: string) {
-        const nodes = Array.from(
-            Editor.nodes(this.editor, {
-                match: (n) =>
-                    Element.isElementType(n, "image") &&
-                    (n as ImageElement).id === id
-            })
-        )
-        for (const [_, at] of nodes) {
-            Transforms.setNodes(
-                this.editor,
-                success ? { status: "ready" } : { status: "error", error },
-                { at }
-            )
-        }
-    }
 }
 
-const Toolbar = observer(() => {
+type ToolbarProps = {
+    document: DocumentViewStore
+}
+
+const Toolbar = observer((props: ToolbarProps) => {
+    const { document } = props
+
     const editor = useSlate() as ReactEditor
-    const spaceStore = useSpace()
-    const toolbarStore = useMemo(() => new ToolbarStore(editor, spaceStore), [])
+    const toolbarStore = useMemo(
+        () =>
+            new ToolbarStore({
+                editor,
+                document
+            }),
+        []
+    )
 
     if (toolbarStore.view === "toolbar") {
         return <ToolbarButtonsView store={toolbarStore} />
