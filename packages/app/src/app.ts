@@ -378,7 +378,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.post<{ Body: Buffer; Params: { spaceId: string; fileId: string } }>(
         "/spaces/:spaceId/upload_image/:fileId",
-        { bodyLimit: 5 * 1024 * 1024 /* 5Mb */ },
+        { bodyLimit: 20 * 1024 * 1024 /* 20Mb */ },
         async (request, reply) => {
             await app.transaction(async (models) => {
                 const { spaceId, fileId } = request.params

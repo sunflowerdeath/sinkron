@@ -246,7 +246,7 @@ const ImageComponent = observer(
                     src={src}
                     style={{
                         maxWidth: "100%",
-                        maxHeight: "50vh"
+                        maxHeight: "66vh"
                     }}
                     loader={
                         <ImagePlaceholder>Loading image...</ImagePlaceholder>
@@ -277,7 +277,7 @@ const ImageComponent = observer(
                     style={{
                         minHeight: 100,
                         minWidth: 100,
-                        maxHeight: "50vh",
+                        maxHeight: "66vh",
                         maxWidth: "100%",
                         outline: isSelected
                             ? "4px solid var(--color-link)"

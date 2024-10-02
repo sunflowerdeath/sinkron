@@ -15,7 +15,6 @@ import { Row, Col } from "oriente"
 import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 import { Transforms } from "slate"
-import { nanoid } from "nanoid"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
@@ -25,6 +24,7 @@ import { useSpace } from "../../store"
 import type { Document } from "../../entities"
 import { fromAutomerge, applySlateOps } from "../../slate"
 import SelectCategoriesView from "../../views/SelectCategoriesView"
+import ShareAndAccessView from "../../views/ShareAndAccessView"
 import CategoriesList from "../../components/CategoriesList"
 import {
     Button,
@@ -33,8 +33,7 @@ import {
     Menu,
     MenuItem,
     useDialog,
-    Heading,
-    Input
+    Heading
 } from "../../ui"
 import ButtonsGrid from "../../ui/ButtonsGrid"
 
@@ -177,7 +176,7 @@ const EditorView = observer((props: EditorViewProps) => {
                             }}
                         />
                     </div>
-                    <Button size="s" onClick={() => setShowSelect(true)}>
+                    <Button size="s" onClick={() => setView("categories")}>
                         <Icon svg={expandLessSvg} />
                     </Button>
                 </Row>
@@ -187,7 +186,7 @@ const EditorView = observer((props: EditorViewProps) => {
                 <Button
                     kind="faint"
                     size="s"
-                    onClick={() => setShowSelect(true)}
+                    onClick={() => setView("categories")}
                 >
                     Select categories
                 </Button>
@@ -217,8 +216,10 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const menu = () => (
         <>
-            <MenuItem isDisabled={true}>Share</MenuItem>
             <MenuItem isDisabled={true}>Copy to another space</MenuItem>
+            <MenuItem onSelect={() => setView("share")}>
+                Share & Access
+            </MenuItem>
             <MenuItem onSelect={() => publishDialog.open()}>Publish</MenuItem>
             <MenuItem onSelect={onDelete} isDisabled={!canDelete}>
                 Delete
@@ -311,10 +312,29 @@ const EditorView = observer((props: EditorViewProps) => {
         </ErrorBoundary>
     )
 
-    let selectCategories: React.ReactNode
-    const [showSelect, setShowSelect] = useState(false)
-    if (showSelect) {
-        selectCategories = (
+    const [view, setView] = useState<"share" | "categories" | undefined>(
+        undefined
+    )
+    let viewElem = null
+    if (view !== undefined) {
+        let content
+        if (view === "categories") {
+            content = (
+                <SelectCategoriesView
+                    value={doc.categories}
+                    onChange={(value) => {
+                        spaceStore.collection.change(id, (doc) => {
+                            doc.categories = value
+                        })
+                    }}
+                    categoryTree={spaceStore.categoryTree}
+                    onClose={() => setView(undefined)}
+                />
+            )
+        } else if (view === "share") {
+            content = <ShareAndAccessView onClose={() => setView(undefined)} />
+        }
+        viewElem = (
             <div
                 style={{
                     position: "absolute",
@@ -326,16 +346,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     overflow: "scroll"
                 }}
             >
-                <SelectCategoriesView
-                    value={doc.categories}
-                    onChange={(value) => {
-                        spaceStore.collection.change(id, (doc) => {
-                            doc.categories = value
-                        })
-                    }}
-                    categoryTree={spaceStore.categoryTree}
-                    onClose={() => setShowSelect(false)}
-                />
+                {content}
             </div>
         )
     }
@@ -366,7 +377,8 @@ const EditorView = observer((props: EditorViewProps) => {
             {topBar}
             <div style={{ flexGrow: 1, overflow: "auto" }}>{editorElem}</div>
             {bottomElem}
-            {selectCategories}
+            {viewElem}
+            {publishDialog.render()}
         </Col>
     )
 
@@ -384,7 +396,6 @@ const EditorView = observer((props: EditorViewProps) => {
             }}
         >
             {content}
-            {publishDialog.render()}
         </Slate>
     )
 })

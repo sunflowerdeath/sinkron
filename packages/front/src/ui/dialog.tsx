@@ -9,6 +9,9 @@ const mobileDialogStyles: StyleMap = {
     },
     container: {
         alignItems: "flex-end"
+    },
+    overlay: {
+        background: "rgba(15,15,15,.55)"
     }
 }
 
@@ -21,6 +24,9 @@ const desktopDialogStyles: StyleMap = {
     container: {
         paddingTop: 40,
         alignItems: "center"
+    },
+    overlay: {
+        background: "rgba(15,15,15,.55)"
     }
 }
 

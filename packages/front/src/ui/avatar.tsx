@@ -16,6 +16,7 @@ const Avatar = (props: AvatarProps) => (
         style={{
             width: 45,
             height: 45,
+            flexShrink: 0,
             borderRadius: 12,
             background:
                 props.name?.length > 0 ? stringToColor(props.name) : '#ccc',
