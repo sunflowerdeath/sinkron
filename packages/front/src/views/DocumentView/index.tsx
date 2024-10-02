@@ -15,6 +15,7 @@ import { Row, Col } from "oriente"
 import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 import { Transforms } from "slate"
+import { nanoid } from "nanoid"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
@@ -25,7 +26,17 @@ import type { Document } from "../../entities"
 import { fromAutomerge, applySlateOps } from "../../slate"
 import SelectCategoriesView from "../../views/SelectCategoriesView"
 import CategoriesList from "../../components/CategoriesList"
-import { Button, LinkButton, Icon, Menu, MenuItem } from "../../ui"
+import {
+    Button,
+    LinkButton,
+    Icon,
+    Menu,
+    MenuItem,
+    useDialog,
+    Heading,
+    Input
+} from "../../ui"
+import ButtonsGrid from "../../ui/ButtonsGrid"
 
 import { DocumentViewStore } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
@@ -38,6 +49,49 @@ const useForceUpdate = () => {
         setState(() => ({}))
     }, [])
     return forceUpdate
+}
+
+type PublishDialogProps = {
+    onClose: () => void
+}
+
+const PublishDialog = (props: PublishDialogProps) => {
+    const { onClose } = props
+
+    return (
+        <Col gap={16}>
+            <Heading style={{ flexGrow: 1 }}>Publish document</Heading>
+            <div>Document is published on 1 Oct at 23:52</div>
+            <a href="#" style={{ color: "var(--color-link)" }}>
+                https:sinkron.xyz/posts/recept-vkusnogo-borscha
+            </a>
+            <ButtonsGrid>
+                <Button>Copy link</Button>
+                <Button
+                    style={{
+                        textAlign: "center",
+                        fontSize: ".9rem",
+                        lineHeight: "1.5em"
+                    }}
+                >
+                    Update to current version
+                </Button>
+                <Button>Unpublish</Button>
+                <Button onClick={onClose}>Close</Button>
+            </ButtonsGrid>
+        </Col>
+    )
+
+    return (
+        <Col gap={16}>
+            <Heading style={{ flexGrow: 1 }}>Publish document</Heading>
+            Document is not published
+            <ButtonsGrid>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button>Publish</Button>
+            </ButtonsGrid>
+        </Col>
+    )
 }
 
 type EditorViewProps = {
@@ -157,11 +211,15 @@ const EditorView = observer((props: EditorViewProps) => {
         )
     }
 
+    const publishDialog = useDialog((close) => (
+        <PublishDialog onClose={close} />
+    ))
+
     const menu = () => (
         <>
             <MenuItem isDisabled={true}>Share</MenuItem>
             <MenuItem isDisabled={true}>Copy to another space</MenuItem>
-            <MenuItem isDisabled={true}>Publish</MenuItem>
+            <MenuItem onSelect={() => publishDialog.open()}>Publish</MenuItem>
             <MenuItem onSelect={onDelete} isDisabled={!canDelete}>
                 Delete
             </MenuItem>
@@ -326,6 +384,7 @@ const EditorView = observer((props: EditorViewProps) => {
             }}
         >
             {content}
+            {publishDialog.render()}
         </Slate>
     )
 })

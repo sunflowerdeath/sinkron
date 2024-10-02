@@ -3,7 +3,7 @@ import { createServer } from "node:http"
 import { Sinkron, SinkronServer, Permissions, Role, Action } from "sinkron"
 import pino, { Logger } from "pino"
 
-const numCols = 100
+const numCols = 250
 const numUsers = numCols * 2
 const port = 8081
 

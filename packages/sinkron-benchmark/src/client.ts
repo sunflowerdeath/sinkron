@@ -6,9 +6,10 @@ import WebSocket from "ws"
 import { Collection, WebSocketTransport } from "sinkron-client"
 import pino, { Logger } from "pino"
 
-const numCols = 100
+const numCols = 250
 const numUsers = numCols * 2
 const port = 8081
+const actionTimeout = () => random(1000, 1500)
 
 type Doc = {
     text: string
@@ -55,7 +56,7 @@ const client = (userid: string, colid: string) => {
                 })
             }
         }
-        setTimeout(doSomething, random(500, 1000))
+        setTimeout(doSomething, actionTimeout())
     }
     setTimeout(doSomething, random(2000, 3000))
 }

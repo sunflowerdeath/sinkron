@@ -176,6 +176,18 @@ const FileEntity = new EntitySchema<File>({
     }
 })
 
+/*
+export type Post = {
+    id: string
+    spaceId: String
+    space: Space
+    docId: String
+    content: String
+    publishedAt: String
+    publishedBy: String
+}
+*/
+
 const entities = [
     UserEntity,
     OtpEntity,

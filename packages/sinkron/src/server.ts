@@ -495,6 +495,7 @@ class SinkronServer {
                 details: "Client not found"
             })
         }
+
         const checkRes = await this.sinkron.checkDocumentPermission({
             id,
             user: client.id,

@@ -9,7 +9,7 @@ import {
 import { without, remove, isEqual, uniq } from "lodash"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
-// import pino from "pino"
+import { LRUCache } from "lru-cache"
 
 import { createDataSource } from "./db"
 // import { getEntities } from "./entities"
@@ -85,9 +85,11 @@ class Sinkron {
     constructor(props: SinkronProps) {
         const { db } = props
         this.db = createDataSource(db)
+        this.cache = new LRUCache({ max: 1000 })
     }
 
     db: DataSource
+    cache: LRUCache<string, Document>
 
     async init() {
         await this.db.initialize()
@@ -103,7 +105,13 @@ class Sinkron {
         }
     }
 
-    async getDocumentTr(m: EntityManager, id: string) {
+    async getDocumentTr(
+        m: EntityManager,
+        id: string
+    ): Promise<null | Document> {
+        const cached = this.cache.get(id)
+        if (cached !== undefined) return cached
+
         const models = this.getModels(m)
         const select = {
             id: true,
@@ -335,7 +343,7 @@ class Sinkron {
         }
         const insertRes = await models.documents.insert(doc)
         const generated = insertRes.generatedMaps[0]
-        const result = { ...doc, ...generated } as Document
+        const result = { ...doc, ...generated } as Document // TODO cache
         return Result.ok(result)
     }
 
@@ -496,7 +504,16 @@ class Sinkron {
             ...incrementRefColrevsRes.value
         ]
 
-        return Result.ok({ ...doc, ...update, colrev: nextColrev, updatedAt })
+        const updated: Document = {
+            ...doc,
+            ...update,
+            colrev: nextColrev,
+            updatedAt
+        }
+        this.cache.set(doc.id, updated)
+
+        // TODO return updated ref collections (but do not cache?)
+        return Result.ok(updated)
     }
 
     async updateDocumentTr(
