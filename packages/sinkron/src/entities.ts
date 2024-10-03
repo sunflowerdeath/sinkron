@@ -1,4 +1,4 @@
-import { EntitySchema } from "typeorm"
+import { EntitySchema, ColumnType } from "typeorm"
 
 export type Document = {
     id: string
@@ -44,18 +44,29 @@ export type GroupMember = {
     group: Group
 }
 
+const sqliteTypes: { [key: string]: ColumnType } = {
+    uuid: String,
+    date: Date,
+    blob: "blob"
+}
+
+const postgresTypes: { [key: string]: ColumnType } = {
+    uuid: "uuid",
+    date: "timestamp with time zone",
+    blob: "bytea"
+}
+
 const getEntities = (db: "postgres" | "sqlite") => {
-    const uuidType = db === "postgres" ? "uuid" : "text"
-    const blobType = db === "postgres" ? "bytea" : "blob"
+    const types = db === "postgres" ? postgresTypes : sqliteTypes
 
     const DocumentEntity = new EntitySchema<Document>({
         name: "document",
         columns: {
-            id: { type: uuidType, primary: true },
+            id: { type: types.uuid, primary: true },
             rev: { type: Number },
-            data: { type: blobType, nullable: true },
-            createdAt: { type: Date, createDate: true },
-            updatedAt: { type: Date, updateDate: true },
+            data: { type: types.blob, nullable: true },
+            createdAt: { type: types.date, createDate: true },
+            updatedAt: { type: types.date, updateDate: true },
             isDeleted: { type: Boolean },
             permissions: { type: String },
             colrev: { type: Number },
@@ -70,11 +81,11 @@ const getEntities = (db: "postgres" | "sqlite") => {
     const RefEntity = new EntitySchema<Ref>({
         name: "ref",
         columns: {
-            id: { type: uuidType, primary: true },
+            id: { type: types.uuid, primary: true },
             isRemoved: { type: Boolean },
             colrev: { type: Number },
             colId: { type: String },
-            docId: { type: uuidType }
+            docId: { type: types.uuid }
         },
         relations: {
             col: { type: "many-to-one", target: "collection" },
@@ -87,8 +98,8 @@ const getEntities = (db: "postgres" | "sqlite") => {
         name: "collection",
         columns: {
             id: { type: String, primary: true },
-            createdAt: { type: Date, createDate: true },
-            updatedAt: { type: Date, updateDate: true },
+            createdAt: { type: types.date, createDate: true },
+            updatedAt: { type: types.date, updateDate: true },
             colrev: { type: Number },
             permissions: { type: String },
             ref: { type: Boolean, default: false }
@@ -105,7 +116,7 @@ const getEntities = (db: "postgres" | "sqlite") => {
     const GroupMemberEntity = new EntitySchema<GroupMember>({
         name: "group_member",
         columns: {
-            id: { type: uuidType, primary: true, generated: "uuid" },
+            id: { type: types.uuid, primary: true, generated: "uuid" },
             user: { type: String },
             groupId: { type: String }
         },

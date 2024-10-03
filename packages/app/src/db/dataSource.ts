@@ -1,6 +1,6 @@
 import { DataSource } from "typeorm"
 
-import { entities } from "../entities"
+import { createEntities } from "../entities"
 
 export type PostgresConfig = {
     type: "postgres"
@@ -27,6 +27,7 @@ const migrations = ctx.keys().map((key: string) => {
 })
 
 const createDataSource = (config: DbConfig) => {
+    const entities = createEntities(config.type)
     if (config.type === "sqlite") {
         const { database, synchronize } = config
         return new DataSource({

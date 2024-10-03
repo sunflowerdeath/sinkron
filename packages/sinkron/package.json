@@ -7,7 +7,6 @@
     "scripts": {
         "lint": "eslint src",
         "build": "NODE_ENV=production rspack --config rspack.config.js",
-        "build2": "NODE_ENV=production webpack --config rspack.config.js",
         "test": "rspack --config rspack.test.config.js && mocha ./build/test.js"
     },
     "author": "sunflowerdeath",
@@ -26,18 +25,14 @@
         "mocha": "^10.1.0",
         "ts-loader": "^9.5.1",
         "typescript": "^5.3.3",
-        "webpack": "^5.94.0",
-        "webpack-cli": "^5.1.4",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
         "@automerge/automerge": "^2.2.8",
         "ajv": "^8.12.0",
         "date-fns": "^2.30.0",
-        "flatbuffers": "^24.3.25",
         "lodash": "^4.17.21",
         "lru-cache": "^11.0.1",
-        "pg": "^8.13.0",
         "pino": "^8.11.0",
         "pino-pretty": "^10.3.1",
         "typeorm": "^0.3.13",

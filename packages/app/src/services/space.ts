@@ -162,6 +162,7 @@ class SpaceService {
             where: { userId, spaceId },
             relations: ["space"],
             select: {
+                id: true,
                 spaceId: true,
                 role: true,
                 space: {

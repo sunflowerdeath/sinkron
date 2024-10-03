@@ -25,10 +25,15 @@ const AccessListItem = (props: AccessListItem) => {
     return (
         <Row gap={8} align="center" style={{ alignSelf: "stretch" }}>
             <Avatar name={email} />
-            <div style={{ flexGrow: 1,
-                overflow: "hidden",
-                textOverflow: "ellipsis"
-                }}>{email}</div>
+            <div
+                style={{
+                    flexGrow: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                }}
+            >
+                {email}
+            </div>
             <Select
                 value={"readonly"}
                 options={accessOptions}

@@ -10,7 +10,7 @@ import cors from "@fastify/cors"
 import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 
 import dataSource from "./db/app"
-import { config } from "./config"
+import { config, SinkronConfig } from "./config"
 import {
     User,
     Otp,
@@ -18,7 +18,8 @@ import {
     Space,
     SpaceMember,
     Invite,
-    File
+    File,
+    Post
 } from "./entities"
 
 import { EmailSender, FakeEmailSender } from "./email"
@@ -47,6 +48,7 @@ export type AppModels = {
     members: Repository<SpaceMember>
     invites: Repository<Invite>
     files: Repository<File>
+    posts: Repository<Post>
 }
 
 type AppProps = {
@@ -724,6 +726,7 @@ type Services = {
 }
 
 class App {
+    config: SinkronConfig
     sinkron: Sinkron
     sinkronServer: SinkronServer
     storage: ObjectStorage
@@ -735,6 +738,8 @@ class App {
     services: Services
 
     constructor() {
+        this.config = config
+
         this.db = dataSource
 
         this.emailSender = new FakeEmailSender()
@@ -761,7 +766,8 @@ class App {
             spaces: this.db.getRepository<Space>("space"),
             members: this.db.getRepository<SpaceMember>("space_member"),
             invites: this.db.getRepository<Invite>("invite"),
-            files: this.db.getRepository<File>("file")
+            files: this.db.getRepository<File>("file"),
+            posts: this.db.getRepository<Post>("post")
         }
 
         this.sinkron = new Sinkron({ db: config.sinkron.db })
