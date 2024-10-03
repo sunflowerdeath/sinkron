@@ -71,7 +71,8 @@ class SpaceService {
             name,
             owner: { id: ownerId } as User,
             role: "owner",
-            membersCount: 1
+            membersCount: 1,
+            usedStorage: 0
         }
 
         const col = `spaces/${space.id}`
@@ -151,6 +152,18 @@ class SpaceService {
             `spaces/${spaceId}/` +
             (role === "readonly" ? "readonly" : "members")
         await this.app.sinkron.addMemberToGroup(userId, group)
+    }
+
+    async getMemberRole(
+        models: AppModels,
+        props: { spaceId: string; userId: string }
+    ) : Promise<SpaceRole | null> {
+        const { userId, spaceId } = props
+        const member = await models.members.findOne({
+            where: { userId, spaceId },
+            select: { role: true }
+        })
+        return member ? member.role : null
     }
 
     async getUserSpace(

@@ -73,11 +73,11 @@ export type File = {
 }
 
 export type Post = {
-    docId: string // uuid
+    id: string // uuid (same as docId in sinkron)
     spaceId: string // uuid
     space: Space
     content: string
-    publishedAt: string
+    publishedAt: Date
 }
 
 const sqliteTypes = {
@@ -200,7 +200,7 @@ const createEntities = (type: "postgres" | "sqlite") => {
     const PostEntity = new EntitySchema<Post>({
         name: "post",
         columns: {
-            docId: { type: types.uuid, primary: true },
+            id: { type: types.uuid, primary: true },
             spaceId: { type: types.uuid },
             content: { type: String },
             publishedAt: { type: types.date, updateDate: true }

@@ -8,10 +8,14 @@ type PublishProps = {
     spaceId: string
 }
 
-type PublishResult = {
-    docId: string
-    spaceId: string
+type PostPublishResult = {
+    id: string
     publishedAt: Date
+}
+
+type PostContentResult = {
+    id: string
+    content: object
 }
 
 class PostService {
@@ -24,29 +28,28 @@ class PostService {
     async get(
         models: AppModels,
         id: string
-    ): Promise<ResultType<Post, RequestError>> {
-        const post = await models.posts.findOne({
-            where: { docId: id },
-            select: { docId: true, content: true }
+    ): Promise<PostPublishResult | null> {
+        const res = await models.posts.findOne({
+            where: { id },
+            select: { id: true, spaceId: true, publishedAt: true }
         })
-
-        if (post === null) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Post not found",
-                details: { id }
-            })
-        }
-
-        return Result.ok(post)
+        return res as PostPublishResult
     }
 
-    async publish(
+    async content(
         models: AppModels,
-        props: PublishProps
-    ): Promise<ResultType<PublishResult, RequestError>> {
-        const { docId, spaceId } = props
+        id: string
+    ): Promise<PostContentResult | null> {
+        const res = await models.posts.findOne({
+            where: { id },
+            select: { content: true }
+        })
+        return res === null ? null : { id, content: JSON.parse(res.content) }
+    }
 
+    async #getDocContent(
+        docId: string
+    ): Promise<ResultType<string, RequestError>> {
         const doc = await this.app.sinkron.getDocument(docId)
         if (doc === null || doc.data === null) {
             return Result.err({
@@ -55,17 +58,29 @@ class PostService {
                 details: { docId }
             })
         }
-
-        // TODO check col
-
         const automerge = Automerge.load(doc.data)
+        return Result.ok(JSON.stringify(automerge.content))
+    }
 
-        const res = await models.posts.insert({
-            docId,
+    async publish(
+        models: AppModels,
+        props: PublishProps
+    ): Promise<ResultType<PostPublishResult, RequestError>> {
+        const { docId, spaceId } = props
+
+        // TODO check post already exists
+
+        // TODO check that document is part of space
+
+        const getContentRes = await this.#getDocContent(docId)
+        if (!getContentRes.isOk) return getContentRes
+
+        const insertRes = await models.posts.insert({
+            id: docId,
             spaceId,
-            content: JSON.stringify(automerge.content)
+            content: getContentRes.value
         })
-        const { publishedAt } = res.generatedMaps[0]
+        const { publishedAt } = insertRes.generatedMaps[0]
 
         const updateRes = await this.app.sinkron.updateDocumentWithCallback(
             docId,
@@ -80,25 +95,43 @@ class PostService {
             })
         }
 
-        return Result.ok({ docId, spaceId, publishedAt })
+        return Result.ok({ id: docId, spaceId, publishedAt })
     }
 
-    // async update(
-        // models: AppModels,
-        // id: string
-    // ): Promise<ResultType<PublishResult, RequestError>> {
-    // }
+    async update(
+        models: AppModels,
+        id: string
+    ): Promise<ResultType<PostPublishResult, RequestError>> {
+        const post = await this.get(models, id)
+        if (post === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "Post not found"
+            })
+        }
+
+        const getContentRes = await this.#getDocContent(id)
+        if (!getContentRes.isOk) return getContentRes
+
+        const updateRes = await models.posts.update(
+            { id },
+            { content: getContentRes.value }
+        )
+        const { publishedAt } = updateRes.generatedMaps[0]
+
+        return Result.ok({ ...post, publishedAt })
+    }
 
     async unpublish(
         models: AppModels,
         id: string
     ): Promise<ResultType<true, RequestError>> {
-        const res = await models.posts.deleteBy({ id })
+        const res = await models.posts.delete({ id })
 
-        if (res.affectedRows === 0) {
+        if (res.affected === 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "Post doesn't exist",
+                code: ErrorCode.NotFound,
+                message: "Post not found",
                 details: { id }
             })
         }

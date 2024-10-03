@@ -30,6 +30,7 @@ import { AuthService } from "./services/auth"
 import { SpaceService } from "./services/space"
 import { InviteService } from "./services/invite"
 import { FileService, ObjectStorage } from "./services/file"
+import { PostService } from "./services/post"
 
 const authTokenHeader = "x-sinkron-auth-token"
 
@@ -344,27 +345,27 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             await app.transaction(async (models) => {
                 const { spaceId, userId } = request.params
 
-                const member = await models.members.findOne({
-                    where: { userId, spaceId },
-                    select: { id: true, role: true }
-                })
-                if (member === null) {
+                const memberRole = await app.services.spaces.getMemberRole(
+                    models,
+                    { userId, spaceId }
+                )
+                if (memberRole === null) {
                     reply
                         .code(500)
                         .send({ error: { message: "Member not found" } })
                     return
                 }
 
-                const currentUserMember = await models.members.findOne({
-                    where: { userId: request.token.userId, spaceId },
-                    select: { role: true }
-                })
+                const currentUserRole = await app.services.spaces.getMemberRole(
+                    models,
+                    { userId: request.token.userId, spaceId }
+                )
                 const isPermitted =
-                    currentUserMember !== null &&
-                    member.role !== "owner" &&
-                    (member.role === "admin"
-                        ? currentUserMember.role === "owner"
-                        : ["admin", "owner"].includes(currentUserMember.role))
+                    currentUserRole !== null &&
+                    memberRole !== "owner" &&
+                    (memberRole === "admin"
+                        ? currentUserRole === "owner"
+                        : ["admin", "owner"].includes(currentUserRole))
                 if (!isPermitted) {
                     reply
                         .code(500)
@@ -372,7 +373,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                await models.members.delete({ id: member.id })
+                await models.members.delete({ id: userId })
                 reply.send({})
             })
         }
@@ -385,17 +386,14 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             await app.transaction(async (models) => {
                 const { spaceId, fileId } = request.params
 
-                const member = await models.members.findOne({
-                    where: { spaceId, userId: request.token.userId },
-                    select: { role: true }
+                const role = await app.services.spaces.getMemberRole(models, {
+                    userId: request.token.userId,
+                    spaceId
                 })
-                if (!member) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Space not found" } })
-                    return
-                }
-                if (!["admin", "owner", "editor"].includes(member.role)) {
+                if (
+                    role === null ||
+                    !["admin", "owner", "editor"].includes(role)
+                ) {
                     reply
                         .code(500)
                         .send({ error: { message: "Not permitted" } })
@@ -490,18 +488,18 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                const member = await models.members.findOne({
-                    where: {
-                        spaceId: invite.spaceId,
-                        userId: request.token.userId
-                    },
-                    select: { role: true }
-                })
+                const currentUserRole = await app.services.spaces.getMemberRole(
+                    models,
+                    {
+                        userId: request.token.userId,
+                        spaceId: invite.spaceId
+                    }
+                )
                 const isPermitted =
-                    member !== null &&
+                    currentUserRole !== null &&
                     (role === "admin"
-                        ? member.role === "owner"
-                        : ["admin", "owner"].includes(member.role))
+                        ? currentUserRole === "owner"
+                        : ["admin", "owner"].includes(currentUserRole))
                 if (!isPermitted) {
                     reply
                         .code(500)
@@ -611,17 +609,11 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                     return
                 }
 
-                const member = await models.members.findOne({
-                    where: {
-                        spaceId: invite.spaceId,
-                        userId: request.token.userId
-                    },
-                    select: { role: true }
+                const role = await app.services.spaces.getMemberRole(models, {
+                    userId: request.token.userId,
+                    spaceId: invite.spaceId
                 })
-                if (
-                    member === null ||
-                    !["admin", "owner"].includes(member.role)
-                ) {
+                if (role === null || !["admin", "owner"].includes(role)) {
                     reply
                         .code(500)
                         .send({ error: { message: "Not permitted" } })
@@ -671,6 +663,48 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     )
 }
 
+type PostCreateBody = { docId: string; spaceId: string }
+
+const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
+    fastify.post<{ Body: PostCreateBody }>(
+        "/posts/new",
+        async (request, reply) => {
+            const { docId, spaceId } = request.body
+            await app.transaction(async (models) => {
+                const role = await app.services.spaces.getMemberRole(models, {
+                    userId: request.token.userId,
+                    spaceId
+                })
+                if (role === null || !["admin", "owner"].includes(role)) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
+                    return
+                }
+
+                const res = await app.services.posts.publish(models, {
+                    docId,
+                    spaceId
+                })
+                if (!res.isOk) {
+                    reply.code(500).send(res.error)
+                    return
+                }
+
+                reply.send(res.value)
+            })
+        }
+    )
+
+    fastify.post<{ Body: PostCreateBody }>("/posts/:id/update", () => {})
+
+    fastify.post<{ Body: PostCreateBody }>("/posts/:id/unpublish", () => {})
+
+    fastify.post<{ Body: PostCreateBody }>("/posts/:id", () => {})
+
+    fastify.post<{ Body: PostCreateBody }>("/posts/:id/content", () => {})
+}
+
 const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.addHook("preValidation", async (request, reply) => {
         const token = request.headers[authTokenHeader]
@@ -715,6 +749,7 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.register(accountRoutes(app))
     fastify.register(spacesRoutes(app))
     fastify.register(invitesRoutes(app))
+    fastify.register(postsRoutes(app))
 }
 
 type Services = {
@@ -723,6 +758,7 @@ type Services = {
     spaces: SpaceService
     invites: InviteService
     file: FileService
+    posts: PostService
 }
 
 class App {
@@ -739,26 +775,22 @@ class App {
 
     constructor() {
         this.config = config
-
         this.db = dataSource
-
         this.emailSender = new FakeEmailSender()
-
         this.storage =
             config.storage.type === "s3"
                 ? new S3ObjectStorage(config.storage)
                 : new LocalObjectStorage(
                       path.join(process.cwd(), config.storage.path)
                   )
-
         this.services = {
             users: new UserService(this),
             auth: new AuthService(this),
             spaces: new SpaceService(this),
             invites: new InviteService(this),
-            file: new FileService({ app: this, storage: this.storage })
+            file: new FileService({ app: this, storage: this.storage }),
+            posts: new PostService(this)
         }
-
         this.models = {
             users: this.db.getRepository<User>("user"),
             otps: this.db.getRepository<Otp>("otp"),
@@ -769,12 +801,9 @@ class App {
             files: this.db.getRepository<File>("file"),
             posts: this.db.getRepository<Post>("post")
         }
-
         this.sinkron = new Sinkron({ db: config.sinkron.db })
         this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
-
         this.channels = new ChannelServer({})
-
         this.fastify = this.createFastify()
     }
 
@@ -787,7 +816,8 @@ class App {
                 spaces: m.getRepository<Space>("space"),
                 members: m.getRepository<SpaceMember>("space_member"),
                 invites: m.getRepository<Invite>("invite"),
-                files: m.getRepository<File>("file")
+                files: m.getRepository<File>("file"),
+                posts: m.getRepository<Post>("post")
             }
             return cb(models)
         })
