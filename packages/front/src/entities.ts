@@ -62,3 +62,9 @@ export type Document = {
     content: AutomergeNode
     categories: string[]
 }
+
+export type Post = {
+    id: string
+    spaceId: string
+    publishedAt: string
+}

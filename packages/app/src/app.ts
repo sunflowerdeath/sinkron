@@ -770,7 +770,12 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 if (post === null) {
                     reply
                         .code(500)
-                        .send({ error: { message: "Post not found" } })
+                        .send({
+                            error: {
+                                message: "Post not found",
+                                code: "not_found"
+                            }
+                        })
                     return
                 }
                 reply.send(post)

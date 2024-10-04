@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class Initial1727958243301 implements MigrationInterface {
-    name = 'Initial1727958243301'
+export class Initial1728044568087 implements MigrationInterface {
+    name = 'Initial1728044568087'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "user" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "email" character varying NOT NULL, "isDisabled" boolean NOT NULL, "hasUnreadNotifications" boolean NOT NULL, CONSTRAINT "PK_cace4a159ff9f2512dd42373760" PRIMARY KEY ("id"))`);
@@ -18,7 +18,7 @@ export class Initial1727958243301 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_0d683af0f9844ed115756f559f" ON "invite" ("fromId") `);
         await queryRunner.query(`CREATE INDEX "IDX_9f0e8951f9decd5a33d34f3357" ON "invite" ("toId") `);
         await queryRunner.query(`CREATE TABLE "file" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "spaceId" uuid NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "size" integer NOT NULL, CONSTRAINT "PK_36b46d232307066b3a2c9ea3a1d" PRIMARY KEY ("id"))`);
-        await queryRunner.query(`CREATE TABLE "post" ("docId" uuid NOT NULL, "spaceId" uuid NOT NULL, "content" character varying NOT NULL, "publishedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_5f6af3a0e20bb22a045ecb4001c" PRIMARY KEY ("docId"))`);
+        await queryRunner.query(`CREATE TABLE "post" ("id" uuid NOT NULL, "spaceId" uuid NOT NULL, "content" character varying NOT NULL, "publishedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_be5fda3aac270b134ff9c21cdee" PRIMARY KEY ("id"))`);
         await queryRunner.query(`ALTER TABLE "token" ADD CONSTRAINT "FK_94f168faad896c0786646fa3d4a" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "space" ADD CONSTRAINT "FK_5c9f1f9a773546f4393d1b8c9c9" FOREIGN KEY ("ownerId") REFERENCES "user"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "space_member" ADD CONSTRAINT "FK_c6700f460e6c6197d6b520394a7" FOREIGN KEY ("spaceId") REFERENCES "space"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);

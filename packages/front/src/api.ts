@@ -3,7 +3,7 @@ import { fetchJson, FetchError, FetchParams } from "./utils/fetchJson"
 const authTokenHeader = "x-sinkron-auth-token"
 
 export interface ApiError {
-    error: { message: string } & object
+    error: { message: string } & { [key:string]: any }
 }
 
 const isApiError = (data: object | undefined): data is ApiError =>
