@@ -21,7 +21,8 @@ module.exports = {
         test: [
             "./src/tests/users.test.ts",
             "./src/tests/spaces.test.ts",
-            "./src/tests/invites.test.ts"
+            "./src/tests/invites.test.ts",
+            "./src/tests/posts.test.ts"
         ]
     },
     output: {

@@ -209,7 +209,7 @@ type SpaceCreateBody = { name: string }
 const spaceCreateRenameSchema = {
     type: "object",
     properties: {
-        name: { type: "string", minLength: 1 }
+        name: { type: "string", minLength: 1 } // TODO proper validdtion
     },
     required: ["name"],
     additionalProperties: false
@@ -235,32 +235,23 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         }
     )
 
-    fastify.post<{ Params: { id: string }; Body: { name: string } }>(
-        "/spaces/:id/rename",
+    fastify.post<{ Params: { spaceId: string }; Body: { name: string } }>(
+        "/spaces/:spaceId/rename",
         { schema: { body: spaceCreateRenameSchema } },
         async (request, reply) => {
-            const { id } = request.params
+            const { spaceId } = request.params
             const { name } = request.body
             await app.transaction(async (models) => {
-                const exist = await app.services.spaces.exists(models, id)
-                if (!exist) {
-                    reply.code(500).send()
-                    return
-                }
-
-                const member = await models.members.findOne({
-                    where: { userId: request.token.userId, spaceId: id },
-                    select: { role: true }
+                const role = await app.services.spaces.getMemberRole(models, {
+                    userId: request.token.userId,
+                    spaceId
                 })
-                if (
-                    member === null ||
-                    !["admin", "owner"].includes(member.role)
-                ) {
+                if (role === null || !["admin", "owner"].includes(role)) {
                     reply.code(500).send()
                     return
                 }
 
-                await app.services.spaces.rename(models, id, name)
+                await app.services.spaces.rename(models, spaceId, name)
                 reply.send({})
             })
         }
@@ -311,13 +302,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const { id } = request.params
             await app.transaction(async (models) => {
-                const exist = await app.services.spaces.exists(models, id)
-                if (!exist) {
-                    reply.code(500).send()
-                    return
-                }
-
-                // Check if user is member
+                // Check if the user is a member of the space
                 const count = await models.members.count({
                     where: { userId: request.token.userId, spaceId: id }
                 })
@@ -696,13 +681,119 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
         }
     )
 
-    fastify.post<{ Body: PostCreateBody }>("/posts/:id/update", () => {})
+    fastify.post<{ Params: { postId: string } }>(
+        "/posts/:postId/update",
+        async (request, reply) => {
+            const { postId } = request.params
+            await app.transaction(async (models) => {
+                const post = await app.services.posts.get(models, postId)
+                if (post === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Post not found" } })
+                    return
+                }
 
-    fastify.post<{ Body: PostCreateBody }>("/posts/:id/unpublish", () => {})
+                const role = await app.services.spaces.getMemberRole(models, {
+                    userId: request.token.userId,
+                    spaceId: post.spaceId
+                })
+                if (role === null || !["admin", "owner"].includes(role)) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
+                    return
+                }
 
-    fastify.post<{ Body: PostCreateBody }>("/posts/:id", () => {})
+                const updateRes = await app.services.posts.update(
+                    models,
+                    postId
+                )
+                if (!updateRes.isOk) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Couldn't update post" } })
+                    return
+                }
 
-    fastify.post<{ Body: PostCreateBody }>("/posts/:id/content", () => {})
+                reply.send(updateRes.value)
+            })
+        }
+    )
+
+    fastify.post<{ Params: { postId: string } }>(
+        "/posts/:postId/unpublish",
+        async (request, reply) => {
+            const { postId } = request.params
+            await app.transaction(async (models) => {
+                const post = await app.services.posts.get(models, postId)
+                if (post === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Post not found" } })
+                    return
+                }
+
+                const role = await app.services.spaces.getMemberRole(models, {
+                    userId: request.token.userId,
+                    spaceId: post.spaceId
+                })
+                if (role === null || !["admin", "owner"].includes(role)) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Not permitted" } })
+                    return
+                }
+
+                const unpublishRes = await app.services.posts.unpublish(
+                    models,
+                    postId
+                )
+                if (!unpublishRes.isOk) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Couldn't update post" } })
+                    return
+                }
+
+                reply.send({})
+            })
+        }
+    )
+
+    fastify.get<{ Params: { postId: string } }>(
+        "/posts/:postId",
+        async (request, reply) => {
+            const { postId } = request.params
+            await app.transaction(async (models) => {
+                const post = await app.services.posts.get(models, postId)
+                if (post === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Post not found" } })
+                    return
+                }
+                reply.send(post)
+            })
+        }
+    )
+
+    fastify.get<{ Params: { postId: string } }>(
+        "/posts/:postId/content",
+        async (request, reply) => {
+            const { postId } = request.params
+            await app.transaction(async (models) => {
+                const content = await app.services.posts.content(models, postId)
+                if (content === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Post not found" } })
+                    return
+                }
+                reply.send(content)
+            })
+        }
+    )
 }
 
 const appRoutes = (app: App) => async (fastify: FastifyInstance) => {

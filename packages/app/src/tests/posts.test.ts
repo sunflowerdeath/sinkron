@@ -37,14 +37,14 @@ describe("Posts", () => {
         const authHeaders = await getAuthHeaders(app, user.id)
         const spaceId = user.spaces[0].id
 
-        const docContent = {
+        const doc = {
             content: [{ type: "title", children: [{ text: "Hello" }] }]
         }
         const docId = uuidv4()
         const res1 = await app.sinkron.createDocument(
             docId,
             `spaces/${spaceId}`,
-            Automerge.save(Automerge.from(docContent))
+            Automerge.save(Automerge.from(doc))
         )
         assert(res1.isOk, "res1")
 
@@ -72,7 +72,7 @@ describe("Posts", () => {
         })
         assert(res4.statusCode === 200, "res4")
         const content = JSON.parse(res4.body)
-        assert.deepEqual(content, docContent, "content")
+        assert.deepEqual(content, doc.content, "content")
 
         // update
         // TODO

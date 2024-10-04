@@ -10,12 +10,8 @@ type PublishProps = {
 
 type PostPublishResult = {
     id: string
+    spaceId: string
     publishedAt: Date
-}
-
-type PostContentResult = {
-    id: string
-    content: object
 }
 
 class PostService {
@@ -39,12 +35,12 @@ class PostService {
     async content(
         models: AppModels,
         id: string
-    ): Promise<PostContentResult | null> {
+    ): Promise<string | null> {
         const res = await models.posts.findOne({
             where: { id },
             select: { content: true }
         })
-        return res === null ? null : { id, content: JSON.parse(res.content) }
+        return res === null ? null : res.content
     }
 
     async #getDocContent(
