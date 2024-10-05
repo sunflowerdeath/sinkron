@@ -52,7 +52,14 @@ const plugins = [
     }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
-        favicon: "src/favicon.ico"
+        favicon: "src/favicon.ico",
+        chunks: ["main"]
+    }),
+    new HtmlWebpackPlugin({
+        template: "./src/index.html",
+        favicon: "src/favicon.ico",
+        filename: "post.html",
+        chunks: ["post"]
     })
 ]
 
@@ -62,7 +69,8 @@ if (process.env.ANALYZE) {
 
 module.exports = {
     entry: {
-        main: "./src/index.tsx"
+        main: "./src/index.tsx",
+        post: "./src/post.tsx"
     },
     output: {
         clean: true,
@@ -72,7 +80,7 @@ module.exports = {
     },
     mode: "none",
     optimization: {
-        // minimize: isProduction
+        minimize: isProduction
     },
     target: "web",
     resolve: {
@@ -85,7 +93,12 @@ module.exports = {
     devServer: {
         host: "0.0.0.0",
         port: 1337,
-        historyApiFallback: true,
+        historyApiFallback: {
+            rewrites: [
+                { from: /^\/$/, to: "/index.html" },
+                { from: /^\/posts/, to: "/post.html" }
+            ]
+        },
         proxy: [
             {
                 context: "/api",

@@ -13,6 +13,11 @@ server {
         try_files $uri =404;
     }
 
+    location /posts {
+        add_header Cache-Control "no-store";
+        try_files /post.html last;
+    }
+
     location / {
         add_header Cache-Control "no-store";
         try_files /index.html last;

@@ -768,34 +768,15 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
             await app.transaction(async (models) => {
                 const post = await app.services.posts.get(models, postId)
                 if (post === null) {
-                    reply
-                        .code(500)
-                        .send({
-                            error: {
-                                message: "Post not found",
-                                code: "not_found"
-                            }
-                        })
+                    reply.code(500).send({
+                        error: {
+                            message: "Post not found",
+                            code: "not_found"
+                        }
+                    })
                     return
                 }
                 reply.send(post)
-            })
-        }
-    )
-
-    fastify.get<{ Params: { postId: string } }>(
-        "/posts/:postId/content",
-        async (request, reply) => {
-            const { postId } = request.params
-            await app.transaction(async (models) => {
-                const content = await app.services.posts.content(models, postId)
-                if (content === null) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Post not found" } })
-                    return
-                }
-                reply.send(content)
             })
         }
     )
@@ -1010,6 +991,26 @@ class App {
         fastify.get("/", (request, reply) => {
             reply.send("Sinkron API")
         })
+
+        fastify.get<{ Params: { postId: string } }>(
+            "/posts/:postId/content",
+            async (request, reply) => {
+                const { postId } = request.params
+                await this.transaction(async (models) => {
+                    const content = await this.services.posts.content(
+                        models,
+                        postId
+                    )
+                    if (content === null) {
+                        reply
+                            .code(500)
+                            .send({ error: { message: "Post not found" } })
+                        return
+                    }
+                    reply.send(content)
+                })
+            }
+        )
 
         if (config.storage.type === "local") {
             fastify.get<{ Params: { spaceId: string; fileId: string } }>(

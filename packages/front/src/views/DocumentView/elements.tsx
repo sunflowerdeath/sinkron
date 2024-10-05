@@ -220,7 +220,6 @@ const ImageComponent = observer(
         const { id, status, error } = element
 
         const isSelected = useSelected()
-        const spaceStore = useSpace()
 
         let content
         if (status !== "ready") {
@@ -240,7 +239,7 @@ const ImageComponent = observer(
         } else {
             const src = env.isProductionEnv
                 ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
-                : `${spaceStore.api.baseUrl}/files/${id}`
+                : `${env.apiUrl}/files/${id}`
             content = (
                 <Img
                     src={src}
@@ -379,4 +378,152 @@ const EditorLeaf = (props: CustomRenderLeafProps) => {
     return <span {...attributes}>{children}</span>
 }
 
-export { EditorElement, EditorLeaf }
+const PostTitle = (props: CustomRenderElementProps<TitleElement>) => {
+    const { children, attributes } = props
+    return (
+        <div
+            style={{
+                fontSize: 42,
+                lineHeight: "135%",
+                marginBottom: 30,
+                fontWeight: 650,
+                position: "relative"
+            }}
+            {...attributes}
+        >
+            {children}
+        </div>
+    )
+}
+
+const PostLink = (props: CustomRenderElementProps<LinkElement>) => {
+    const { element, attributes, children } = props
+    return (
+        <a
+            href={element.url}
+            target="_blank"
+            style={{ color: "var(--color-link)", textDecoration: "underline" }}
+            {...attributes}
+        >
+            {children}
+        </a>
+    )
+}
+
+const PostImage = observer((props: CustomRenderElementProps<ImageElement>) => {
+    const { attributes, element, children } = props
+    const { id, status } = element
+
+    let content
+    if (status !== "ready") {
+        content = (
+            <ImagePlaceholder>
+                <span style={{ color: "var(--color-error)" }}>
+                    Couldn't load image
+                </span>
+            </ImagePlaceholder>
+        )
+    } else {
+        const src = env.isProductionEnv
+            ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
+            : `${env.apiUrl}/files/${id}`
+        content = (
+            <Img
+                src={src}
+                style={{
+                    maxWidth: "100%",
+                    maxHeight: "80vh"
+                }}
+                loader={<ImagePlaceholder>Loading image...</ImagePlaceholder>}
+                unloader={
+                    <ImagePlaceholder>
+                        <span style={{ color: "var(--color-error)" }}>
+                            Couldn't load image
+                        </span>
+                    </ImagePlaceholder>
+                }
+            />
+        )
+    }
+
+    return (
+        <div
+            contentEditable={false}
+            {...attributes}
+            style={{
+                margin: "1rem 0",
+                display: "flex",
+                justifyContent: "center"
+            }}
+        >
+            {children}
+            {content}
+        </div>
+    )
+})
+
+const PostElement = (props: RenderElementProps) => {
+    switch (props.element.type) {
+        case "paragraph":
+            return <p {...props.attributes}>{props.children}</p>
+        case "title":
+            return (
+                <PostTitle
+                    {...(props as CustomRenderElementProps<TitleElement>)}
+                />
+            )
+        case "heading":
+            return (
+                <Heading
+                    {...(props as CustomRenderElementProps<HeadingElement>)}
+                />
+            )
+        case "link":
+            return (
+                <PostLink
+                    {...(props as CustomRenderElementProps<LinkElement>)}
+                />
+            )
+        case "image":
+            return (
+                <PostImage
+                    {...(props as CustomRenderElementProps<ImageElement>)}
+                />
+            )
+        case "code":
+            return (
+                <pre
+                    style={{
+                        padding: 8,
+                        border: "2px solid var(--color-elem)"
+                    }}
+                    {...props.attributes}
+                >
+                    {props.children}
+                </pre>
+            )
+        case "list":
+            return (
+                <ul style={{ margin: 0 }} {...props.attributes}>
+                    {props.children}
+                </ul>
+            )
+        case "ordered-list":
+            return <ol {...props.attributes}>{props.children}</ol>
+        case "list-item":
+            return (
+                <li style={{ margin: ".5rem 0" }} {...props.attributes}>
+                    {props.children}
+                </li>
+            )
+        case "check-list-item":
+            return (
+                <CheckListItem
+                    {...(props as CustomRenderElementProps<CheckListItemElement>)}
+                />
+            )
+    }
+    return <span {...props.attributes}>{props.children}</span>
+}
+
+export { EditorElement, EditorLeaf, PostElement }
