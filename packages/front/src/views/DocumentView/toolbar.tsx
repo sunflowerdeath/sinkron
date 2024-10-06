@@ -15,8 +15,33 @@ import { LinkElement } from "../../types"
 import { Button, Icon, Input } from "../../ui"
 
 import { DocumentViewStore } from "./store"
-import type { BlockType, TextMarkType } from "./helpers"
-import { isNodeActive, toggleBlock, isMarkActive, toggleMark } from "./helpers"
+import type { TextMarkType } from "./helpers"
+import { isNodeActive, isMarkActive, toggleMark } from "./helpers"
+
+type ToolbarButtonProps = {
+    isActive: boolean
+    onClick: () => void
+    children: React.ReactNode
+}
+
+const ToolbarButton = (props: ToolbarButtonProps) => {
+    const { isActive, onClick, children } = props
+    return (
+        <Button
+            style={{
+                width: "100%",
+                boxShadow: isActive
+                    ? "0 0 0 2px var(--color-link) inset"
+                    : "none"
+            }}
+            preventFocusSteal
+            onClick={onClick}
+            size="s"
+        >
+            {children}
+        </Button>
+    )
+}
 
 interface ToolbarViewProps {
     store: ToolbarStore
@@ -27,18 +52,6 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
     const editor = useSlate() as ReactEditor
     const isMobile = useMedia("(max-width: 1023px)")
 
-    const blockNodes = [
-        { type: "heading", label: "Heading" },
-        { type: "image", label: "Image" },
-        { type: "link", label: "Link" },
-        { type: "code", label: "Code" },
-        { type: "list", label: "List" },
-        { type: "ordered-list", label: "Num.list" },
-        {
-            type: "check-list",
-            label: <span style={{ fontSize: ".87rem" }}>Checklist</span>
-        }
-    ]
     const textNodes = [
         { type: "bold", label: <Icon svg={formatBoldSvg} /> },
         { type: "italic", label: <Icon svg={formatItalicSvg} /> },
@@ -46,56 +59,129 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
         { type: "strikethrough", label: <Icon svg={formatStrikethroughSvg} /> }
     ]
 
-    const blockButtons = blockNodes.map(({ type, label }) => (
-        <Button
-            key={type}
-            style={{
-                width: "100%",
-                boxShadow: isNodeActive(editor, type)
-                    ? "0 0 0 2px var(--color-link) inset"
-                    : "none"
-            }}
-            preventFocusSteal
-            onClick={() => {
-                if (type === "image") {
-                    store.document.openImageDialog()
-                } else if (type === "link") {
-                    if (isNodeActive(editor, "link")) {
-                        store.view = "edit_link"
-                    } else {
-                        store.view = "create_link"
-                    }
-                } else {
-                    if (isNodeActive(editor, "image")) {
-                        // TODO just insert node ?
-                    } else {
-                        toggleBlock(editor, type as BlockType)
-                    }
-                }
-            }}
-            size="s"
-        >
-            {label}
-        </Button>
-    ))
+    const listTypes = ["list", "ordered-list", "check-list"]
+    const unwrapList = () => {
+        Transforms.unwrapNodes(editor, {
+            match: (n) => Element.isElement(n) && listTypes.includes(n.type),
+            split: true
+        })
+    }
+    const onClickHeading = () => {
+        if (isNodeActive(editor, "heading")) {
+            Transforms.setNodes(editor, { type: "paragraph" })
+        } else {
+            unwrapList()
+            Transforms.setNodes(editor, { type: "heading" })
+        }
+    }
+    const onClickImage = () => {
+        store.document.openImageDialog()
+    }
+    const onClickLink = () => {
+        if (isNodeActive(editor, "link")) {
+            store.view = "edit_link"
+        } else {
+            store.view = "create_link"
+        }
+    }
+    const onClickCode = () => {
+        if (isNodeActive(editor, "code-block")) {
+            Transforms.unwrapNodes(editor, {
+                match: (n) => Element.isElementType(n, "code-block")
+            })
+        } else {
+            Transforms.setNodes(editor, { type: "code-line" })
+            Transforms.wrapNodes(editor, { type: "code-block" })
+        }
+    }
+    const onClickList = () => {
+        const isActive = isNodeActive(editor, "list")
+        unwrapList()
+        if (isActive) {
+            Transforms.setNodes(editor, { type: "paragraph" })
+        } else {
+            Transforms.setNodes(editor, { type: "list-item" })
+            Transforms.wrapNodes(editor, { type: "list" })
+        }
+    }
+    const onClickNumList = () => {
+        const isActive = isNodeActive(editor, "ordered-list")
+        unwrapList()
+        if (isActive) {
+            Transforms.setNodes(editor, { type: "paragraph" })
+        } else {
+            Transforms.setNodes(editor, { type: "list-item" })
+            Transforms.wrapNodes(editor, { type: "ordered-list" })
+        }
+    }
+    const onClickCheckList = () => {
+        const isActive = isNodeActive(editor, "check-list")
+        unwrapList()
+        if (isActive) {
+            Transforms.setNodes(editor, { type: "paragraph" })
+        } else {
+            Transforms.setNodes(editor, { type: "check-list-item" })
+            Transforms.wrapNodes(editor, { type: "check-list" })
+        }
+    }
+
+    const blockButtons = (
+        <>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "heading")}
+                onClick={onClickHeading}
+            >
+                Heading
+            </ToolbarButton>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "image")}
+                onClick={onClickImage}
+            >
+                Image
+            </ToolbarButton>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "link")}
+                onClick={onClickLink}
+            >
+                Link
+            </ToolbarButton>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "code-block")}
+                onClick={onClickCode}
+            >
+                Code
+            </ToolbarButton>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "list")}
+                onClick={onClickList}
+            >
+                List
+            </ToolbarButton>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "ordered-list")}
+                onClick={onClickNumList}
+            >
+                Num.list
+            </ToolbarButton>
+            <ToolbarButton
+                isActive={isNodeActive(editor, "check-list")}
+                onClick={onClickCheckList}
+            >
+                <span style={{ fontSize: ".87rem" }}>Checklist</span>
+            </ToolbarButton>
+        </>
+    )
 
     const textButtons = textNodes.map(({ type, label }) => (
-        <Button
+        <ToolbarButton
             key={type}
-            preventFocusSteal
-            style={{
-                width: isMobile ? "100%" : 60,
-                boxShadow: isMarkActive(editor, type as TextMarkType)
-                    ? "0 0 0 2px #dfdfdf inset"
-                    : "none"
-            }}
+            isActive={isMarkActive(editor, type as TextMarkType)}
             onClick={() => {
                 toggleMark(editor, type as TextMarkType)
             }}
-            size="s"
         >
             {label}
-        </Button>
+        </ToolbarButton>
     ))
 
     if (isMobile) {

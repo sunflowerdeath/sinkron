@@ -32,10 +32,7 @@ class PostService {
         return res as PostPublishResult
     }
 
-    async content(
-        models: AppModels,
-        id: string
-    ): Promise<string | null> {
+    async content(models: AppModels, id: string): Promise<string | null> {
         const res = await models.posts.findOne({
             where: { id },
             select: { content: true }
@@ -98,24 +95,19 @@ class PostService {
         models: AppModels,
         id: string
     ): Promise<ResultType<PostPublishResult, RequestError>> {
-        const post = await this.get(models, id)
-        if (post === null) {
-            return Result.err({
-                code: ErrorCode.NotFound,
-                message: "Post not found"
-            })
-        }
-
         const getContentRes = await this.#getDocContent(id)
         if (!getContentRes.isOk) return getContentRes
 
-        const updateRes = await models.posts.update(
-            { id },
-            { content: getContentRes.value }
-        )
-        const { publishedAt } = updateRes.generatedMaps[0]
+        await models.posts.update({ id }, { content: getContentRes.value })
 
-        return Result.ok({ ...post, publishedAt })
+        const updated = await this.get(models, id)
+        if (updated === null) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Unknown error"
+            })
+        }
+        return Result.ok(updated)
     }
 
     async unpublish(

@@ -1,10 +1,11 @@
 import { useMemo } from "react"
-import { makeAutoObservable } from "mobx"
+import { makeAutoObservable, action } from "mobx"
 import { observer } from "mobx-react"
 import { fromPromise } from "mobx-utils"
 import { Col } from "oriente"
 import { parseISO, format } from "date-fns"
 
+import env from "../env"
 import { useSpace } from "../store"
 import { Post } from "../entities"
 import { Api } from "../api"
@@ -61,9 +62,11 @@ class PublishStore {
                 data: { docId: this.docId, spaceId: this.spaceId }
             })
         )
-        state.then((post) => {
-            this.post = post
-        })
+        state.then(
+            action((post) => {
+                this.post = post
+            })
+        )
         this.actionState = state
     }
 
@@ -74,9 +77,11 @@ class PublishStore {
                 method: "POST"
             })
         )
-        state.then((post) => {
-            this.post = post
-        })
+        state.then(
+            action((post) => {
+                this.post = post
+            })
+        )
         this.actionState = state
     }
 
@@ -87,9 +92,11 @@ class PublishStore {
                 method: "POST"
             })
         )
-        state.then(() => {
-            this.post = null
-        })
+        state.then(
+            action(() => {
+                this.post = null
+            })
+        )
         this.actionState = state
     }
 }
@@ -116,9 +123,12 @@ const PublishForm = observer((props: PublishFormProps) => {
     } else {
         const date = format(
             parseISO(store.post.publishedAt),
-            "'on' d MMM 'at' H:MM"
+            "'on' d MMM 'at' H:mm"
         )
-        const url = `https://sinkron.xyz/posts/${store.post.id}/`
+        const host = env.isProductionEnv
+            ? "https://sinkron.xyz"
+            : "http://localhost:1337"
+        const url = `${host}/posts/${store.post.id}/`
         return (
             <Col gap={16}>
                 <div>Document is published {date}</div>
@@ -160,7 +170,7 @@ type PublishViewProps = {
     onClose: () => void
 }
 
-const PublishView = (props: PublishViewProps) => {
+const PublishView = observer((props: PublishViewProps) => {
     const { onClose, docId } = props
 
     const spaceStore = useSpace()
@@ -181,6 +191,6 @@ const PublishView = (props: PublishViewProps) => {
             </ActionStateView>
         </Container>
     )
-}
+})
 
 export default PublishView

@@ -60,7 +60,9 @@ type FetchState<T> =
     | { state: "success"; value: T }
 
 const Root = () => {
-    const id = window.location.pathname.replace(/^\/posts\//, "")
+    const id = window.location.pathname
+        .replace(/^\/posts\//, "")
+        .replace(/\/$/, "")
     const [fetchState, setFetchState] = useState<FetchState<PostContent>>({
         state: "pending"
     })

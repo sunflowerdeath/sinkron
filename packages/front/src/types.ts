@@ -55,8 +55,13 @@ export type OrderedListElement = {
     children: ListItemElement[]
 }
 
-export type CodeElement = {
-    type: "code"
+export type CodeBlockElement = {
+    type: "code-block"
+    children: CodeLineElement[]
+}
+
+export type CodeLineElement = {
+    type: "code-line"
     children: string
 }
 
@@ -77,6 +82,7 @@ export type SinkronElement =
     | CheckListElement
     | OrderedListElement
     | CodeElement
+    | CodeLineElement
     | LinkElement
     | ImageElement
 

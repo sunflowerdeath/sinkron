@@ -36,6 +36,14 @@ const createSinkronEditor = (props: CreateEditorProps): ReactEditor => {
         }
     }
 
+    const closeList = (type: "list" | "ordered-list" | "check-list") => {
+        Transforms.unwrapNodes(editor, {
+            match: (n) => Element.isElementType(n, type),
+            split: true
+        })
+        Transforms.setNodes(editor, { type: "paragraph" })
+    }
+
     editor.insertBreak = () => {
         const heading = isAtEndOfNode(editor, "heading")
         if (heading) {
@@ -55,18 +63,18 @@ const createSinkronEditor = (props: CreateEditorProps): ReactEditor => {
         const listItem = isAtEndOfNode(editor, "list-item")
         if (listItem && Editor.isEmpty(editor, listItem)) {
             if (isNodeActive(editor, "list")) {
-                toggleBlock(editor, "list")
+                closeList("list")
                 return
             }
             if (isNodeActive(editor, "ordered-list")) {
-                toggleBlock(editor, "ordered-list")
+                closeList("ordered-list")
                 return
             }
         }
 
         const checkListItem = isAtEndOfNode(editor, "check-list-item")
         if (checkListItem && Editor.isEmpty(editor, checkListItem)) {
-            toggleBlock(editor, "check-list")
+            closeList("check-list")
             return
         }
 
@@ -176,6 +184,46 @@ const createSinkronEditor = (props: CreateEditorProps): ReactEditor => {
         ) {
             for (const [child, childPath] of Node.children(editor, path)) {
                 if (Element.isElement(child) && !editor.isInline(child)) {
+                    Transforms.unwrapNodes(editor, { at: childPath })
+                    return
+                }
+            }
+        }
+
+        const isCodeBlock = Element.isElementType(node, "code-block")
+        if (isCodeBlock) {
+            for (const [child, childPath] of Node.children(editor, path)) {
+                if (Text.isText(child)) {
+                    Transforms.wrapNodes(
+                        editor,
+                        // @ts-expect-error wrap doesn't need "children"
+                        { type: "code-line" },
+                        { at: childPath }
+                    )
+                    return
+                }
+                if (Element.isElement(child) && child.type !== "code-line") {
+                    Transforms.setNodes(
+                        editor,
+                        { type: "code-line" },
+                        { at: childPath }
+                    )
+                    return
+                }
+            }
+        }
+
+        const isCodeLine = Element.isElementType(node, "code-line")
+        if (isCodeLine) {
+            // No orphan code lines
+            const parent = Node.parent(editor, path)
+            if (!Element.isElementType(parent, "code-block")) {
+                Transforms.setNodes(editor, { type: "paragraph" }, { at: path })
+                return
+            }
+            // Only text elements inside code lines
+            for (const [child, childPath] of Node.children(editor, path)) {
+                if (!Text.isText(child)) {
                     Transforms.unwrapNodes(editor, { at: childPath })
                     return
                 }

@@ -5,7 +5,7 @@ import {
     useSlateStatic,
     useFocused,
     useSelected,
-    // useReadOnly,
+    useReadOnly,
     RenderElementProps,
     RenderLeafProps
 } from "slate-react"
@@ -17,7 +17,6 @@ import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
 import env from "../../env"
-import { useSpace } from "../../store"
 import { Button, Icon } from "../../ui"
 import {
     SinkronTextElement,
@@ -163,7 +162,7 @@ const CheckListItem = (
 ) => {
     const { attributes, children, element } = props
     const editor = useSlateStatic() as ReactEditor
-    // const readOnly = useReadOnly()
+    const readOnly = useReadOnly()
 
     const toggle = () => {
         const path = ReactEditor.findPath(editor, element)
@@ -171,10 +170,12 @@ const CheckListItem = (
         Transforms.setNodes(editor, newProps, { at: path })
     }
 
+    const mark = <Icon svg={element.isChecked ? checkBox : checkBoxOutline} />
+
     return (
         <li
             style={{
-                margin: ".25rem 0",
+                margin: readOnly ? ".5rem 0" : ".25rem 0",
                 listStyleType: "none",
                 display: "flex",
                 alignItems: "center",
@@ -183,11 +184,18 @@ const CheckListItem = (
             {...attributes}
         >
             <div contentEditable={false}>
-                <Button size="s" onClick={toggle} kind="transparent">
-                    <Icon
-                        svg={element.isChecked ? checkBox : checkBoxOutline}
-                    />
-                </Button>
+                {readOnly ? (
+                    mark
+                ) : (
+                    <Button
+                        size="s"
+                        onClick={toggle}
+                        kind="transparent"
+                        isDisabled={readOnly}
+                    >
+                        {mark}
+                    </Button>
+                )}
             </div>
             {children}
         </li>
@@ -214,84 +222,80 @@ const ImagePlaceholder = (props: { children: React.ReactNode }) => {
     )
 }
 
-const ImageComponent = observer(
-    (props: CustomRenderElementProps<ImageElement>) => {
-        const { attributes, element, children } = props
-        const { id, status, error } = element
+const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
+    const { attributes, element, children } = props
+    const { id, status, error } = element
 
-        const isSelected = useSelected()
+    const isSelected = useSelected()
 
-        let content
-        if (status !== "ready") {
-            let statusText = null
-            if (status === "uploading") {
-                statusText = "Uploading image..."
-            } else if (status === "error") {
-                statusText = (
-                    <span style={{ color: "var(--color-error)" }}>
-                        Image upload error:
-                        <br />
-                        {error ?? "Unknown error"}
-                    </span>
-                )
-            }
-            content = <ImagePlaceholder>{statusText}</ImagePlaceholder>
-        } else {
-            const src = env.isProductionEnv
-                ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
-                : `${env.apiUrl}/files/${id}`
-            content = (
-                <Img
-                    src={src}
-                    style={{
-                        maxWidth: "100%",
-                        maxHeight: "66vh"
-                    }}
-                    loader={
-                        <ImagePlaceholder>Loading image...</ImagePlaceholder>
-                    }
-                    unloader={
-                        <ImagePlaceholder>
-                            <span style={{ color: "var(--color-error)" }}>
-                                Couldn't load image
-                            </span>
-                        </ImagePlaceholder>
-                    }
-                />
+    let content
+    if (status !== "ready") {
+        let statusText = null
+        if (status === "uploading") {
+            statusText = "Uploading image..."
+        } else if (status === "error") {
+            statusText = (
+                <span style={{ color: "var(--color-error)" }}>
+                    Image upload error:
+                    <br />
+                    {error ?? "Unknown error"}
+                </span>
             )
         }
-
-        return (
-            <div
-                contentEditable={false}
-                {...attributes}
+        content = <ImagePlaceholder>{statusText}</ImagePlaceholder>
+    } else {
+        const src = env.isProductionEnv
+            ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
+            : `${env.apiUrl}/files/${id}`
+        content = (
+            <Img
+                src={src}
                 style={{
-                    margin: "1rem 0",
-                    display: "flex",
-                    alignItems: "start"
+                    maxWidth: "100%",
+                    maxHeight: "66vh"
                 }}
-            >
-                {children}
-                <div
-                    style={{
-                        minHeight: 100,
-                        minWidth: 100,
-                        maxHeight: "66vh",
-                        maxWidth: "100%",
-                        outline: isSelected
-                            ? "4px solid var(--color-link)"
-                            : "none",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                    }}
-                >
-                    {content}
-                </div>
-            </div>
+                loader={<ImagePlaceholder>Loading image...</ImagePlaceholder>}
+                unloader={
+                    <ImagePlaceholder>
+                        <span style={{ color: "var(--color-error)" }}>
+                            Couldn't load image
+                        </span>
+                    </ImagePlaceholder>
+                }
+            />
         )
     }
-)
+
+    return (
+        <div
+            contentEditable={false}
+            {...attributes}
+            style={{
+                margin: "1rem 0",
+                display: "flex",
+                alignItems: "start"
+            }}
+        >
+            {children}
+            <div
+                style={{
+                    minHeight: 100,
+                    minWidth: 100,
+                    maxHeight: "66vh",
+                    maxWidth: "100%",
+                    outline: isSelected
+                        ? "4px solid var(--color-link)"
+                        : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+            >
+                {content}
+            </div>
+        </div>
+    )
+})
 
 const EditorElement = (props: RenderElementProps) => {
     switch (props.element.type) {
@@ -313,11 +317,9 @@ const EditorElement = (props: RenderElementProps) => {
             )
         case "image":
             return (
-                <ImageComponent
-                    {...(props as CustomRenderElementProps<ImageElement>)}
-                />
+                <Image {...(props as CustomRenderElementProps<ImageElement>)} />
             )
-        case "code":
+        case "code-block":
             return (
                 <pre
                     style={{
@@ -329,6 +331,8 @@ const EditorElement = (props: RenderElementProps) => {
                     {props.children}
                 </pre>
             )
+        case "code-line":
+            return <div {...props.attributes}>{props.children}</div>
         case "list":
             return (
                 <ul style={{ margin: 0 }} {...props.attributes}>
@@ -490,7 +494,7 @@ const PostElement = (props: RenderElementProps) => {
                     {...(props as CustomRenderElementProps<ImageElement>)}
                 />
             )
-        case "code":
+        case "code-block":
             return (
                 <pre
                     style={{
@@ -502,6 +506,8 @@ const PostElement = (props: RenderElementProps) => {
                     {props.children}
                 </pre>
             )
+        case "code-line":
+            return <div {...props.attributes}>{props.children}</div>
         case "list":
             return (
                 <ul style={{ margin: 0 }} {...props.attributes}>
