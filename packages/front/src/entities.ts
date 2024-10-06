@@ -61,6 +61,7 @@ export type Metadata = {
 export type Document = {
     content: AutomergeNode
     categories: string[]
+    isPublished: boolean
 }
 
 export type Post = {

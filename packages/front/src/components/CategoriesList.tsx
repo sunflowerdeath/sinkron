@@ -64,7 +64,7 @@ const CategoriesList = (props: CategoriesListProps) => {
                     key={item.id}
                     item={item}
                     onSelect={() => {
-                        spaceStore.selectCategory(item.id)
+                        spaceStore.view = { kind: "category", id: item.id }
                         if (isMobile) navigate("/")
                     }}
                     onRemove={() => onRemove(item.id)}

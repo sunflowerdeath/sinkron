@@ -124,21 +124,22 @@ const DocumentList = observer((props: DocumentListProps) => {
     const { selectedDocId } = props
 
     const [_location, navigate] = useLocation()
-    const space = useSpace()
+    const spaceStore = useSpace()
 
     const categoryItems =
-        space.category &&
-        space.category.children.map((c) => (
+        spaceStore.viewProps.kind === "category" &&
+        spaceStore.viewProps.children.map((c) => (
             <DocumentListCategoryItem
                 key={c.id}
                 name={c.name}
                 count={c.count}
                 onSelect={() => {
-                    space.selectCategory(c.id)
+                    spaceStore.view = { kind: "category", id: c.id }
                 }}
             />
         ))
-    const docItems = space.sortedDocumentList.map((item) => (
+
+    const docItems = spaceStore.sortedDocumentList.map((item) => (
         <DocumentListItem
             key={item.id}
             data={item}
@@ -168,23 +169,29 @@ const DocumentListView = observer(() => {
         navigate(`/documents/${id}`)
     }
 
+    const upButton = space.view.kind !== "all" && (
+        <Button
+            onClick={() => {
+                if (space.viewProps.kind === "category") {
+                    const parent = space.viewProps.parent
+                    space.view = parent
+                        ? { kind: "category", id: parent }
+                        : { kind: "all" }
+                } else {
+                    space.view = { kind: "all" }
+                }
+            }}
+        >
+            <Icon
+                svg={arrowCategoryBackSvg}
+                style={{ transform: "rotate(90deg)" }}
+            />
+        </Button>
+    )
+
     const topBar = (
         <Row gap={8}>
-            {space.category !== null && (
-                <Button
-                    onClick={() => {
-                        const parent = space.category
-                            ? space.category.parent
-                            : null
-                        space.selectCategory(parent)
-                    }}
-                >
-                    <Icon
-                        svg={arrowCategoryBackSvg}
-                        style={{ transform: "rotate(90deg)" }}
-                    />
-                </Button>
-            )}
+            {upButton}
             <LinkButton
                 style={{
                     flexGrow: 1,
@@ -202,12 +209,10 @@ const DocumentListView = observer(() => {
                         flexGrow: 1
                     }}
                 >
-                    {space.category ? space.category.name : "All documents"}
+                    {space.viewProps.name}
                 </div>
                 <div style={{ color: "var(--color-secondary)" }}>
-                    {space.category
-                        ? space.category.count
-                        : space.documents.length}
+                    {space.viewProps.count}
                 </div>
             </LinkButton>
             <Button onClick={createDocument} isDisabled={!canCreate}>

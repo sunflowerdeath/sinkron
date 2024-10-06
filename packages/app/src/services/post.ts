@@ -75,12 +75,13 @@ class PostService {
         })
         const { publishedAt } = insertRes.generatedMaps[0]
 
-        const updateRes = await this.app.sinkron.updateDocumentWithCallback(
-            docId,
-            (doc) => {
-                doc.isPublished = true
-            }
-        )
+        const updateRes =
+            await this.app.sinkronServer.updateDocumentWithCallback(
+                docId,
+                (doc) => {
+                    doc.isPublished = true
+                }
+            )
         if (!updateRes.isOk) {
             return Result.err({
                 code: ErrorCode.InternalServerError,
@@ -124,12 +125,13 @@ class PostService {
             })
         }
 
-        const updateRes = await this.app.sinkron.updateDocumentWithCallback(
-            id,
-            (doc) => {
-                doc.isPublished = false
-            }
-        )
+        const updateRes =
+            await this.app.sinkronServer.updateDocumentWithCallback(
+                id,
+                (doc) => {
+                    doc.isPublished = false
+                }
+            )
         if (!updateRes.isOk) {
             return Result.err({
                 code: ErrorCode.InternalServerError,

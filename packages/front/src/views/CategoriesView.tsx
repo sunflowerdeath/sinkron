@@ -10,7 +10,7 @@ import keyboardArrowUpSvg from "@material-design-icons/svg/outlined/keyboard_arr
 import { Menu, MenuItem, Button, LinkButton, Icon } from "../ui"
 import Container from "../ui/Container"
 import { useSpace } from "../store"
-import type { CategoryTree, CategoryTreeNode } from "../store/SpaceStore"
+import type { CategoryTreeNode, SpaceView } from "../store/SpaceStore"
 
 type CategoriesListItemProps = {
     category: CategoryTreeNode
@@ -50,22 +50,18 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
         </>
     )
 
+    const expandButton = hasChildren && (
+        <Button onClick={() => setIsCollapsed((v) => !v)}>
+            <Icon
+                svg={isCollapsed ? keyboardArrowDownSvg : keyboardArrowUpSvg}
+            />
+        </Button>
+    )
+
     return (
         <>
             <Row align="center" gap={8} style={{ alignSelf: "stretch" }}>
-                {hasChildren ? (
-                    <Button onClick={() => setIsCollapsed((v) => !v)}>
-                        <Icon
-                            svg={
-                                isCollapsed
-                                    ? keyboardArrowDownSvg
-                                    : keyboardArrowUpSvg
-                            }
-                        />
-                    </Button>
-                ) : (
-                    <div style={{ width: 60 }} />
-                )}
+                {expandButton}
                 <Button
                     style={{
                         flexGrow: 1,
@@ -73,22 +69,21 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                         flexShrink: 1,
                         overflow: "hidden"
                     }}
-                    kind="transparent"
                     onClick={() => onSelect(category.id)}
+                    kind="transparent"
                 >
                     <Row
                         style={{
                             flexGrow: 1,
                             overflow: "hidden"
                         }}
-                        gap={10}
+                        gap={16}
                     >
                         <div
                             style={{
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                flexGrow: 1
+                                whiteSpace: "nowrap"
                             }}
                         >
                             {category.name}
@@ -147,20 +142,57 @@ const CategoryList = (props: CategoryListProps) => {
 }
 
 const CategoriesView = observer(() => {
-    const space = useSpace()
+    const spaceStore = useSpace()
     const [_location, navigate] = useLocation()
 
     const onDelete = (id: string) => {
-        space.deleteCategory(id)
+        spaceStore.deleteCategory(id)
     }
 
-    const selectCategory = (id: string | null) => {
-        space.selectCategory(id)
+    const setView = (view: SpaceView) => {
+        spaceStore.view = view
         navigate("/")
     }
 
     let list
-    if (space.collection.initialSyncCompleted) {
+    if (spaceStore.collection.initialSyncCompleted) {
+        const allDocumentsButton = (
+            <Button
+                style={{
+                    alignSelf: "normal",
+                    justifyContent: "start"
+                }}
+                kind="transparent"
+                onClick={() => setView({ kind: "all" })}
+            >
+                <Row gap={16} align="center" style={{ flexGrow: 1 }}>
+                    <div>All documents</div>
+                    <div style={{ color: "var(--color-secondary)" }}>
+                        {spaceStore.documents.length}
+                    </div>
+                </Row>
+            </Button>
+        )
+
+        const publishedCount = spaceStore.publishedDocuments.length
+        const publishedButton = publishedCount > 0 && (
+            <Button
+                style={{
+                    alignSelf: "normal",
+                    justifyContent: "start"
+                }}
+                kind="transparent"
+                onClick={() => setView({ kind: "published" })}
+            >
+                <Row gap={16} align="center" style={{ flexGrow: 1 }}>
+                    <div>Published</div>
+                    <div style={{ color: "var(--color-secondary)" }}>
+                        {publishedCount}
+                    </div>
+                </Row>
+            </Button>
+        )
+
         list = (
             <Col gap={8}>
                 <LinkButton
@@ -170,20 +202,12 @@ const CategoriesView = observer(() => {
                     Create category
                 </LinkButton>
                 <Col gap={8} style={{ alignSelf: "stretch" }}>
-                    <Button
-                        style={{ alignSelf: "normal", justifyContent: "start" }}
-                        kind="transparent"
-                        onClick={() => selectCategory(null)}
-                    >
-                        <Row gap={8} align="center">
-                            <div>All documents</div>
-                            {/*<div style={{ color: "#999" }}>2</div>*/}
-                        </Row>
-                    </Button>
+                    {allDocumentsButton}
+                    {publishedButton}
                     <CategoryList
-                        categories={space.categoryTree.nodes}
+                        categories={spaceStore.categoryTree.nodes}
                         onDelete={onDelete}
-                        onSelect={(id) => selectCategory(id)}
+                        onSelect={(id) => setView({ kind: "category", id })}
                     />
                 </Col>
             </Col>

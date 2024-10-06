@@ -558,6 +558,38 @@ class SinkronServer {
         this.profile = initialProfilerSegment()
         return res
     }
+
+    async updateDocumentWithCallback<T>(
+        id: string,
+        cb: (val: T) => void
+    ): Promise<ResultType<true, RequestError>> {
+        const res = await this.sinkron.updateDocumentWithCallback(id, cb)
+        if (!res.isOk) return res
+
+        const { doc, changes } = res.value
+        const collection = this.collections.get(doc.colId)
+        if (collection) {
+            const { colId, colrev, updatedAt, createdAt } = doc
+            const msg: ChangeMessage = {
+                kind: "change",
+                op: Op.Modify,
+                id,
+                // @ts-ignore
+                data: changes.map((c) => Buffer.from(c).toString("base64")),
+                col: colId,
+                colrev,
+                updatedAt: serializeDate(updatedAt),
+                changeid: ""
+            }
+            const reponseMsg = JSON.stringify(msg)
+            collection.subscribers.forEach((ws) => {
+                ws.send(reponseMsg)
+                if (this.profile) this.profile.sentMessages += 1
+            })
+        }
+
+        return Result.ok(true)
+    }
 }
 
 export { SinkronServer }

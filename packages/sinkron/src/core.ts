@@ -37,6 +37,11 @@ import {
 } from "./protocol"
 import type { DbConfig } from "./db"
 
+export type UpdateResult = {
+    doc: Document
+    changes: Uint8Array[]
+}
+
 type CreateCollectionProps = {
     id: string
     permissions: PermissionsTable
@@ -54,11 +59,6 @@ type UpdateDocumentProps = {
     id: string
     changes: Uint8Array[]
     permissions: Permissions
-}
-
-type UpdateDocumentWithCallbackProps = {
-    id: string
-    callback: (doc: any) => void
 }
 
 type CheckPermissionProps = {
@@ -563,7 +563,7 @@ class Sinkron {
         m: EntityManager,
         id: string,
         cb: Automerge.ChangeFn<T>
-    ): Promise<ResultType<Document, RequestError>> {
+    ): Promise<ResultType<UpdateResult, RequestError>> {
         const models = this.getModels(m)
 
         const doc = await this.getDocumentTr(m, id)
@@ -584,9 +584,23 @@ class Sinkron {
                 details: "Unable to apply changes"
             })
         }
-        const nextData = Automerge.save(automerge)
 
-        return await this.updateDocumentEntityTr(m, doc, { data: nextData })
+        const change = Automerge.getLastLocalChange(automerge)
+        if (change === undefined) {
+            // nothing changed
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Empty change"
+            })
+        }
+
+        const nextData = Automerge.save(automerge)
+        const updateRes = await this.updateDocumentEntityTr(m, doc, {
+            data: nextData
+        })
+        if (!updateRes.isOk) return updateRes
+
+        return Result.ok({ doc: updateRes.value, changes: [change] })
     }
 
     async updateCollectionPermissionsTr(
@@ -764,7 +778,7 @@ class Sinkron {
     updateDocumentWithCallback<T>(
         id: string,
         cb: Automerge.ChangeFn<T>
-    ): Promise<ResultType<Document, RequestError>> {
+    ): Promise<ResultType<UpdateResult, RequestError>> {
         return this.db.transaction((m) =>
             this.updateDocumentWithCallbackTr(m, id, cb)
         )

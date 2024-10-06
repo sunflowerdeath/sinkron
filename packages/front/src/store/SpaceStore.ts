@@ -132,19 +132,31 @@ const makeInitialDocument = (): Document => ({
             }
         ]
     }),
-    categories: []
+    categories: [],
+    isPublished: false
 })
 
 const isMeta = (item: Document | Metadata): item is Metadata => {
     return "meta" in item && item.meta == true
 }
 
+export type SpaceView =
+    | { kind: "category"; id: string }
+    | { kind: "published" }
+    | { kind: "all" }
+
+export type SpaceViewProps =
+    | { kind: "published" | "all"; count: number; name: string }
+    | ({ kind: "category" } & CategoryTreeNode)
+
 class SpaceStore {
     space: Space
     store: UserStore
     collection: Collection<Document | Metadata>
     loadedState: IPromiseBasedObservable<void>
-    categoryId: string | null = null
+
+    view: SpaceView = { kind: "all" }
+
     documentList: TransformedMap<
         Item<Document | Metadata>,
         DocumentListItemData
@@ -189,11 +201,14 @@ class SpaceStore {
             filter: (item) => {
                 if (item.local === null) return false
                 if (isMeta(item.local)) return false
-                if (this.categoryId !== null) {
-                    // @ts-expect-error item is not meta
-                    return item.local.categories.includes(this.categoryId)
-                } else {
+                if (this.view.kind === "all") {
                     return true
+                } else if (this.view.kind === "published") {
+                    // @ts-expect-error item is not meta
+                    return item.local.isPublished
+                } /* this.view.kind === "category" */ else {
+                    // @ts-expect-error item is not meta
+                    return item.local.categories.includes(this.view.id)
                 }
             },
             transform: getDocumentListItemData
@@ -201,11 +216,12 @@ class SpaceStore {
 
         makeObservable(this, {
             documents: computed,
+            publishedDocuments: computed,
             sortedDocumentList: computed,
             metaItem: computed,
             meta: computed,
-            categoryId: observable,
-            category: computed,
+            view: observable,
+            viewProps: computed,
             categoryTree: computed
         })
     }
@@ -214,11 +230,40 @@ class SpaceStore {
         this.collection.destroy()
     }
 
+    get viewProps() : SpaceViewProps {
+        const { kind } = this.view
+        if (kind === "all") {
+            return {
+                kind: "all",
+                name: "All documents",
+                count: this.documents.length
+            }
+        } else if (kind === "published") {
+            return {
+                kind: "published",
+                name: "Published documents",
+                count: this.publishedDocuments.length
+            }
+        } /* kind === "category" */ else {
+            const category = this.categoryTree.map[this.view.id]
+            return { kind: "category", ...category }
+        }
+    }
+
     get documents() {
         const documents = Array.from(this.collection.items.values()).filter(
             (item) => item.local !== null && !isMeta(item.local)
         )
         return documents as Item<Document>[]
+    }
+
+    get publishedDocuments() {
+        console.log("OBSERVE")
+        const published = []
+        for (const item of this.documents) {
+            if (item.local?.isPublished) published.push(item)
+        }
+        return published
     }
 
     get sortedDocumentList() {
@@ -258,8 +303,8 @@ class SpaceStore {
 
     createDocument() {
         const doc = makeInitialDocument()
-        if (this.categoryId !== null) {
-            doc.categories.push(this.categoryId)
+        if (this.view.kind === "category") {
+            doc.categories.push(this.view.id)
         }
         const id = this.collection.create(doc)
         return id
@@ -268,7 +313,8 @@ class SpaceStore {
     importDocument(content: Node) {
         const doc = {
             content: toAutomerge(content),
-            categories: []
+            categories: [],
+            isPublished: false
         }
         const id = this.collection.create(doc)
         return id
@@ -303,16 +349,6 @@ class SpaceStore {
         })
 
         return { map, nodes }
-    }
-
-    get category() {
-        return this.categoryId === null
-            ? null
-            : this.categoryTree.map[this.categoryId]
-    }
-
-    selectCategory(id: string | null) {
-        this.categoryId = id
     }
 
     createCategory(values: { name: string; parent: string | null }) {
@@ -351,7 +387,9 @@ class SpaceStore {
             }
         })
 
-        if (this.categoryId === id) this.categoryId = null
+        if (this.view.kind === "category" && this.view.id === id) {
+            this.view = { kind: "all" }
+        }
     }
 
     // === Members and invites
