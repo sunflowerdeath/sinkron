@@ -22,17 +22,19 @@ type ToolbarButtonProps = {
     isActive: boolean
     onClick: () => void
     children: React.ReactNode
+    style?: React.CSSProperties
 }
 
 const ToolbarButton = (props: ToolbarButtonProps) => {
-    const { isActive, onClick, children } = props
+    const { isActive, onClick, children, style } = props
     return (
         <Button
             style={{
                 width: "100%",
                 boxShadow: isActive
                     ? "0 0 0 2px var(--color-link) inset"
-                    : "none"
+                    : "none",
+                ...style
             }}
             preventFocusSteal
             onClick={onClick}
@@ -179,6 +181,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             onClick={() => {
                 toggleMark(editor, type as TextMarkType)
             }}
+            style={{ width: isMobile ? "100%" : 60 }}
         >
             {label}
         </ToolbarButton>
