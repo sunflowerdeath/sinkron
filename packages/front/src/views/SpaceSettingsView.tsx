@@ -65,7 +65,6 @@ type DeleteSpaceViewProps = {
 const DeleteSpaceView = (props: DeleteSpaceViewProps) => {
     const { store, onClose, toast } = props
 
-    const [_location, navigate] = useLocation()
     const spaceStore = store.space!
 
     const [deleteState, setDeleteState] = useState<
@@ -77,7 +76,7 @@ const DeleteSpaceView = (props: DeleteSpaceViewProps) => {
         state.then(
             () => {
                 toast.success("Space deleted!")
-                navigate("/")
+                // navigate("/")
             },
             (e: Error) => {
                 toast.error(<>Couldn't delete space: {e.message}</>)

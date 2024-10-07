@@ -11,7 +11,7 @@ import {
     ShowErrorMode
 } from "../utils/forms"
 import { useStore } from "../store"
-import { Button, Input, useStateToast, useActionState } from "../ui"
+import { Button, Input, Heading, useStateToast, useActionState } from "../ui"
 import Container from "../ui/Container"
 
 interface FieldProps {
@@ -54,7 +54,12 @@ const Field = observer((props: FieldProps) => {
 
 type FormShape = { name: string }
 
-const CreateSpaceView = observer(() => {
+type CreateSpaceViewProps = {
+    container: boolean
+}
+
+const CreateSpaceView = observer((props: CreateSpaceViewProps) => {
+    const { container } = props
     const store = useStore()
 
     const form = useMemo(
@@ -95,8 +100,8 @@ const CreateSpaceView = observer(() => {
         setCreateState(state)
     }
 
-    return (
-        <Container title="Create space" onClose={() => navigate("/")}>
+    const content = (
+        <>
             <Field
                 field={form.fields.name}
                 showValidationErrors="onChange"
@@ -125,8 +130,36 @@ const CreateSpaceView = observer(() => {
             >
                 Create
             </Button>
-        </Container>
+        </>
     )
+
+    if (container) {
+        return (
+            <Container title="Create space" onClose={() => navigate("/")}>
+                {content}
+            </Container>
+        )
+    } else {
+        return (
+            <Col
+                align="normal"
+                justify="center"
+                style={{
+                    height: "100%",
+                    width: 320,
+                    margin: "auto",
+                    paddingTop: "4rem"
+                }}
+                gap={16}
+            >
+                <Heading>Create space</Heading>
+                {content}
+                <Button kind="transparent" onClick={() => store.logout()}>
+                    Logout
+                </Button>
+            </Col>
+        )
+    }
 })
 
 export default CreateSpaceView

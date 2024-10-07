@@ -1,13 +1,14 @@
-import { useMemo } from 'react'
-import { createRoot } from 'react-dom/client'
-import { useTitle } from 'react-use'
-import { observer } from 'mobx-react-lite'
-import { Router, Switch, Route, Redirect } from 'wouter'
-import { OrienteProvider } from 'oriente'
+import { useMemo } from "react"
+import { createRoot } from "react-dom/client"
+import { useTitle } from "react-use"
+import { observer } from "mobx-react-lite"
+import { Router, Switch, Route, Redirect } from "wouter"
+import { OrienteProvider } from "oriente"
 
-import { AuthStore, StoreContext } from './store'
-import SpaceView from './views/SpaceView'
-import { LoginView } from './views/LoginView'
+import { AuthStore, StoreContext } from "./store"
+import SpaceView from "./views/SpaceView"
+import { LoginView } from "./views/LoginView"
+import CreateSpaceView from "./views/CreateSpaceView"
 
 const Root = observer(() => {
     const authStore = useMemo(() => {
@@ -17,14 +18,18 @@ const Root = observer(() => {
         return s
     }, [])
 
-    useTitle('Sinkron')
+    useTitle("Sinkron")
 
     return (
         <OrienteProvider>
             <Router>
                 {authStore.store ? (
                     <StoreContext.Provider value={authStore.store}>
-                        <SpaceView />
+                        {authStore.store.space ? (
+                            <SpaceView />
+                        ) : (
+                            <CreateSpaceView container={false} />
+                        )}
                     </StoreContext.Provider>
                 ) : (
                     <Switch>
@@ -40,5 +45,5 @@ const Root = observer(() => {
     )
 })
 
-const root = createRoot(document.getElementById('root')!)
+const root = createRoot(document.getElementById("root")!)
 root.render(<Root />)

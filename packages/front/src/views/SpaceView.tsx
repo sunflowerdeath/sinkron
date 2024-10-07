@@ -45,7 +45,7 @@ const SpaceView = observer(() => {
             />
             <Route
                 path={"/create-space"}
-                children={() => <CreateSpaceView />}
+                children={() => <CreateSpaceView container={true} />}
             />
             <Route
                 path={"/switch-space"}

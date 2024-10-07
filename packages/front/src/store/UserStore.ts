@@ -72,8 +72,13 @@ class UserStore {
                 const space = this.user.spaces.find(
                     (s) => s.id === this.spaceId
                 )!
-                this.space = new SpaceStore(space, this)
-                localStorage.setItem("space", space.id)
+                if (space !== undefined) {
+                    this.space = new SpaceStore(space, this)
+                    localStorage.setItem("space", space.id)
+                } else {
+                    this.space = undefined
+                    localStorage.removeItem("space")
+                }
             },
             { fireImmediately: true }
         )
@@ -124,7 +129,7 @@ class UserStore {
     updateUser(user: User) {
         this.user = user
         if (!user.spaces.find((s) => s.id === this.spaceId)) {
-            this.spaceId = user.spaces[0].id
+            this.spaceId = user.spaces[0]?.id
         }
     }
 
@@ -165,6 +170,7 @@ class UserStore {
             method: "POST",
             url: `/spaces/${this.spaceId}/delete`
         })
+        history.pushState({}, "", "/")
         const idx = this.user.spaces.findIndex((s) => s.id === this.spaceId)
         this.user.spaces.splice(idx, 1)
         this.spaceId = this.user.spaces[0]?.id
