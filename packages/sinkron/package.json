@@ -6,7 +6,7 @@
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "eslint src",
-        "build1": "NODE_ENV=production rspack --config rspack.config.js",
+        "build-rspack": "NODE_ENV=production rspack --config rspack.config.js",
         "build": "NODE_ENV=production webpack --config rspack.config.js",
         "test": "rspack --config rspack.test.config.js && mocha ./build/test.js"
     },

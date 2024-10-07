@@ -5,7 +5,7 @@ import { Row, Col } from "oriente"
 import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
 import { ceil } from "lodash-es"
 
-import { useStore, SpaceStore } from "../store"
+import { useStore, UserStore, SpaceStore } from "../store"
 import { Button, Avatar, Input, Heading, useDialog, useStateToast } from "../ui"
 import ButtonsGrid from "../ui/ButtonsGrid"
 import Container from "../ui/Container"
@@ -56,6 +56,52 @@ const RenameSpaceView = observer((props: RenameSpaceViewProps) => {
     )
 })
 
+type DeleteSpaceViewProps = {
+    store: UserStore
+    onClose: () => void
+    toast: ReturnType<typeof useStateToast>
+}
+
+const DeleteSpaceView = (props: DeleteSpaceViewProps) => {
+    const { store, onClose, toast } = props
+
+    const [_location, navigate] = useLocation()
+    const spaceStore = store.space!
+
+    const [deleteState, setDeleteState] = useState<
+        IPromiseBasedObservable<void>
+    >(fromPromise.resolve())
+    const deleteSpace = async () => {
+        const state = fromPromise(store.deleteSpace())
+        setDeleteState(state)
+        state.then(
+            () => {
+                toast.success("Space deleted!")
+                navigate("/")
+            },
+            (e: Error) => {
+                toast.error(<>Couldn't delete space: {e.message}</>)
+            }
+        )
+    }
+
+    return (
+        <Col gap={20}>
+            <Heading>Delete space</Heading>
+            Are you sure you want to delete space "{spaceStore.space.name}"?
+            <ButtonsGrid>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button
+                    onClick={deleteSpace}
+                    isDisabled={deleteState.state === "pending"}
+                >
+                    Delete
+                </Button>
+            </ButtonsGrid>
+        </Col>
+    )
+}
+
 const SpaceSettingsView = observer(() => {
     const [_location, navigate] = useLocation()
     const store = useStore()
@@ -72,26 +118,17 @@ const SpaceSettingsView = observer(() => {
         />
     ))
 
-    const deleteDialog = useDialog((close) => {
-        return (
-            <Col gap={20}>
-                <Heading>Delete space</Heading>
-                Are you sure you want to delete space "{space.name}"?
-                <ButtonsGrid>
-                    <Button onClick={close}>Cancel</Button>
-                    <Button>Delete</Button>
-                </ButtonsGrid>
-            </Col>
-        )
-    })
+    const deleteDialog = useDialog((close) => (
+        <DeleteSpaceView store={store} onClose={close} toast={toast} />
+    ))
 
     const usedStorageMb = ceil(space.usedStorage / (1024 * 1024), 2)
     const storage = (
-            <Col gap={16}>
-                <Heading>Storage</Heading>
-                <div>Used storage: {usedStorageMb} / 100Mb</div>
-                <Button isDisabled>Delete unused files</Button>
-            </Col>
+        <Col gap={16}>
+            <Heading>Storage</Heading>
+            <div>Used storage: {usedStorageMb} / 100Mb</div>
+            <Button isDisabled>Delete unused files</Button>
+        </Col>
     )
 
     return (
@@ -102,7 +139,9 @@ const SpaceSettingsView = observer(() => {
             </Row>
             <ButtonsGrid>
                 <Button>Change image</Button>
-                <Button onClick={() => renameDialog.open()}>Rename space</Button>
+                <Button onClick={() => renameDialog.open()}>
+                    Rename space
+                </Button>
                 <Button onClick={() => deleteDialog.open()}>
                     Delete space
                 </Button>

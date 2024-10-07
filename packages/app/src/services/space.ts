@@ -109,7 +109,20 @@ class SpaceService {
         return Result.ok(space)
     }
 
-    async delete(models: AppModels, spaceId: string) {
+    async delete(
+        models: AppModels,
+        spaceId: string
+    ): Promise<ResultType<true, RequestError>> {
+        const files = await models.files.find({
+            where: { spaceId },
+            select: { id: true }
+        })
+        if (files.length > 0) {
+            const ids = files.map((f) => f.id)
+            const deleteRes = await this.app.storage.batchDelete(ids)
+            if (!deleteRes.isOk) return deleteRes
+        }
+        await models.posts.delete({ spaceId })
         await models.members.delete({ spaceId })
         await models.invites.delete({ spaceId })
         const col = `spaces/${spaceId}`
@@ -117,6 +130,7 @@ class SpaceService {
         await this.app.sinkron.deleteGroup(`${col}/readonly`)
         await this.app.sinkron.deleteGroup(`${col}/members`)
         await models.spaces.delete({ id: spaceId })
+        return Result.ok(true)
     }
 
     async rename(
@@ -157,7 +171,7 @@ class SpaceService {
     async getMemberRole(
         models: AppModels,
         props: { spaceId: string; userId: string }
-    ) : Promise<SpaceRole | null> {
+    ): Promise<SpaceRole | null> {
         const { userId, spaceId } = props
         const member = await models.members.findOne({
             where: { userId, spaceId },

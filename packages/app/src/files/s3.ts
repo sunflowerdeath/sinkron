@@ -1,7 +1,8 @@
 import {
     S3Client,
     PutObjectCommand,
-    DeleteObjectCommand
+    DeleteObjectCommand,
+    DeleteObjectsCommand
 } from "@aws-sdk/client-s3"
 
 import { Result, ResultType } from "../utils/result"
@@ -73,6 +74,25 @@ class S3ObjectStorage implements ObjectStorage {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
                 message: "Couldn't delete object",
+                details: { error }
+            })
+        }
+        return Result.ok(true)
+    }
+
+    async batchDelete(ids: string[]): Promise<ResultType<true, RequestError>> {
+        const command = new DeleteObjectsCommand({
+            Bucket: this.config.bucket,
+            Delete: {
+                Objects: ids.map((id) => ({ Key: id }))
+            }
+        })
+        try {
+            await this.client.send(command)
+        } catch (error) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Couldn't delete objects",
                 details: { error }
             })
         }

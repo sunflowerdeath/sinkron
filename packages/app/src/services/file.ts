@@ -15,7 +15,7 @@ export interface ObjectStorage {
     ): Promise<ResultType<true, RequestError>>
     get(id: string): Promise<ResultType<Buffer, RequestError>>
     delete(id: string): Promise<ResultType<true, RequestError>>
-    // batchDelete(ids: string[]): Promise<ResultType<true, RequestError>>
+    batchDelete(ids: string[]): Promise<ResultType<true, RequestError>>
 }
 
 type UploadFileProps = {

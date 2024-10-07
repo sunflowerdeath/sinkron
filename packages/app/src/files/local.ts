@@ -58,6 +58,14 @@ class LocalObjectStorage implements ObjectStorage {
         }
         return Result.ok(true)
     }
+
+    async batchDelete(ids: string[]): Promise<ResultType<true, RequestError>> {
+        for (const id of ids) {
+            const res = await this.delete(id)
+            if (!res.isOk) return res
+        }
+        return Result.ok(true)
+    }
 }
 
 export { LocalObjectStorage }

@@ -75,14 +75,34 @@ describe("Posts", () => {
         assert.deepEqual(content, doc.content, "content")
 
         // update
-        // TODO
+        const newDoc = {
+            content: [{ type: "title", children: [{ text: "New" }] }]
+        }
+        await app.sinkron.updateDocumentWithCallback(docId, (doc) => {
+            doc.content = newDoc.content
+        })
+        const res5 = await app.fastify.inject({
+            method: "POST",
+            url: `/posts/${docId}/update`,
+            headers: authHeaders
+        })
+        assert(res5.statusCode === 200, "res5")
+
+        const res6 = await app.fastify.inject({
+            method: "GET",
+            url: `/posts/${docId}/content`,
+            headers: authHeaders
+        })
+        assert(res6.statusCode === 200, "res6")
+        const newContent = JSON.parse(res6.body)
+        assert.deepEqual(newContent, newDoc.content, "update")
 
         // unpublish
-        const res5 = await app.fastify.inject({
+        const res7 = await app.fastify.inject({
             method: "POST",
             url: `/posts/${docId}/unpublish`,
             headers: authHeaders
         })
-        assert(res5.statusCode === 200, "res5")
+        assert(res7.statusCode === 200, "res7")
     })
 })

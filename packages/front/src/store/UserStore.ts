@@ -156,7 +156,18 @@ class UserStore {
         })
         const idx = this.user.spaces.findIndex((s) => s.id === this.spaceId)
         this.user.spaces.splice(idx, 1)
-        this.spaceId = this.user.spaces[0].id
+        this.spaceId = this.user.spaces[0]?.id
+    }
+
+    async deleteSpace() {
+        if (!this.spaceId) return
+        await this.api.fetch({
+            method: "POST",
+            url: `/spaces/${this.spaceId}/delete`
+        })
+        const idx = this.user.spaces.findIndex((s) => s.id === this.spaceId)
+        this.user.spaces.splice(idx, 1)
+        this.spaceId = this.user.spaces[0]?.id
     }
 
     fetchNotifications() {
