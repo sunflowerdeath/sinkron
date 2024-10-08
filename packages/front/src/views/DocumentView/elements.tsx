@@ -226,6 +226,7 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
     const { attributes, element, children } = props
     const { id, status, error } = element
 
+    const isFocused = useFocused()
     const isSelected = useSelected()
 
     let content
@@ -283,7 +284,7 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
                     minWidth: 100,
                     maxHeight: "66vh",
                     maxWidth: "100%",
-                    outline: isSelected
+                    outline: (isFocused && isSelected)
                         ? "4px solid var(--color-link)"
                         : "none",
                     display: "flex",

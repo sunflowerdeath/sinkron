@@ -44,7 +44,7 @@ const Field = observer((props: FieldProps) => {
         onChange: (value: string) => field.change(value),
         onFocus,
         onBlur,
-        hasError: showError
+        // hasError: showError
     }
     return children({
         inputProps,
