@@ -31,6 +31,12 @@ export type SpaceView = {
     owner: { id: string }
 }
 
+export type SpaceMemberView = {
+    id: string
+    email: string
+    role: string
+}
+
 const spaceNameSchema = ajv.compile({
     type: "string",
     minLength: 1,
@@ -63,9 +69,8 @@ class SpaceService {
             })
         }
 
-        const createRes = await models.spaces.insert({ name, ownerId })
-
-        const { id } = createRes.generatedMaps[0]
+        const insertRes = await models.spaces.insert({ name, ownerId })
+        const { id } = insertRes.generatedMaps[0]
         const space: SpaceView = {
             id,
             name,
@@ -74,6 +79,12 @@ class SpaceService {
             membersCount: 1,
             usedStorage: 0
         }
+
+        this.addMember(models, {
+            userId: ownerId,
+            spaceId: space.id,
+            role: "owner"
+        })
 
         const col = `spaces/${space.id}`
 
@@ -100,12 +111,6 @@ class SpaceService {
             Automerge.save(meta)
         )
 
-        this.addMember(models, {
-            userId: ownerId,
-            spaceId: space.id,
-            role: "owner"
-        })
-
         return Result.ok(space)
     }
 
@@ -119,9 +124,9 @@ class SpaceService {
         })
         if (files.length > 0) {
             const ids = files.map((f) => f.id)
-            const deleteRes = await this.app.storage.batchDelete(ids)
-            if (!deleteRes.isOk) return deleteRes
+            await this.app.storage.batchDelete(ids)
         }
+        await models.files.delete({ spaceId })
         await models.posts.delete({ spaceId })
         await models.members.delete({ spaceId })
         await models.invites.delete({ spaceId })
@@ -149,7 +154,10 @@ class SpaceService {
         return Result.ok(true)
     }
 
-    async getMembers(models: AppModels, spaceId: string): Promise<User[]> {
+    async getMembers(
+        models: AppModels,
+        spaceId: string
+    ): Promise<SpaceMemberView[]> {
         const res = await models.members.find({
             where: { spaceId },
             relations: { user: true },

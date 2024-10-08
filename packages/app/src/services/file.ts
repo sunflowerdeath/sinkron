@@ -1,7 +1,8 @@
 // import { v4 as uuidv4 } from "uuid"
 import sharp from "sharp"
-// import { difference, sum } from "lodash"
-// import { In } from "typeorm"
+import { union, difference, sum } from "lodash"
+import { In } from "typeorm"
+import * as Automerge from "@automerge/automerge"
 
 import { App, AppModels } from "../app"
 import { Result, ResultType } from "../utils/result"
@@ -81,7 +82,7 @@ class FileService {
         const res = await this.storage.put(fileId, data, contentType)
         if (!res.isOk) return res
 
-        await models.files.create({ id: fileId, spaceId, size: fileSize })
+        await models.files.insert({ id: fileId, spaceId, size: fileSize })
         await models.spaces.update(spaceId, {
             usedStorage: () => `usedStorage + ${fileSize}`
         })
@@ -155,7 +156,6 @@ class FileService {
         return uploadRes
     }
 
-    /*
     async batchDeleteFiles(
         models: AppModels,
         props: { spaceId: string; fileIds: string[] }
@@ -167,20 +167,18 @@ class FileService {
             where,
             select: { spaceId: true, id: true, size: true }
         })
-        
-        await this.storage.batchDelete(fileIds)
-        
+        await this.storage.batchDelete(files.map((f) => f.id))
         await models.files.delete(where)
 
         const deletedFilesSize = sum(files.map((f) => f.size))
         await models.spaces.update(spaceId, {
-            usedStorage: () => `used_storage - ${deletedFilesSize}`
+            usedStorage: () => `usedStorage - ${deletedFilesSize}`
         })
 
         return Result.ok(true)
     }
 
-    async orphanCheck(models: AppModels, spaceId: string) {
+    async deleteOrphanFiles(models: AppModels, spaceId: string) {
         const files = await models.files.find({
             where: { spaceId },
             select: { id: true }
@@ -190,17 +188,23 @@ class FileService {
         if (uploadedFileIds.length === 0) return
 
         const col = `spaces/${spaceId}`
-        const res = await this.sinkron.syncCollection(col)
+        const res = await this.app.sinkron.syncCollection(col)
         if (!res.isOk) return
-        const usedFileIds = res.value.documents.map((doc) => {
-            const automerge = Automerge.load(doc.data)
-            return scanDocumentForAttachments(automerge.content)
-        })
 
-        const orphanIds = difference(uploadedFileIds, usedFileIds)
-        await this.batchDeleteFiles(models, orphanIds)
+        const usedFileIds = res.value.documents.map((doc) => {
+            if (doc.data === null) return []
+            const automerge = Automerge.load(doc.data)
+            if (automerge.meta) return []
+            const ids: string[] = automerge.content.children
+                .filter((node) => node.type === "image")
+                .map((node) => node.id)
+            return ids
+        })
+        const orphanIds = difference(uploadedFileIds, union(...usedFileIds))
+        if (orphanIds.length > 0) {
+            await this.batchDeleteFiles(models, { spaceId, fileIds: orphanIds })
+        }
     }
-    */
 }
 
 export { FileService }

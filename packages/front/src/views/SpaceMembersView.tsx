@@ -113,6 +113,7 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
 
     const showActions =
         !isCurrentUser &&
+        member.role !== "owner" &&
         (member.role === "admin"
             ? currentUserRole === "owner"
             : ["owner", "admin"].includes(currentUserRole))

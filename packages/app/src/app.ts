@@ -116,14 +116,12 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: loginSchema } },
         async (request, reply) => {
             const { email } = request.body
-            await app.transaction(async (models) => {
-                const res = await app.services.auth.sendCode(models, email)
-                if (!res.isOk) {
-                    reply.code(500).send({ error: res.error })
-                    return
-                }
-                reply.send(res.value)
-            })
+            const res = await app.services.auth.sendCode(app.models, email)
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+            reply.send(res.value)
         }
     )
 
@@ -132,34 +130,32 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: checkCodeSchema } },
         async (request, reply) => {
             const { id, code } = request.body
-            await app.transaction(async (models) => {
-                const authRes = await app.services.auth.authorizeWithCode(
-                    models,
-                    {
-                        id,
-                        code,
-                        client: parseClient(request)
-                    }
-                )
-                if (!authRes.isOk) {
-                    reply.code(500).send({ error: authRes.error })
-                    return
+            const authRes = await app.services.auth.authorizeWithCode(
+                app.models,
+                {
+                    id,
+                    code,
+                    client: parseClient(request)
                 }
-                const token = authRes.value
+            )
+            if (!authRes.isOk) {
+                reply.code(500).send({ error: authRes.error })
+                return
+            }
+            const token = authRes.value
 
-                const profileRes = await app.services.users.getProfile(
-                    models,
-                    token.userId
-                )
-                if (!profileRes.isOk) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Couldn't authorize" } })
-                    return
-                }
+            const profileRes = await app.services.users.getProfile(
+                app.models,
+                token.userId
+            )
+            if (!profileRes.isOk) {
+                reply
+                    .code(500)
+                    .send({ error: { message: "Couldn't authorize" } })
+                return
+            }
 
-                reply.send({ user: profileRes.value, token: token.token })
-            })
+            reply.send({ user: profileRes.value, token: token.token })
         }
     )
 
@@ -179,28 +175,24 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
 const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.get("/account/sessions", async (request, reply) => {
         const { userId, token } = request.token
-        await app.transaction(async (models) => {
-            const sessions = await app.services.auth.getActiveSessions(models, {
-                userId,
-                token
-            })
-            reply.send(sessions)
+        const sessions = await app.services.auth.getActiveSessions(app.models, {
+            userId,
+            token
         })
+        reply.send(sessions)
     })
 
     fastify.post("/account/sessions/terminate", async (request, reply) => {
         const { token, userId } = request.token
-        await app.transaction(async (models) => {
-            await app.services.auth.deleteOtherTokens(models, {
-                token,
-                userId
-            })
-            const sessions = await app.services.auth.getActiveSessions(models, {
-                userId,
-                token
-            })
-            reply.send(sessions)
+        await app.services.auth.deleteOtherTokens(app.models, {
+            token,
+            userId
         })
+        const sessions = await app.services.auth.getActiveSessions(app.models, {
+            userId,
+            token
+        })
+        reply.send(sessions)
     })
 }
 
@@ -241,36 +233,38 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const { spaceId } = request.params
             const { name } = request.body
-            await app.transaction(async (models) => {
-                const role = await app.services.spaces.getMemberRole(models, {
-                    userId: request.token.userId,
-                    spaceId
-                })
-                if (role === null || !["admin", "owner"].includes(role)) {
-                    reply.code(500).send()
-                    return
-                }
-
-                await app.services.spaces.rename(models, spaceId, name)
-                reply.send({})
+            const role = await app.services.spaces.getMemberRole(app.models, {
+                userId: request.token.userId,
+                spaceId
             })
+            if (role === null || !["admin", "owner"].includes(role)) {
+                reply.code(500).send()
+                return
+            }
+
+            await app.services.spaces.rename(app.models, spaceId, name)
+            reply.send({})
         }
     )
 
-    fastify.post<{ Params: { id: string } }>(
-        "/spaces/:id/delete",
+    fastify.post<{ Params: { spaceId: string } }>(
+        "/spaces/:spaceId/delete",
         async (request, reply) => {
-            const { id } = request.params
+            const { spaceId } = request.params
+            const space = await app.models.spaces.findOne({
+                where: { id: spaceId },
+                select: { ownerId: true }
+            })
+            if (space === null || space.ownerId !== request.token.userId) {
+                reply.code(500).send()
+                return
+            }
             await app.transaction(async (models) => {
-                const space = await models.spaces.findOne({
-                    where: { id },
-                    select: { ownerId: true }
-                })
-                if (space === null || space.ownerId !== request.token.userId) {
-                    reply.code(500).send()
+                const res = await app.services.spaces.delete(models, spaceId)
+                if (!res.isOk) {
+                    reply.code(500).send(res.error)
                     return
                 }
-                await app.services.spaces.delete(models, id)
                 reply.send({})
             })
         }
@@ -280,40 +274,43 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/spaces/:id/leave",
         async (request, reply) => {
             const { id } = request.params
-            await app.transaction(async (models) => {
-                const res = await models.members.delete({
-                    spaceId: id,
-                    userId: request.token.userId,
-                    role: Not(Equal("owner"))
-                })
-                if (res.affected === 0) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Invalid request" } })
-                    return
-                }
-                reply.send({})
+            const res = await app.models.members.delete({
+                spaceId: id,
+                userId: request.token.userId,
+                role: Not(Equal("owner"))
             })
+            if (res.affected === 0) {
+                reply.code(500).send({ error: { message: "Invalid request" } })
+                return
+            }
+            reply.send({})
         }
     )
 
-    fastify.get<{ Params: { id: string } }>(
-        "/spaces/:id/members",
+    fastify.get<{ Params: { spaceId: string } }>(
+        "/spaces/:spaceId/members",
         async (request, reply) => {
-            const { id } = request.params
-            await app.transaction(async (models) => {
-                // Check if the user is a member of the space
-                const count = await models.members.count({
-                    where: { userId: request.token.userId, spaceId: id }
-                })
-                if (count === 0) {
-                    reply.code(500).send()
-                    return
-                }
+            const { spaceId } = request.params
+            const userId = request.token.userId
 
-                const members = await app.services.spaces.getMembers(models, id)
+            const count = await app.models.members.count({
+                where: { userId, spaceId }
+            })
+            if (count === 0) {
+                reply.code(500).send()
+                return
+            }
+
+            await app.transaction(async (models) => {
+                const members = await app.services.spaces.getMembers(
+                    models,
+                    spaceId
+                )
                 const invites =
-                    await app.services.invites.getSpaceActiveInvites(models, id)
+                    await app.services.invites.getSpaceActiveInvites(
+                        models,
+                        spaceId
+                    )
                 reply.send({ members, invites })
             })
         }
@@ -327,40 +324,34 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Params: { spaceId: string; userId: string } }>(
         "/spaces/:spaceId/members/:userId/remove",
         async (request, reply) => {
-            await app.transaction(async (models) => {
-                const { spaceId, userId } = request.params
+            const { spaceId, userId } = request.params
 
-                const memberRole = await app.services.spaces.getMemberRole(
-                    models,
-                    { userId, spaceId }
-                )
-                if (memberRole === null) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Member not found" } })
-                    return
-                }
+            const memberRole = await app.services.spaces.getMemberRole(
+                app.models,
+                { userId, spaceId }
+            )
+            if (memberRole === null) {
+                reply.code(500).send({ error: { message: "Member not found" } })
+                return
+            }
 
-                const currentUserRole = await app.services.spaces.getMemberRole(
-                    models,
-                    { userId: request.token.userId, spaceId }
-                )
-                const isPermitted =
-                    currentUserRole !== null &&
-                    memberRole !== "owner" &&
-                    (memberRole === "admin"
-                        ? currentUserRole === "owner"
-                        : ["admin", "owner"].includes(currentUserRole))
-                if (!isPermitted) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
+            const currentUserRole = await app.services.spaces.getMemberRole(
+                app.models,
+                { userId: request.token.userId, spaceId }
+            )
+            const isPermitted =
+                currentUserRole !== null &&
+                memberRole !== "owner" &&
+                (memberRole === "admin"
+                    ? currentUserRole === "owner"
+                    : ["admin", "owner"].includes(currentUserRole))
+            if (!isPermitted) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
 
-                await models.members.delete({ id: userId })
-                reply.send({})
-            })
+            await app.models.members.delete({ id: userId })
+            reply.send({})
         }
     )
 
@@ -368,35 +359,37 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/spaces/:spaceId/upload_image/:fileId",
         { bodyLimit: 20 * 1024 * 1024 /* 20Mb */ },
         async (request, reply) => {
-            await app.transaction(async (models) => {
-                const { spaceId, fileId } = request.params
+            const { spaceId, fileId } = request.params
 
-                const role = await app.services.spaces.getMemberRole(models, {
-                    userId: request.token.userId,
-                    spaceId
-                })
-                if (
-                    role === null ||
-                    !["admin", "owner", "editor"].includes(role)
-                ) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
-
-                const res = await app.services.file.uploadImage(models, {
-                    data: request.body,
-                    spaceId,
-                    fileId
-                })
-                if (!res.isOk) {
-                    reply.code(500).send({ error: res.error })
-                    return
-                }
-
-                reply.send({})
+            const role = await app.services.spaces.getMemberRole(app.models, {
+                userId: request.token.userId,
+                spaceId
             })
+            if (role === null || !["admin", "owner", "editor"].includes(role)) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const res = await app.services.file.uploadImage(app.models, {
+                data: request.body,
+                spaceId,
+                fileId
+            })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+
+            reply.send({})
+        }
+    )
+
+    fastify.post<{ Params: { spaceId: string } }>(
+        "/spaces/:spaceId/delete_orphans",
+        async (request, reply) => {
+            const { spaceId } = request.params
+            await app.services.file.deleteOrphanFiles(app.models, spaceId)
+            reply.send({})
         }
     )
 }
@@ -435,23 +428,21 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         { schema: { body: inviteCreateBodySchema } },
         async (request, reply) => {
             const { spaceId, toEmail, role } = request.body
-            await app.transaction(async (models) => {
-                const res = await app.services.invites.create(models, {
-                    fromId: request.token.userId,
-                    spaceId,
-                    toEmail,
-                    role
-                })
-                if (!res.isOk) {
-                    reply.code(500).send({ error: res.error })
-                    return
-                }
-                await app.services.users.setUnreadNotifications(
-                    models,
-                    res.value.toId
-                )
-                reply.send(res.value)
+            const res = await app.services.invites.create(app.models, {
+                fromId: request.token.userId,
+                spaceId,
+                toEmail,
+                role
             })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+            await app.services.users.setUnreadNotifications(
+                app.models,
+                res.value.toId
+            )
+            reply.send(res.value)
         }
     )
 
@@ -461,46 +452,41 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const { role } = request.body
             const { id } = request.params
-            await app.transaction(async (models) => {
-                const invite = await models.invites.findOne({
-                    where: { id, status: "sent" },
-                    select: { spaceId: true }
-                })
-                if (invite === null) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Invite not found" } })
-                    return
-                }
 
-                const currentUserRole = await app.services.spaces.getMemberRole(
-                    models,
-                    {
-                        userId: request.token.userId,
-                        spaceId: invite.spaceId
-                    }
-                )
-                const isPermitted =
-                    currentUserRole !== null &&
-                    (role === "admin"
-                        ? currentUserRole === "owner"
-                        : ["admin", "owner"].includes(currentUserRole))
-                if (!isPermitted) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
-
-                await models.invites.update({ id }, { role })
-
-                const inviteRes = await app.services.invites.get(models, id)
-                if (!inviteRes.isOk) {
-                    reply.code(500).send()
-                    return
-                }
-                reply.send(inviteRes.value)
+            const invite = await app.models.invites.findOne({
+                where: { id, status: "sent" },
+                select: { spaceId: true }
             })
+            if (invite === null) {
+                reply.code(500).send({ error: { message: "Invite not found" } })
+                return
+            }
+
+            const currentUserRole = await app.services.spaces.getMemberRole(
+                app.models,
+                {
+                    userId: request.token.userId,
+                    spaceId: invite.spaceId
+                }
+            )
+            const isPermitted =
+                currentUserRole !== null &&
+                (role === "admin"
+                    ? currentUserRole === "owner"
+                    : ["admin", "owner"].includes(currentUserRole))
+            if (!isPermitted) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            await app.models.invites.update({ id }, { role })
+
+            const inviteRes = await app.services.invites.get(app.models, id)
+            if (!inviteRes.isOk) {
+                reply.code(500).send()
+                return
+            }
+            reply.send(inviteRes.value)
         }
     )
 
@@ -508,47 +494,42 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/invites/:id/accept",
         async (request, reply) => {
             const id = request.params.id
-            await app.transaction(async (models) => {
-                const userId = request.token.userId
+            const userId = request.token.userId
 
-                const updateRes = await models.invites.update(
-                    { id, status: "sent", toId: userId },
-                    { status: "accepted" }
-                )
-                if (updateRes.affected === 0) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Invite not found" } })
-                    return
-                }
+            const updateRes = await app.models.invites.update(
+                { id, status: "sent", toId: userId },
+                { status: "accepted" }
+            )
+            if (updateRes.affected === 0) {
+                reply.code(500).send({ error: { message: "Invite not found" } })
+                return
+            }
 
-                const inviteRes = await app.services.invites.get(models, id)
-                if (!inviteRes.isOk) {
-                    reply.code(500).send()
-                    return
-                }
-                const invite = inviteRes.value
+            const inviteRes = await app.services.invites.get(app.models, id)
+            if (!inviteRes.isOk) {
+                reply.code(500).send()
+                return
+            }
+            const invite = inviteRes.value
 
-                await app.services.spaces.addMember(models, {
-                    userId: invite.to.id,
-                    spaceId: invite.space.id,
-                    role: invite.role
-                })
-
-                const getSpaceRes = await app.services.spaces.getUserSpace(
-                    models,
-                    userId,
-                    invite.spaceId
-                )
-                if (!getSpaceRes.isOk) {
-                    reply.code(500).send(getSpaceRes.error)
-                    return
-                }
-                // @ts-expect-error SpaceView
-                invite.space = getSpaceRes.value
-
-                reply.send(invite)
+            await app.services.spaces.addMember(app.models, {
+                userId: invite.to.id,
+                spaceId: invite.space.id,
+                role: invite.role
             })
+
+            const getSpaceRes = await app.services.spaces.getUserSpace(
+                app.models,
+                userId,
+                invite.spaceId
+            )
+            if (!getSpaceRes.isOk) {
+                reply.code(500).send(getSpaceRes.error)
+                return
+            }
+
+            const acceptedInvite = { ...invite, space: getSpaceRes.value }
+            reply.send(acceptedInvite)
         }
     )
 
@@ -556,25 +537,21 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/invites/:id/decline",
         async (request, reply) => {
             const id = request.params.id
-            await app.transaction(async (models) => {
-                const updateRes = await models.invites.update(
-                    { id, status: "sent", toId: request.token.userId },
-                    { status: "declined" }
-                )
-                if (updateRes.affected === 0) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Invite not found" } })
-                    return
-                }
+            const updateRes = await app.models.invites.update(
+                { id, status: "sent", toId: request.token.userId },
+                { status: "declined" }
+            )
+            if (updateRes.affected === 0) {
+                reply.code(500).send({ error: { message: "Invite not found" } })
+                return
+            }
 
-                const inviteRes = await app.services.invites.get(models, id)
-                if (!inviteRes.isOk) {
-                    reply.code(500).send()
-                    return
-                }
-                reply.send(inviteRes.value)
-            })
+            const inviteRes = await app.services.invites.get(app.models, id)
+            if (!inviteRes.isOk) {
+                reply.code(500).send()
+                return
+            }
+            reply.send(inviteRes.value)
         }
     )
 
@@ -582,38 +559,32 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/invites/:id/cancel",
         async (request, reply) => {
             const id = request.params.id
-            await app.transaction(async (models) => {
-                const invite = await models.invites.findOne({
-                    where: { id, status: "sent" },
-                    select: { spaceId: true }
-                })
-                if (invite === null) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Invite not found" } })
-                    return
-                }
-
-                const role = await app.services.spaces.getMemberRole(models, {
-                    userId: request.token.userId,
-                    spaceId: invite.spaceId
-                })
-                if (role === null || !["admin", "owner"].includes(role)) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
-
-                await models.invites.update({ id }, { status: "cancelled" })
-
-                const inviteRes = await app.services.invites.get(models, id)
-                if (!inviteRes.isOk) {
-                    reply.code(500).send()
-                    return
-                }
-                reply.send(inviteRes.value)
+            const invite = await app.models.invites.findOne({
+                where: { id, status: "sent" },
+                select: { spaceId: true }
             })
+            if (invite === null) {
+                reply.code(500).send({ error: { message: "Invite not found" } })
+                return
+            }
+
+            const role = await app.services.spaces.getMemberRole(app.models, {
+                userId: request.token.userId,
+                spaceId: invite.spaceId
+            })
+            if (role === null || !["admin", "owner"].includes(role)) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            await app.models.invites.update({ id }, { status: "cancelled" })
+
+            const inviteRes = await app.services.invites.get(app.models, id)
+            if (!inviteRes.isOk) {
+                reply.code(500).send()
+                return
+            }
+            reply.send(inviteRes.value)
         }
     )
 
@@ -621,29 +592,25 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/invites/:id/hide",
         async (request, reply) => {
             const id = request.params.id
-            await app.transaction(async (models) => {
-                const updateRes = await models.invites.update(
-                    {
-                        id,
-                        status: Or(Equal("accepted"), Equal("declined")),
-                        fromId: request.token.userId
-                    },
-                    { isHidden: true }
-                )
-                if (updateRes.affected === 0) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Invite not found" } })
-                    return
-                }
+            const updateRes = await app.models.invites.update(
+                {
+                    id,
+                    status: Or(Equal("accepted"), Equal("declined")),
+                    fromId: request.token.userId
+                },
+                { isHidden: true }
+            )
+            if (updateRes.affected === 0) {
+                reply.code(500).send({ error: { message: "Invite not found" } })
+                return
+            }
 
-                const inviteRes = await app.services.invites.get(models, id)
-                if (!inviteRes.isOk) {
-                    reply.code(500).send()
-                    return
-                }
-                reply.send(inviteRes.value)
-            })
+            const inviteRes = await app.services.invites.get(app.models, id)
+            if (!inviteRes.isOk) {
+                reply.code(500).send()
+                return
+            }
+            reply.send(inviteRes.value)
         }
     )
 }
@@ -655,29 +622,25 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/posts/new",
         async (request, reply) => {
             const { docId, spaceId } = request.body
-            await app.transaction(async (models) => {
-                const role = await app.services.spaces.getMemberRole(models, {
-                    userId: request.token.userId,
-                    spaceId
-                })
-                if (role === null || !["admin", "owner"].includes(role)) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
-
-                const res = await app.services.posts.publish(models, {
-                    docId,
-                    spaceId
-                })
-                if (!res.isOk) {
-                    reply.code(500).send(res.error)
-                    return
-                }
-
-                reply.send(res.value)
+            const role = await app.services.spaces.getMemberRole(app.models, {
+                userId: request.token.userId,
+                spaceId
             })
+            if (role === null || !["admin", "owner"].includes(role)) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const res = await app.services.posts.publish(app.models, {
+                docId,
+                spaceId
+            })
+            if (!res.isOk) {
+                reply.code(500).send(res.error)
+                return
+            }
+
+            reply.send(res.value)
         }
     )
 
@@ -685,39 +648,33 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/posts/:postId/update",
         async (request, reply) => {
             const { postId } = request.params
-            await app.transaction(async (models) => {
-                const post = await app.services.posts.get(models, postId)
-                if (post === null) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Post not found" } })
-                    return
-                }
+            const post = await app.services.posts.get(app.models, postId)
+            if (post === null) {
+                reply.code(500).send({ error: { message: "Post not found" } })
+                return
+            }
 
-                const role = await app.services.spaces.getMemberRole(models, {
-                    userId: request.token.userId,
-                    spaceId: post.spaceId
-                })
-                if (role === null || !["admin", "owner"].includes(role)) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
-
-                const updateRes = await app.services.posts.update(
-                    models,
-                    postId
-                )
-                if (!updateRes.isOk) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Couldn't update post" } })
-                    return
-                }
-
-                reply.send(updateRes.value)
+            const role = await app.services.spaces.getMemberRole(app.models, {
+                userId: request.token.userId,
+                spaceId: post.spaceId
             })
+            if (role === null || !["admin", "owner"].includes(role)) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const updateRes = await app.services.posts.update(
+                app.models,
+                postId
+            )
+            if (!updateRes.isOk) {
+                reply
+                    .code(500)
+                    .send({ error: { message: "Couldn't update post" } })
+                return
+            }
+
+            reply.send(updateRes.value)
         }
     )
 
@@ -725,39 +682,34 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/posts/:postId/unpublish",
         async (request, reply) => {
             const { postId } = request.params
-            await app.transaction(async (models) => {
-                const post = await app.services.posts.get(models, postId)
-                if (post === null) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Post not found" } })
-                    return
-                }
 
-                const role = await app.services.spaces.getMemberRole(models, {
-                    userId: request.token.userId,
-                    spaceId: post.spaceId
-                })
-                if (role === null || !["admin", "owner"].includes(role)) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Not permitted" } })
-                    return
-                }
+            const post = await app.services.posts.get(app.models, postId)
+            if (post === null) {
+                reply.code(500).send({ error: { message: "Post not found" } })
+                return
+            }
 
-                const unpublishRes = await app.services.posts.unpublish(
-                    models,
-                    postId
-                )
-                if (!unpublishRes.isOk) {
-                    reply
-                        .code(500)
-                        .send({ error: { message: "Couldn't update post" } })
-                    return
-                }
-
-                reply.send({})
+            const role = await app.services.spaces.getMemberRole(app.models, {
+                userId: request.token.userId,
+                spaceId: post.spaceId
             })
+            if (role === null || !["admin", "owner"].includes(role)) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const unpublishRes = await app.services.posts.unpublish(
+                app.models,
+                postId
+            )
+            if (!unpublishRes.isOk) {
+                reply
+                    .code(500)
+                    .send({ error: { message: "Couldn't unpublish post" } })
+                return
+            }
+
+            reply.send({})
         }
     )
 
@@ -765,19 +717,18 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/posts/:postId",
         async (request, reply) => {
             const { postId } = request.params
-            await app.transaction(async (models) => {
-                const post = await app.services.posts.get(models, postId)
-                if (post === null) {
-                    reply.code(500).send({
-                        error: {
-                            message: "Post not found",
-                            code: "not_found"
-                        }
-                    })
-                    return
-                }
-                reply.send(post)
-            })
+
+            const post = await app.services.posts.get(app.models, postId)
+            if (post === null) {
+                reply.code(500).send({
+                    error: {
+                        message: "Post not found",
+                        code: "not_found"
+                    }
+                })
+                return
+            }
+            reply.send(post)
         }
     )
 }
@@ -800,27 +751,23 @@ const appRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
     fastify.get("/profile", async (request, reply) => {
         const userId = request.token.userId
-        await app.transaction(async (models) => {
-            const res = await app.services.users.getProfile(models, userId)
-            if (!res.isOk) {
-                reply.code(500).send({ error: { message: "Server error" } })
-                return
-            }
-            reply.send(res.value)
-        })
+
+        const res = await app.services.users.getProfile(app.models, userId)
+        if (!res.isOk) {
+            reply.code(500).send({ error: { message: "Server error" } })
+            return
+        }
+        reply.send(res.value)
     })
 
     fastify.get("/notifications", async (request, reply) => {
         const userId = request.token.userId
-        await app.transaction(async (models) => {
-            const invites = await app.services.invites.getUserActiveInvites(
-                models,
-                userId
-            )
-            const res = { invites }
-            app.services.users.setUnreadNotifications(models, userId, false)
-            reply.send(res)
-        })
+        const invites = await app.services.invites.getUserActiveInvites(
+            app.models,
+            userId
+        )
+        app.services.users.setUnreadNotifications(app.models, userId, false)
+        reply.send({ invites })
     })
 
     fastify.register(accountRoutes(app))
@@ -996,19 +943,17 @@ class App {
             "/posts/:postId/content",
             async (request, reply) => {
                 const { postId } = request.params
-                await this.transaction(async (models) => {
-                    const content = await this.services.posts.content(
-                        models,
-                        postId
-                    )
-                    if (content === null) {
-                        reply
-                            .code(500)
-                            .send({ error: { message: "Post not found" } })
-                        return
-                    }
-                    reply.send(content)
-                })
+                const content = await this.services.posts.content(
+                    this.models,
+                    postId
+                )
+                if (content === null) {
+                    reply
+                        .code(500)
+                        .send({ error: { message: "Post not found" } })
+                    return
+                }
+                reply.send(content)
             }
         )
 

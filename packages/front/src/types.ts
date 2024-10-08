@@ -81,7 +81,7 @@ export type SinkronElement =
     | ListElement
     | CheckListElement
     | OrderedListElement
-    | CodeElement
+    | CodeBlockElement
     | CodeLineElement
     | LinkElement
     | ImageElement

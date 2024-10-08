@@ -230,7 +230,7 @@ class SpaceStore {
         this.collection.destroy()
     }
 
-    get viewProps() : SpaceViewProps {
+    get viewProps(): SpaceViewProps {
         const { kind } = this.view
         if (kind === "all") {
             return {
@@ -466,6 +466,20 @@ class SpaceStore {
         const uploadState = { id, content, state }
         this.uploadQueue.set(id, uploadState)
         return uploadState
+    }
+
+    deleteOrphans() {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/delete_orphans`
+            })
+        )
+        res.then(
+            () => console.log("Deleted"),
+            (e) => console.log("Error:", e)
+        )
+        return res
     }
 }
 

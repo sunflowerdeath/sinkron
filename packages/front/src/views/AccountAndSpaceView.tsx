@@ -104,7 +104,7 @@ const AccountAndSpaceView = observer(() => {
             </Col>
             <Col gap={16}>
                 <Heading>Space</Heading>
-                <Row gap={8}>
+                <Row gap={8} align="center">
                     <Avatar name={space.space.name} />
                     <Col>
                         <div>{space.space.name}</div>

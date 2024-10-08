@@ -41,56 +41,6 @@ class AuthService {
         this.app = app
     }
 
-    isTokenExpired(token: AuthToken): boolean {
-        const now = new Date()
-        return token.expiresAt === null || token.expiresAt > now
-    }
-
-    async deleteExpiredTokens(models: AppModels, userId: string) {
-        const now =
-            this.app.config.db.type === "postgres" ? "NOW()" : "TIME('now')"
-        await models.tokens.delete({
-            userId,
-            expiresAt: Raw((f) => `${f} IS NOT NULL AND ${f} < ${now}`)
-        })
-    }
-
-    async deleteTokensOverLimit(models: AppModels, userId: string) {
-        const tokensOverLimit = await models.tokens.find({
-            select: { token: true },
-            where: { userId },
-            order: { lastAccess: "DESC" },
-            skip: maxTokensPerUser
-        })
-        if (tokensOverLimit.length) {
-            await models.tokens.delete(tokensOverLimit.map((t) => t.token))
-        }
-    }
-
-    async issueAuthToken(
-        models: AppModels,
-        props: AuthTokenProps
-    ): Promise<ResultType<AuthToken, RequestError>> {
-        const { userId, client } = props // TODO issue with expiration
-
-        const count = await models.users.countBy({ id: userId })
-        if (count === 0) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "User does not exist",
-                details: { id: userId }
-            })
-        }
-
-        const res = await models.tokens.insert({ userId, client })
-        const token = { userId, ...res.generatedMaps[0] } as AuthToken
-
-        this.deleteExpiredTokens(models, userId)
-        this.deleteTokensOverLimit(models, userId)
-
-        return Result.ok(token)
-    }
-
     async sendCode(
         models: AppModels,
         email: string
@@ -205,6 +155,51 @@ class AuthService {
         return res
     }
 
+    async #deleteExpiredTokens(models: AppModels, userId: string) {
+        const now =
+            this.app.config.db.type === "postgres" ? "NOW()" : "TIME('now')"
+        await models.tokens.delete({
+            userId,
+            expiresAt: Raw((f) => `${f} IS NOT NULL AND ${f} < ${now}`)
+        })
+    }
+
+    async #deleteTokensOverLimit(models: AppModels, userId: string) {
+        const tokensOverLimit = await models.tokens.find({
+            select: { token: true },
+            where: { userId },
+            order: { lastAccess: "DESC" },
+            skip: maxTokensPerUser
+        })
+        if (tokensOverLimit.length) {
+            await models.tokens.delete(tokensOverLimit.map((t) => t.token))
+        }
+    }
+
+    async issueAuthToken(
+        models: AppModels,
+        props: AuthTokenProps
+    ): Promise<ResultType<AuthToken, RequestError>> {
+        const { userId, client } = props // TODO issue with expiration
+
+        const count = await models.users.countBy({ id: userId })
+        if (count === 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "User does not exist",
+                details: { id: userId }
+            })
+        }
+
+        const res = await models.tokens.insert({ userId, client })
+        const token = { userId, ...res.generatedMaps[0] } as AuthToken
+
+        this.#deleteExpiredTokens(models, userId)
+        this.#deleteTokensOverLimit(models, userId)
+
+        return Result.ok(token)
+    }
+
     async deleteAuthToken(
         models: AppModels,
         token: string
@@ -235,14 +230,16 @@ class AuthService {
     ): Promise<ResultType<AuthToken | null, RequestError>> {
         const res = await models.tokens.findOne({
             where: { token },
-            select: { token: true, userId: true, createdAt: true }
+            select: { token: true, userId: true, expiresAt: true }
         })
 
         if (res === null) {
             return Result.ok(null)
         }
 
-        if (this.isTokenExpired(res)) {
+        const isExpired =
+            res.expiresAt !== null && isAfter(res.expiresAt, new Date())
+        if (isExpired) {
             models.tokens.delete({ token })
             return Result.ok(null)
         }
@@ -252,25 +249,19 @@ class AuthService {
         return Result.ok(res)
     }
 
-    async getActiveTokens(
-        models: AppModels,
-        userId: string
-    ): Promise<AuthToken[]> {
-        await this.deleteExpiredTokens(models, userId)
-        return await models.tokens.find({
-            where: { userId },
-            order: { lastAccess: "desc" }
-        })
-    }
-
     async getActiveSessions(
         models: AppModels,
         props: { userId: string; token: string }
     ): Promise<Session[]> {
         const { userId, token } = props
-        const tokens = await this.getActiveTokens(models, userId)
+
+        await this.#deleteExpiredTokens(models, userId)
+        const tokens = await models.tokens.find({
+            where: { userId },
+            order: { lastAccess: "desc" }
+        })
+
         const sessions: Session[] = tokens.map((t) => {
-            // const data = JSON.parse(t.client)
             return {
                 lastActive: t.lastAccess.toISOString(),
                 from: "", // TODO t.from,
