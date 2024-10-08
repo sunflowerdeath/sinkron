@@ -37,55 +37,51 @@ import {
 } from "./protocol"
 import type { DbConfig } from "./db"
 
-export type UpdateResult = {
-    doc: Document
-    changes: Uint8Array[]
+export type CollectionView = {
+    id: string
+    colrev: number
+    ref: boolean
 }
 
-type CreateCollectionProps = {
+export type DocumentView = {
     id: string
-    permissions: PermissionsTable
-    ref?: boolean
-}
-
-type CreateDocumentProps = {
-    id: string
-    data: Uint8Array
-    permissions: Permissions
-    col?: string
-}
-
-type UpdateDocumentProps = {
-    id: string
-    changes: Uint8Array[]
-    permissions: Permissions
-}
-
-type CheckPermissionProps = {
-    id: string
-    action: Action
-    user: string
-}
-
-type SyncCollectionDocument = {
-    id: string
-    data: Buffer | null
+    data: Uint8Array | null
+    col: string
     colrev: number
     createdAt: Date
     updatedAt: Date
 }
 
-type SyncCollectionResult = {
+export type SyncCollectionResult = {
     col: string
     colrev: number
-    documents: SyncCollectionDocument[]
+    documents: DocumentView[]
 }
+
+export type CreateCollectionProps = {
+    id: string
+    permissions: PermissionsTable
+    ref?: boolean
+}
+
+export type UpdateResult = {
+    doc: DocumentView
+    changes: Uint8Array[]
+}
+
+export type CheckPermissionProps = {
+    id: string
+    action: Action
+    user: string
+}
+
+type UserObject = { id: string; groups: string[] }
 
 type Colrevs = Array<{ id: string; colrev: number }>
 
 export type RequestError = { code: ErrorCode; details?: string }
 
-interface SinkronProps {
+export type SinkronProps = {
     db: DbConfig
 }
 
@@ -102,6 +98,7 @@ class Sinkron {
         const { db } = props
         this.db = createDataSource(db)
         this.cache = new LRUCache({ max: 1000 })
+        this.userCache = new LRUCache({ max: 1000 })
         this.models = {
             documents: this.db.getRepository<Document>("document"),
             collections: this.db.getRepository<Collection>("collection"),
@@ -112,36 +109,28 @@ class Sinkron {
     }
 
     db: DataSource
-    cache: LRUCache<string, Document>
+    cache: LRUCache<string, DocumentView>
+    userCache: LRUCache<string, UserObject>
     models: SinkronModels
 
     async init() {
         await this.db.initialize()
     }
 
-    async getDocument(id: string): Promise<null | Document> {
-        const cached = this.cache.get(id)
-        if (cached !== undefined) return cached
+    // === Collections ===
 
+    async getCollection(id: string): Promise<CollectionView | null> {
         const models = this.models
-        const select: FindOptionsSelect<Document> = {
-            id: true,
-            rev: true,
-            data: true,
-            colId: true,
-            createdAt: true,
-            updatedAt: true
-        }
-        const res = await models.documents.findOne({
+        const res = await models.collections.findOne({
             where: { id },
-            select
+            select: { id: true, colrev: true, ref: true }
         })
-        return res as Document | null
+        return res
     }
 
     async createCollection(
         props: CreateCollectionProps
-    ): Promise<ResultType<Collection, RequestError>> {
+    ): Promise<ResultType<CollectionView, RequestError>> {
         const { id, permissions, ref = false } = props
         const models = this.models
 
@@ -159,13 +148,12 @@ class Sinkron {
             permissions: JSON.stringify(permissions),
             ref
         })
-        // TODO generated fields
-        const col = { id, colrev: 1 }
 
-        return Result.ok(col as Collection)
+        const col = { id, colrev: 1, ref }
+        return Result.ok(col)
     }
 
-    async syncDocCollection(
+    async #syncDocCollection(
         colEntity: Collection,
         colrev?: number
     ): Promise<ResultType<SyncCollectionResult, RequestError>> {
@@ -186,8 +174,18 @@ class Sinkron {
             const documents = await models.documents.find({
                 where: { colId: colEntity.id, isDeleted: false },
                 select
-            }) // as SyncCollectionDocument[]
-            return Result.ok({ ...result, documents })
+            })
+            return Result.ok({
+                ...result,
+                documents: documents.map((d) => ({
+                    id: d.id,
+                    data: d.data,
+                    createdAt: d.createdAt,
+                    updatedAt: d.updatedAt,
+                    col: d.colId,
+                    colrev: d.colrev
+                }))
+            })
         }
 
         if (colrev < 0 || colrev > colEntity.colrev) {
@@ -202,25 +200,22 @@ class Sinkron {
         }
 
         // Get documents since provided colrev including deleted
-        const documentsRows = (await models.documents.find({
+        const documents = await models.documents.find({
             where: { colId: colEntity.id, colrev: MoreThan(colrev) },
             select: { ...select, isDeleted: true }
-        })) as Document[]
-        const documents = documentsRows.map((d) =>
-            d.isDeleted
-                ? ({
-                      id: d.id,
-                      data: null,
-                      createdAt: d.createdAt,
-                      updatedAt: d.updatedAt,
-                      col: d.col
-                  } as any as Document)
-                : d
-        )
-        return Result.ok({ ...result, documents })
+        })
+        const views = documents.map((d) => ({
+            id: d.id,
+            data: d.data,
+            createdAt: d.createdAt,
+            updatedAt: d.updatedAt,
+            col: d.colId,
+            colrev: d.colrev
+        }))
+        return Result.ok({ ...result, documents: views })
     }
 
-    async syncRefCollection(
+    async #syncRefCollection(
         colEntity: Collection,
         colrev?: number
     ): Promise<ResultType<SyncCollectionResult, RequestError>> {
@@ -269,10 +264,11 @@ class Sinkron {
             select,
             relations: { doc: true }
         })
+        // TODO colrevs
         const documents = refs.map((ref) =>
             ref.isRemoved
-                ? { ...ref.doc, data: null /*, col: colEntity.id */ }
-                : { ...ref.doc /*, col: colEntity.id */ }
+                ? { ...ref.doc, data: null, col: colEntity.id }
+                : { ...ref.doc, col: colEntity.id }
         )
         return Result.ok({ ...result, documents })
     }
@@ -290,69 +286,8 @@ class Sinkron {
         if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
 
         return colEntity.ref
-            ? this.syncRefCollection(colEntity as Collection, colrev)
-            : this.syncDocCollection(colEntity as Collection, colrev)
-    }
-
-    // notr
-    async createDocument(
-        id: string,
-        col: string,
-        data: Uint8Array
-    ): Promise<ResultType<Document, RequestError>> {
-        const models = this.models
-
-        const docCnt = await models.documents.countBy({ id })
-        if (docCnt > 0) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                details: "Duplicate doc id: " + id
-            })
-        }
-
-        const colEntity = await models.collections.findOne({
-            where: { id: col },
-            select: { colrev: true, permissions: true, ref: true }
-        })
-        if (colEntity === null) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                details: "Collection not found"
-            })
-        }
-        if (colEntity.ref === true) {
-            return Result.err({
-                code: ErrorCode.InvalidRequest,
-                details: "Ref collections don't support creating documents"
-            })
-        }
-
-        // increment colrev
-        // TODO raw with RETURNING ?
-        const nextColrev = colEntity.colrev + 1
-        await models.collections.update(col, { colrev: nextColrev })
-
-        // create document
-        const colPermissions = Permissions.parse(colEntity.permissions)
-        const docPermissions = {
-            create: [],
-            read: [],
-            delete: [],
-            update: colPermissions.table.update
-        }
-        const doc = {
-            id,
-            data,
-            rev: 1,
-            colId: col,
-            isDeleted: false,
-            colrev: nextColrev,
-            permissions: JSON.stringify(docPermissions)
-        }
-        const insertRes = await models.documents.insert(doc)
-        const generated = insertRes.generatedMaps[0]
-        const result = { ...doc, ...generated } as Document // TODO cache
-        return Result.ok(result)
+            ? this.#syncRefCollection(colEntity, colrev)
+            : this.#syncDocCollection(colEntity, colrev)
     }
 
     async addDocumentToCollection(
@@ -436,7 +371,113 @@ class Sinkron {
         return Result.ok(true)
     }
 
-    async incrementRefColrevs(
+    async deleteCollection(
+        id: string
+    ): Promise<ResultType<true, RequestError>> {
+        // TODO
+        return Result.ok(true)
+    }
+
+    // === Documents ===
+
+    async getDocument(id: string): Promise<DocumentView | null> {
+        const cached = this.cache.get(id)
+        if (cached !== undefined) return cached
+
+        const models = this.models
+        const select: FindOptionsSelect<Document> = {
+            id: true,
+            rev: true,
+            data: true,
+            colId: true,
+            colrev: true,
+            createdAt: true,
+            updatedAt: true
+        }
+        const res = await models.documents.findOne({
+            where: { id },
+            select
+        })
+        if (res === null) return res
+        const view = {
+            id: res.id,
+            data: res.data,
+            col: res.colId,
+            colrev: res.colrev,
+            createdAt: res.createdAt,
+            updatedAt: res.updatedAt
+        }
+        return view
+    }
+
+    async createDocument(
+        id: string,
+        col: string,
+        data: Uint8Array
+    ): Promise<ResultType<DocumentView, RequestError>> {
+        const models = this.models
+
+        const docCnt = await models.documents.countBy({ id })
+        if (docCnt > 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Duplicate doc id: " + id
+            })
+        }
+
+        const colEntity = await models.collections.findOne({
+            where: { id: col },
+            select: { colrev: true, permissions: true, ref: true }
+        })
+        if (colEntity === null) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Collection not found"
+            })
+        }
+        if (colEntity.ref === true) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Ref collections don't support creating documents"
+            })
+        }
+
+        // increment colrev
+        // TODO raw with RETURNING ?
+        const nextColrev = colEntity.colrev + 1
+        await models.collections.update(col, { colrev: nextColrev })
+
+        // create document
+        const colPermissions = Permissions.parse(colEntity.permissions)
+        const docPermissions = {
+            create: [],
+            read: [],
+            delete: [],
+            update: colPermissions.table.update
+        }
+        const insertRes = await models.documents.insert({
+            id,
+            data,
+            rev: 1,
+            colId: col,
+            isDeleted: false,
+            colrev: nextColrev,
+            permissions: JSON.stringify(docPermissions)
+        })
+        const { createdAt, updatedAt } = insertRes.generatedMaps[0]
+        const view = {
+            id,
+            data,
+            col,
+            colrev: nextColrev,
+            createdAt,
+            updatedAt
+        }
+        this.cache.set(id, view)
+        return Result.ok(view)
+    }
+
+    async #incrementRefColrevs(
         id: string,
         isRemoved: boolean
     ): Promise<ResultType<Colrevs, RequestError>> {
@@ -459,7 +500,7 @@ class Sinkron {
         return Result.ok(colrevs)
     }
 
-    async incrementColrev(
+    async #incrementColrev(
         id: string
     ): Promise<ResultType<number, RequestError>> {
         const models = this.models
@@ -478,17 +519,17 @@ class Sinkron {
         return Result.ok(nextColrev)
     }
 
-    async updateDocumentEntity(
-        doc: Document,
-        update: Partial<Document>
-    ): Promise<ResultType<Document, RequestError>> {
+    async #updateDocumentEntity(
+        doc: DocumentView,
+        update: { data?: Uint8Array | null; isDeleted?: boolean }
+    ): Promise<ResultType<DocumentView, RequestError>> {
         const models = this.models
 
-        const incrementColrevRes = await this.incrementColrev(doc.colId)
+        const incrementColrevRes = await this.#incrementColrev(doc.col)
         if (!incrementColrevRes.isOk) return incrementColrevRes
         const nextColrev = incrementColrevRes.value
 
-        // TODO returning
+        // TODO returning ?
         const updateRes = await models.documents.update(doc.id, {
             ...update,
             colrev: nextColrev
@@ -498,17 +539,17 @@ class Sinkron {
             select: { updatedAt: true }
         }))!
 
-        const incrementRefColrevsRes = await this.incrementRefColrevs(
+        const incrementRefColrevsRes = await this.#incrementRefColrevs(
             doc.id,
             /* isRemoved */ update.data === null
         )
         if (!incrementRefColrevsRes.isOk) return incrementRefColrevsRes
         const colrevs = [
-            { col: doc.colId, colrev: nextColrev },
+            { col: doc.col, colrev: nextColrev },
             ...incrementRefColrevsRes.value
         ]
 
-        const updated: Document = {
+        const updated: DocumentView = {
             ...doc,
             ...update,
             colrev: nextColrev,
@@ -523,7 +564,7 @@ class Sinkron {
     async updateDocument(
         id: string,
         data: Uint8Array[] | null
-    ): Promise<ResultType<Document, RequestError>> {
+    ): Promise<ResultType<DocumentView, RequestError>> {
         const models = this.models
 
         const doc = await this.getDocument(id)
@@ -537,14 +578,13 @@ class Sinkron {
 
         // Delete document
         if (data === null) {
-            const updateResult = await this.updateDocumentEntity(doc, {
+            const updateResult = await this.#updateDocumentEntity(doc, {
                 data: null,
                 isDeleted: true
             })
             return updateResult
         }
 
-        // TODO cache?
         let automerge = Automerge.load(doc.data)
         try {
             ;[automerge] = Automerge.applyChanges(automerge, data)
@@ -555,10 +595,10 @@ class Sinkron {
             })
         }
         const nextData = Automerge.save(automerge)
-        const updateResult = await this.updateDocumentEntity(doc, {
-            data: nextData as Buffer
-        })
 
+        const updateResult = await this.#updateDocumentEntity(doc, {
+            data: nextData
+        })
         return updateResult
     }
 
@@ -597,13 +637,21 @@ class Sinkron {
         }
 
         const nextData = Automerge.save(automerge)
-        const updateRes = await this.updateDocumentEntity(doc, {
-            data: nextData as Buffer
+        const updateRes = await this.#updateDocumentEntity(doc, {
+            data: nextData
         })
         if (!updateRes.isOk) return updateRes
 
         return Result.ok({ doc: updateRes.value, changes: [change] })
     }
+
+    deleteDocument(
+        id: string
+    ): Promise<ResultType<DocumentView, RequestError>> {
+        return this.updateDocument(id, null)
+    }
+
+    // === Permissions ===
 
     async updateCollectionPermissions(
         col: string,
@@ -655,14 +703,18 @@ class Sinkron {
         return Result.ok(true)
     }
 
-    // TODO private
-    async getUserObject(user: string) {
+    async #getUserObject(user: string): Promise<UserObject> {
+        const cached = this.userCache.get(user)
+        if (cached !== undefined) return cached
+
         const models = this.models
         const members = await models.members.find({
             where: { user },
             select: { groupId: true }
         })
-        return { id: user, groups: members.map((g) => g.groupId) }
+        const userObject = { id: user, groups: members.map((g) => g.groupId) }
+        this.userCache.set(user, userObject)
+        return userObject
     }
 
     async checkDocumentPermission(
@@ -682,7 +734,7 @@ class Sinkron {
             })
         }
 
-        const userObject = await this.getUserObject(user)
+        const userObject = await this.#getUserObject(user)
         const permissions = Permissions.parse(doc.permissions)
         const res = permissions.check(userObject, action)
         return Result.ok(res)
@@ -705,31 +757,10 @@ class Sinkron {
             })
         }
 
-        const userObject = await this.getUserObject(user)
+        const userObject = await this.#getUserObject(user)
         const permissions = Permissions.parse(col.permissions)
         const res = permissions.check(userObject, action)
         return Result.ok(res)
-    }
-
-    async getCollection(id: string): Promise<Collection | null> {
-        const models = this.models
-        const select = { id: true, colrev: true }
-        const colEntity = await models.collections.findOne({
-            where: { id },
-            select
-        })
-        return colEntity as Collection
-    }
-
-    async deleteCollection(
-        id: string
-    ): Promise<ResultType<true, RequestError>> {
-        // TODO
-        return Result.ok(true)
-    }
-
-    deleteDocument(id: string): Promise<ResultType<Document, RequestError>> {
-        return this.updateDocument(id, null)
     }
 
     // Groups
@@ -745,7 +776,7 @@ class Sinkron {
             })
         }
 
-        const res = await models.groups.insert({ id })
+        await models.groups.insert({ id })
         return Result.ok({ id } as Group)
     }
 
@@ -780,7 +811,8 @@ class Sinkron {
             })
         }
 
-        const res = await models.members.insert({ user, groupId: group })
+        await models.members.insert({ user, groupId: group })
+        this.userCache.delete(user)
         return Result.ok(true)
     }
 
@@ -789,8 +821,8 @@ class Sinkron {
         group: string
     ): Promise<ResultType<true, RequestError>> {
         const models = this.models
-
-        const res = await models.members.delete({ user, groupId: group })
+        await models.members.delete({ user, groupId: group })
+        this.userCache.delete(user)
         return Result.ok(true)
     }
 }

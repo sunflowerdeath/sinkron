@@ -5,8 +5,7 @@ import Ajv, { JSONSchemaType } from "ajv"
 import { WebSocketServer, WebSocket } from "ws"
 import pino, { Logger } from "pino"
 
-import { Document } from "./entities"
-import { Sinkron, RequestError } from "./core"
+import { Sinkron, RequestError, DocumentView } from "./core"
 import { Result, ResultType } from "./result"
 import { Action } from "./permissions"
 import {
@@ -382,7 +381,7 @@ class SinkronServer {
     async handleChangeMessage(msg: ChangeMessage, ws: WebSocket) {
         const { op, col } = msg
 
-        let res: ResultType<Document, RequestError>
+        let res: ResultType<DocumentView, RequestError>
         if (op === Op.Create) {
             res = await this.handleCreateMessage(msg, ws)
         } else if (op === Op.Delete) {
@@ -430,7 +429,7 @@ class SinkronServer {
     async handleCreateMessage(
         msg: CreateMessage,
         ws: WebSocket
-    ): Promise<ResultType<Document, RequestError>> {
+    ): Promise<ResultType<DocumentView, RequestError>> {
         const { id, col, changeid, data } = msg
 
         const client = this.clients.get(ws)
@@ -459,7 +458,7 @@ class SinkronServer {
     async handleDeleteMessage(
         msg: DeleteMessage,
         ws: WebSocket
-    ): Promise<ResultType<Document, RequestError>> {
+    ): Promise<ResultType<DocumentView, RequestError>> {
         const { col, id, changeid } = msg
 
         const client = this.clients.get(ws)
@@ -485,7 +484,7 @@ class SinkronServer {
     async handleModifyMessage(
         msg: ModifyMessage,
         ws: WebSocket
-    ): Promise<ResultType<Document, RequestError>> {
+    ): Promise<ResultType<DocumentView, RequestError>> {
         const { id, changeid, col, data } = msg
 
         const client = this.clients.get(ws)
@@ -567,16 +566,16 @@ class SinkronServer {
         if (!res.isOk) return res
 
         const { doc, changes } = res.value
-        const collection = this.collections.get(doc.colId)
+        const collection = this.collections.get(doc.col)
         if (collection) {
-            const { colId, colrev, updatedAt, createdAt } = doc
+            const { col, colrev, updatedAt, createdAt } = doc
             const msg: ChangeMessage = {
                 kind: "change",
                 op: Op.Modify,
                 id,
                 // @ts-ignore
                 data: changes.map((c) => Buffer.from(c).toString("base64")),
-                col: colId,
+                col,
                 colrev,
                 updatedAt: serializeDate(updatedAt),
                 changeid: ""
