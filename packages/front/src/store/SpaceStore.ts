@@ -140,6 +140,10 @@ const isMeta = (item: Document | Metadata): item is Metadata => {
     return "meta" in item && item.meta == true
 }
 
+const isDocument = (item: Document | Metadata): item is Document => {
+    return !isMeta(item)
+}
+
 export type SpaceView =
     | { kind: "category"; id: string }
     | { kind: "published" }
@@ -200,14 +204,12 @@ class SpaceStore {
             source: this.collection.items,
             filter: (item) => {
                 if (item.local === null) return false
-                if (isMeta(item.local)) return false
+                if (!isDocument(item.local)) return false
                 if (this.view.kind === "all") {
                     return true
                 } else if (this.view.kind === "published") {
-                    // @ts-expect-error item is not meta
                     return item.local.isPublished
                 } /* this.view.kind === "category" */ else {
-                    // @ts-expect-error item is not meta
                     return item.local.categories.includes(this.view.id)
                 }
             },
@@ -262,7 +264,6 @@ class SpaceStore {
     }
 
     get publishedDocuments() {
-        console.log("OBSERVE")
         const published = []
         for (const item of this.documents) {
             if (item.local?.isPublished) published.push(item)
@@ -381,8 +382,7 @@ class SpaceStore {
         this.collection.items.forEach((item) => {
             if (item.local === null) return
             const data = item.local
-            if (!isMeta(data)) return
-            // @ts-expect-error item is not meta
+            if (!isDocument(data)) return
             if (data.categories.includes(id)) {
                 this.collection.change(item.id, (d) => {
                     // @ts-expect-error item is not meta
