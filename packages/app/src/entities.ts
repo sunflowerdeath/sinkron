@@ -98,7 +98,7 @@ const createEntities = (type: "postgres" | "sqlite") => {
         columns: {
             id: { type: types.uuid, primary: true, generated: "uuid" },
             createdAt: { type: types.date, createDate: true },
-            email: { type: String },
+            email: { type: String, unique: true },
             isDisabled: { type: Boolean },
             hasUnreadNotifications: { type: Boolean }
         },
