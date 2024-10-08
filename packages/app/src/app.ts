@@ -22,7 +22,7 @@ import {
     Post
 } from "./entities"
 
-import { EmailSender, FakeEmailSender } from "./email"
+import { EmailSender, FakeEmailSender, SmtpEmailSender } from "./email"
 import { LocalObjectStorage } from "./files/local"
 import { S3ObjectStorage } from "./files/s3"
 import { UserService } from "./services/user"
@@ -257,7 +257,10 @@ class App {
     constructor() {
         this.config = config
         this.db = dataSource
-        this.emailSender = new FakeEmailSender()
+        this.emailSender =
+            config.mail.type === "console"
+                ? new FakeEmailSender()
+                : new SmtpEmailSender(config.mail)
         this.storage =
             config.storage.type === "s3"
                 ? new S3ObjectStorage(config.storage)

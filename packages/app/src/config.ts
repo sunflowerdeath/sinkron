@@ -8,6 +8,10 @@ export type StorageConfig =
 export type SmtpConfig = {
     type: "smtp"
     host: string
+    port: number
+    secure: boolean
+    user: string
+    password: string
 }
 
 export type MailConfig = { type: "console" } | SmtpConfig
