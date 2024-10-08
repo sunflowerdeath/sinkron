@@ -5,7 +5,7 @@ export type Document = {
     createdAt: Date
     updatedAt: Date
     rev: number
-    data: Uint8Array | null
+    data: Buffer | null
     permissions: string
     isDeleted: boolean
     colId: string
@@ -17,7 +17,7 @@ export type Ref = {
     id: string
     colId: string
     col: Collection
-    colrev: string
+    colrev: number
     docId: string
     doc: Document
     isRemoved: boolean

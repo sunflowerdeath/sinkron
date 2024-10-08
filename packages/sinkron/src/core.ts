@@ -4,7 +4,8 @@ import {
     Repository,
     MoreThan,
     MoreThanOrEqual,
-    EntityManager
+    EntityManager,
+    FindOptionsSelect
 } from "typeorm"
 import { without, remove, isEqual, uniq } from "lodash"
 import { v4 as uuidv4 } from "uuid"
@@ -12,7 +13,6 @@ import * as Automerge from "@automerge/automerge"
 import { LRUCache } from "lru-cache"
 
 import { createDataSource } from "./db"
-// import { getEntities } from "./entities"
 import type { Document, Collection, Ref, Group, GroupMember } from "./entities"
 import { Result, ResultType } from "./result"
 import {
@@ -67,13 +67,21 @@ type CheckPermissionProps = {
     user: string
 }
 
+type SyncCollectionDocument = {
+    id: string
+    data: Buffer | null
+    colrev: number
+    createdAt: Date
+    updatedAt: Date
+}
+
 type SyncCollectionResult = {
     col: string
     colrev: number
-    documents: Document[]
+    documents: SyncCollectionDocument[]
 }
 
-type Colrevs = Array<{ id: string; colrev: string }>
+type Colrevs = Array<{ id: string; colrev: number }>
 
 export type RequestError = { code: ErrorCode; details?: string }
 
@@ -81,39 +89,42 @@ interface SinkronProps {
     db: DbConfig
 }
 
+type SinkronModels = {
+    documents: Repository<Document>
+    collections: Repository<Collection>
+    refs: Repository<Ref>
+    groups: Repository<Group>
+    members: Repository<GroupMember>
+}
+
 class Sinkron {
     constructor(props: SinkronProps) {
         const { db } = props
         this.db = createDataSource(db)
         this.cache = new LRUCache({ max: 1000 })
+        this.models = {
+            documents: this.db.getRepository<Document>("document"),
+            collections: this.db.getRepository<Collection>("collection"),
+            refs: this.db.getRepository<Ref>("ref"),
+            groups: this.db.getRepository<Group>("group"),
+            members: this.db.getRepository<GroupMember>("group_member")
+        }
     }
 
     db: DataSource
     cache: LRUCache<string, Document>
+    models: SinkronModels
 
     async init() {
         await this.db.initialize()
     }
 
-    getModels(m: EntityManager) {
-        return {
-            documents: m.getRepository("document"),
-            collections: m.getRepository("collection"),
-            refs: m.getRepository("ref"),
-            groups: m.getRepository("group"),
-            members: m.getRepository("group_member")
-        }
-    }
-
-    async getDocumentTr(
-        m: EntityManager,
-        id: string
-    ): Promise<null | Document> {
+    async getDocument(id: string): Promise<null | Document> {
         const cached = this.cache.get(id)
         if (cached !== undefined) return cached
 
-        const models = this.getModels(m)
-        const select = {
+        const models = this.models
+        const select: FindOptionsSelect<Document> = {
             id: true,
             rev: true,
             data: true,
@@ -128,13 +139,12 @@ class Sinkron {
         return res as Document | null
     }
 
-    async createCollectionTr(
-        m: EntityManager,
+    async createCollection(
         props: CreateCollectionProps
     ): Promise<ResultType<Collection, RequestError>> {
         const { id, permissions, ref = false } = props
+        const models = this.models
 
-        const models = this.getModels(m)
         const count = await models.collections.countBy({ id })
         if (count > 0) {
             return Result.err({
@@ -155,16 +165,15 @@ class Sinkron {
         return Result.ok(col as Collection)
     }
 
-    async syncDocCollectionTr(
-        m: EntityManager,
+    async syncDocCollection(
         colEntity: Collection,
         colrev?: number
     ): Promise<ResultType<SyncCollectionResult, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const result = { col: colEntity.id, colrev: colEntity.colrev }
 
-        const select = {
+        const select: FindOptionsSelect<Document> = {
             id: true,
             data: true,
             colrev: true,
@@ -174,10 +183,10 @@ class Sinkron {
 
         if (colrev === undefined) {
             // Get all documents except deleted
-            const documents = (await models.documents.find({
+            const documents = await models.documents.find({
                 where: { colId: colEntity.id, isDeleted: false },
                 select
-            })) as Document[]
+            }) // as SyncCollectionDocument[]
             return Result.ok({ ...result, documents })
         }
 
@@ -211,12 +220,11 @@ class Sinkron {
         return Result.ok({ ...result, documents })
     }
 
-    async syncRefCollectionTr(
-        m: EntityManager,
+    async syncRefCollection(
         colEntity: Collection,
         colrev?: number
     ): Promise<ResultType<SyncCollectionResult, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const result = { col: colEntity.id, colrev: colEntity.colrev }
 
@@ -257,24 +265,23 @@ class Sinkron {
 
         // Get refs since provided colrev including removed
         const refs = await models.refs.find({
-            where: { coldId: colEntity.id, colrev: MoreThan(colrev) },
+            where: { colId: colEntity.id, colrev: MoreThan(colrev) },
             select,
             relations: { doc: true }
         })
         const documents = refs.map((ref) =>
             ref.isRemoved
-                ? { id: ref.docId, data: null, col: colEntity.id }
-                : { ...ref.doc, col: colEntity.id }
+                ? { ...ref.doc, data: null /*, col: colEntity.id */ }
+                : { ...ref.doc /*, col: colEntity.id */ }
         )
         return Result.ok({ ...result, documents })
     }
 
-    async syncCollectionTr(
-        m: EntityManager,
+    async syncCollection(
         col: string,
         colrev?: number
     ): Promise<ResultType<SyncCollectionResult, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const colEntity = await models.collections.findOne({
             where: { id: col },
@@ -283,17 +290,17 @@ class Sinkron {
         if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
 
         return colEntity.ref
-            ? this.syncRefCollectionTr(m, colEntity as Collection, colrev)
-            : this.syncDocCollectionTr(m, colEntity as Collection, colrev)
+            ? this.syncRefCollection(colEntity as Collection, colrev)
+            : this.syncDocCollection(colEntity as Collection, colrev)
     }
 
-    async createDocumentTr(
-        m: EntityManager,
+    // notr
+    async createDocument(
         id: string,
         col: string,
         data: Uint8Array
     ): Promise<ResultType<Document, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const docCnt = await models.documents.countBy({ id })
         if (docCnt > 0) {
@@ -321,6 +328,7 @@ class Sinkron {
         }
 
         // increment colrev
+        // TODO raw with RETURNING ?
         const nextColrev = colEntity.colrev + 1
         await models.collections.update(col, { colrev: nextColrev })
 
@@ -347,12 +355,11 @@ class Sinkron {
         return Result.ok(result)
     }
 
-    async addDocumentToCollectionTr(
-        m: EntityManager,
+    async addDocumentToCollection(
         col: string,
         doc: string
     ): Promise<ResultType<true, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const colEntity = await models.collections.findOne({
             where: { id: col },
@@ -387,26 +394,25 @@ class Sinkron {
             })
         }
 
+        // TODO increment RETURNING ?
         const nextColrev = colEntity.colrev + 1
+        await models.collections.update(col, { colrev: nextColrev })
         const id = uuidv4()
         await models.refs.insert({
             id,
             docId: doc,
             colId: col,
-            removed: false,
             colrev: nextColrev,
             isRemoved: false
         })
-        await models.collections.update(col, { colrev: nextColrev })
         return Result.ok(true)
     }
 
-    async removeDocumentFromCollectionTr(
-        m: EntityManager,
+    async removeDocumentFromCollection(
         col: string,
         doc: string
     ): Promise<ResultType<true, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const ref = await models.refs.findOne({
             where: { colId: col, docId: doc },
@@ -420,6 +426,7 @@ class Sinkron {
             })
         }
 
+        // TODO increment RETURNING ?
         const nextColrev = ref.col.colrev + 1
         await models.collections.update(col, { colrev: nextColrev })
         await models.refs.update(ref.id, {
@@ -429,12 +436,11 @@ class Sinkron {
         return Result.ok(true)
     }
 
-    async incrementRefColrevsTr(
-        m: EntityManager,
+    async incrementRefColrevs(
         id: string,
         isRemoved: boolean
     ): Promise<ResultType<Colrevs, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const colrevs = []
         const refs = await models.refs.find({
@@ -453,11 +459,10 @@ class Sinkron {
         return Result.ok(colrevs)
     }
 
-    async incrementColrevTr(
-        m: EntityManager,
+    async incrementColrev(
         id: string
     ): Promise<ResultType<number, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
         const col = await models.collections.findOne({
             where: { id },
             select: { colrev: true }
@@ -473,17 +478,17 @@ class Sinkron {
         return Result.ok(nextColrev)
     }
 
-    async updateDocumentEntityTr(
-        m: EntityManager,
+    async updateDocumentEntity(
         doc: Document,
         update: Partial<Document>
     ): Promise<ResultType<Document, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
-        const incrementColrevRes = await this.incrementColrevTr(m, doc.colId)
+        const incrementColrevRes = await this.incrementColrev(doc.colId)
         if (!incrementColrevRes.isOk) return incrementColrevRes
         const nextColrev = incrementColrevRes.value
 
+        // TODO returning
         const updateRes = await models.documents.update(doc.id, {
             ...update,
             colrev: nextColrev
@@ -493,8 +498,7 @@ class Sinkron {
             select: { updatedAt: true }
         }))!
 
-        const incrementRefColrevsRes = await this.incrementRefColrevsTr(
-            m,
+        const incrementRefColrevsRes = await this.incrementRefColrevs(
             doc.id,
             /* isRemoved */ update.data === null
         )
@@ -516,14 +520,13 @@ class Sinkron {
         return Result.ok(updated)
     }
 
-    async updateDocumentTr(
-        m: EntityManager,
+    async updateDocument(
         id: string,
         data: Uint8Array[] | null
     ): Promise<ResultType<Document, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
-        const doc = await this.getDocumentTr(m, id)
+        const doc = await this.getDocument(id)
         if (doc === null) return Result.err({ code: ErrorCode.NotFound })
         if (doc.data === null) {
             return Result.err({
@@ -534,7 +537,7 @@ class Sinkron {
 
         // Delete document
         if (data === null) {
-            const updateResult = await this.updateDocumentEntityTr(m, doc, {
+            const updateResult = await this.updateDocumentEntity(doc, {
                 data: null,
                 isDeleted: true
             })
@@ -552,21 +555,20 @@ class Sinkron {
             })
         }
         const nextData = Automerge.save(automerge)
-        const updateResult = await this.updateDocumentEntityTr(m, doc, {
-            data: nextData
+        const updateResult = await this.updateDocumentEntity(doc, {
+            data: nextData as Buffer
         })
 
         return updateResult
     }
 
-    async updateDocumentWithCallbackTr<T>(
-        m: EntityManager,
+    async updateDocumentWithCallback<T>(
         id: string,
         cb: Automerge.ChangeFn<T>
     ): Promise<ResultType<UpdateResult, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
-        const doc = await this.getDocumentTr(m, id)
+        const doc = await this.getDocument(id)
         if (doc === null) return Result.err({ code: ErrorCode.NotFound })
         if (doc.data === null) {
             return Result.err({
@@ -595,20 +597,19 @@ class Sinkron {
         }
 
         const nextData = Automerge.save(automerge)
-        const updateRes = await this.updateDocumentEntityTr(m, doc, {
-            data: nextData
+        const updateRes = await this.updateDocumentEntity(doc, {
+            data: nextData as Buffer
         })
         if (!updateRes.isOk) return updateRes
 
         return Result.ok({ doc: updateRes.value, changes: [change] })
     }
 
-    async updateCollectionPermissionsTr(
-        m: EntityManager,
+    async updateCollectionPermissions(
         col: string,
         cb: (p: Permissions) => void
     ): Promise<ResultType<true, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const colEntity = await models.collections.findOne({
             where: { id: col },
@@ -629,12 +630,11 @@ class Sinkron {
         return Result.ok(true)
     }
 
-    async updateDocumentPermissionsTr(
-        m: EntityManager,
+    async updateDocumentPermissions(
         id: string,
         cb: (p: Permissions) => void
     ): Promise<ResultType<true, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
 
         const doc = await models.documents.findOne({
             where: { id },
@@ -655,8 +655,9 @@ class Sinkron {
         return Result.ok(true)
     }
 
-    async getUserObject(m: EntityManager, user: string) {
-        const models = this.getModels(m)
+    // TODO private
+    async getUserObject(user: string) {
+        const models = this.models
         const members = await models.members.find({
             where: { user },
             select: { groupId: true }
@@ -664,11 +665,10 @@ class Sinkron {
         return { id: user, groups: members.map((g) => g.groupId) }
     }
 
-    async checkDocumentPermissionTr(
-        m: EntityManager,
+    async checkDocumentPermission(
         props: CheckPermissionProps
     ): Promise<ResultType<boolean, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
         const { id, action, user } = props
 
         const doc = await models.documents.findOne({
@@ -682,17 +682,16 @@ class Sinkron {
             })
         }
 
-        const userObject = await this.getUserObject(m, user)
+        const userObject = await this.getUserObject(user)
         const permissions = Permissions.parse(doc.permissions)
         const res = permissions.check(userObject, action)
         return Result.ok(res)
     }
 
-    async checkCollectionPermissionTr(
-        m: EntityManager,
+    async checkCollectionPermission(
         props: CheckPermissionProps
     ): Promise<ResultType<boolean, RequestError>> {
-        const models = this.getModels(m)
+        const models = this.models
         const { id, action, user } = props
 
         const col = await models.collections.findOne({
@@ -706,35 +705,20 @@ class Sinkron {
             })
         }
 
-        const userObject = await this.getUserObject(m, user)
+        const userObject = await this.getUserObject(user)
         const permissions = Permissions.parse(col.permissions)
         const res = permissions.check(userObject, action)
         return Result.ok(res)
     }
 
-    // ==========
-    // Public API
-    // ==========
-
-    // Collections
-    // -----------
-
-    createCollection(
-        props: CreateCollectionProps
-    ): Promise<ResultType<Collection, RequestError>> {
-        return this.db.transaction((m) => this.createCollectionTr(m, props))
-    }
-
-    getCollection(id: string): Promise<Collection | null> {
-        return this.db.transaction(async (m) => {
-            const models = this.getModels(m)
-            const select = { id: true, colrev: true }
-            const colEntity = await models.collections.findOne({
-                where: { id },
-                select
-            })
-            return colEntity as Collection
+    async getCollection(id: string): Promise<Collection | null> {
+        const models = this.models
+        const select = { id: true, colrev: true }
+        const colEntity = await models.collections.findOne({
+            where: { id },
+            select
         })
+        return colEntity as Collection
     }
 
     async deleteCollection(
@@ -744,176 +728,70 @@ class Sinkron {
         return Result.ok(true)
     }
 
-    getDocument(id: string): Promise<Document | null> {
-        return this.db.transaction((m) => this.getDocumentTr(m, id))
-    }
-
-    syncCollection(
-        col: string,
-        colrev?: number
-    ): Promise<ResultType<SyncCollectionResult, RequestError>> {
-        return this.db.transaction((m) => this.syncCollectionTr(m, col, colrev))
-    }
-
-    // Documents
-    // ---------
-
-    createDocument(
-        id: string,
-        col: string,
-        data: Uint8Array
-    ): Promise<ResultType<Document, RequestError>> {
-        return this.db.transaction((tr) =>
-            this.createDocumentTr(tr, id, col, data)
-        )
-    }
-
-    updateDocument(
-        id: string,
-        data: Uint8Array[] | null
-    ): Promise<ResultType<Document, RequestError>> {
-        return this.db.transaction((m) => this.updateDocumentTr(m, id, data))
-    }
-
-    updateDocumentWithCallback<T>(
-        id: string,
-        cb: Automerge.ChangeFn<T>
-    ): Promise<ResultType<UpdateResult, RequestError>> {
-        return this.db.transaction((m) =>
-            this.updateDocumentWithCallbackTr(m, id, cb)
-        )
-    }
-
     deleteDocument(id: string): Promise<ResultType<Document, RequestError>> {
         return this.updateDocument(id, null)
-    }
-
-    // Refs
-    // ----
-
-    async addDocumentToCollection(
-        col: string,
-        doc: string
-    ): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction((m) =>
-            this.addDocumentToCollectionTr(m, col, doc)
-        )
-    }
-
-    async removeDocumentFromCollection(
-        col: string,
-        doc: string
-    ): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction((m) =>
-            this.removeDocumentFromCollectionTr(m, col, doc)
-        )
-    }
-
-    // Permissions
-    // -----------
-
-    updateCollectionPermissions(
-        col: string,
-        cb: (p: Permissions) => void
-    ): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction((m) =>
-            this.updateCollectionPermissionsTr(m, col, cb)
-        )
-    }
-
-    updateDocumentPermissions(
-        id: string,
-        cb: (p: Permissions) => void
-    ): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction((m) =>
-            this.updateDocumentPermissionsTr(m, id, cb)
-        )
-    }
-
-    checkDocumentPermission(
-        props: CheckPermissionProps
-    ): Promise<ResultType<boolean, RequestError>> {
-        return this.db.transaction((m) =>
-            this.checkDocumentPermissionTr(m, props)
-        )
-    }
-
-    checkCollectionPermission(
-        props: CheckPermissionProps
-    ): Promise<ResultType<boolean, RequestError>> {
-        return this.db.transaction((m) =>
-            this.checkCollectionPermissionTr(m, props)
-        )
     }
 
     // Groups
     // ------
 
     async createGroup(id: string): Promise<ResultType<Group, RequestError>> {
-        return this.db.transaction(async (m) => {
-            const models = this.getModels(m)
-            const count = await models.collections.countBy({ id })
-            if (count > 0) {
-                return Result.err({
-                    code: ErrorCode.InvalidRequest,
-                    details: "Duplicate id"
-                })
-            }
+        const models = this.models
+        const count = await models.groups.countBy({ id })
+        if (count > 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Duplicate id"
+            })
+        }
 
-            const res = await models.groups.insert({ id })
-            return Result.ok({ id } as Group)
-        })
+        const res = await models.groups.insert({ id })
+        return Result.ok({ id } as Group)
     }
 
     async deleteGroup(id: string): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction(async (m) => {
-            const models = this.getModels(m)
+        const models = this.models
 
-            const count = await models.collections.countBy({ id })
-            if (count === 0) {
-                return Result.err({
-                    code: ErrorCode.InvalidRequest,
-                    details: "Group not exist"
-                })
-            }
+        const count = await models.collections.countBy({ id })
+        if (count === 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Group not exist"
+            })
+        }
 
-            await models.members.delete({ group: id })
-            await models.groups.delete({ id })
+        await models.members.delete({ groupId: id })
+        await models.groups.delete({ id })
 
-            return Result.ok(true)
-        })
+        return Result.ok(true)
     }
 
     async addMemberToGroup(
         user: string,
         group: string
     ): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction(async (m) => {
-            const models = this.getModels(m)
+        const models = this.models
 
-            const count = await models.groups.countBy({ id: group })
-            if (count === 0) {
-                return Result.err({
-                    code: ErrorCode.InvalidRequest,
-                    details: "Group not exist"
-                })
-            }
+        const count = await models.groups.countBy({ id: group })
+        if (count === 0) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                details: "Group not exist"
+            })
+        }
 
-            const res = await models.members.insert({ user, groupId: group })
-            return Result.ok(true)
-        })
+        const res = await models.members.insert({ user, groupId: group })
+        return Result.ok(true)
     }
 
     async removeMemberFromGroup(
         user: string,
         group: string
     ): Promise<ResultType<true, RequestError>> {
-        return this.db.transaction(async (m) => {
-            const models = this.getModels(m)
+        const models = this.models
 
-            const res = await models.members.delete({ user, groupId: group })
-            return Result.ok(true)
-        })
+        const res = await models.members.delete({ user, groupId: group })
+        return Result.ok(true)
     }
 }
 
