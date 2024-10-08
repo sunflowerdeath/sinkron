@@ -166,7 +166,7 @@ const CreateCategoryView = observer(() => {
 
     const create = (values: { name: string; parent: string | null }) => {
         const id = space.createCategory(values)
-        space.selectCategory(id)
+        space.view = { kind: "category", id }
         navigate("/")
     }
 
