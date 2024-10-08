@@ -128,8 +128,11 @@ class UserStore {
 
     updateUser(user: User) {
         this.user = user
-        if (!user.spaces.find((s) => s.id === this.spaceId)) {
+        const currentSpace = user.spaces.find((s) => s.id === this.spaceId)
+        if (currentSpace === undefined) {
             this.spaceId = user.spaces[0]?.id
+        } else {
+            this.space?.updateSpace(currentSpace)
         }
     }
 

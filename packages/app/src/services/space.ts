@@ -80,12 +80,6 @@ class SpaceService {
             usedStorage: 0
         }
 
-        this.addMember(models, {
-            userId: ownerId,
-            spaceId: space.id,
-            role: "owner"
-        })
-
         const col = `spaces/${space.id}`
 
         await this.app.sinkron.createGroup(`${col}/readonly`)
@@ -102,6 +96,12 @@ class SpaceService {
         await this.app.sinkron.createCollection({
             id: col,
             permissions: p.table
+        })
+
+        await this.addMember(models, {
+            userId: ownerId,
+            spaceId: space.id,
+            role: "owner"
         })
 
         const meta = Automerge.from({ meta: true, categories: {} })
@@ -130,11 +130,11 @@ class SpaceService {
         await models.posts.delete({ spaceId })
         await models.members.delete({ spaceId })
         await models.invites.delete({ spaceId })
+        await models.spaces.delete({ id: spaceId })
         const col = `spaces/${spaceId}`
         await this.app.sinkron.deleteCollection(col)
         await this.app.sinkron.deleteGroup(`${col}/readonly`)
         await this.app.sinkron.deleteGroup(`${col}/members`)
-        await models.spaces.delete({ id: spaceId })
         return Result.ok(true)
     }
 

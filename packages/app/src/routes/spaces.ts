@@ -213,7 +213,16 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const { spaceId } = request.params
             await app.services.file.deleteOrphanFiles(app.models, spaceId)
-            reply.send({})
+
+            const space = await app.models.spaces.findOne({
+                where: { id: spaceId },
+                select: { usedStorage: true }
+            })
+            if (space === null) {
+                reply.code(500).send()
+                return
+            }
+            reply.send({ usedStorage: space.usedStorage })
         }
     )
 }

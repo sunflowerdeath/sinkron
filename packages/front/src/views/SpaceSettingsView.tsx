@@ -76,7 +76,6 @@ const DeleteSpaceView = (props: DeleteSpaceViewProps) => {
         state.then(
             () => {
                 toast.success("Space deleted!")
-                // navigate("/")
             },
             (e: Error) => {
                 toast.error(<>Couldn't delete space: {e.message}</>)
@@ -121,12 +120,37 @@ const SpaceSettingsView = observer(() => {
         <DeleteSpaceView store={store} onClose={close} toast={toast} />
     ))
 
+    const [deleteOrphansState, setDeleteOrphansState] = useState<
+        IPromiseBasedObservable<object>
+    >(fromPromise.resolve({}))
+    const deleteOrphans = () => {
+        const state = spaceStore.deleteOrphans()
+        state.then(
+            () => {
+                toast.success("Completed")
+            },
+            (e: Error) => {
+                toast.error(<>Error: {e.message}</>)
+            }
+        )
+        setDeleteOrphansState(state)
+    }
+
     const usedStorageMb = ceil(space.usedStorage / (1024 * 1024), 2)
     const storage = (
         <Col gap={16}>
             <Heading>Storage</Heading>
             <div>Used storage: {usedStorageMb} / 100Mb</div>
-            <Button isDisabled>Delete unused files</Button>
+            {space.usedStorage > 0 && (
+                <ButtonsGrid>
+                    <Button
+                        onClick={deleteOrphans}
+                        isDisabled={deleteOrphansState.state === "pending"}
+                    >
+                        Delete unused files
+                    </Button>
+                </ButtonsGrid>
+            )}
         </Col>
     )
 

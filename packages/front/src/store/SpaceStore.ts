@@ -230,6 +230,10 @@ class SpaceStore {
         this.collection.destroy()
     }
 
+    updateSpace(space: Space) {
+        this.space = space
+    }
+
     get viewProps(): SpaceViewProps {
         const { kind } = this.view
         if (kind === "all") {
@@ -475,10 +479,11 @@ class SpaceStore {
                 url: `/spaces/${this.space.id}/delete_orphans`
             })
         )
-        res.then(
-            () => console.log("Deleted"),
-            (e) => console.log("Error:", e)
-        )
+        res.then((res) => {
+            if ("usedStorage" in res && typeof res.usedStorage === "number") {
+                this.space.usedStorage = res.usedStorage
+            }
+        })
         return res
     }
 }

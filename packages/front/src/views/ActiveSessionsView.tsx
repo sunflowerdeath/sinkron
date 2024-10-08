@@ -81,6 +81,7 @@ const ActiveSessionsView = observer(() => {
                         <Col gap={8} align="normal">
                             {sessions.map((s, idx) => (
                                 <SessionListItem
+                                    key={idx}
                                     session={s}
                                     isLast={idx === sessions.length - 1}
                                 />

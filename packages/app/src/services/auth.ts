@@ -238,7 +238,7 @@ class AuthService {
         }
 
         const isExpired =
-            res.expiresAt !== null && isAfter(res.expiresAt, new Date())
+            res.expiresAt === null ? false : isAfter(res.expiresAt, new Date())
         if (isExpired) {
             models.tokens.delete({ token })
             return Result.ok(null)
