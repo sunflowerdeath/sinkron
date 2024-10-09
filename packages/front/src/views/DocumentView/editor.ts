@@ -162,6 +162,19 @@ const createSinkronEditor = (props: CreateEditorProps): ReactEditor => {
             }
         }
 
+        // Ensure that last element is paragraph
+        if (Editor.isEditor(node)) {
+            const lastChild = node.children[node.children.length - 1]
+            if (!Element.isElementType(lastChild, "paragraph")) {
+                Transforms.insertNodes(
+                    editor,
+                    { type: "paragraph", children: [{ text: "" }] },
+                    { at: [editor.children.length] }
+                )
+                return
+            }
+        }
+
         // Remove empty links
         if (
             Element.isElementType(node, "link") &&
