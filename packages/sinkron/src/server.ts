@@ -189,19 +189,13 @@ class SinkronServer {
     }
 
     ping() {
-        const numClients = this.ws.clients.size
-        let terminated = 0
         this.ws.clients.forEach((ws) => {
             // @ts-ignore
-            if (ws.isAlive === false) {
-                terminated++
-                return ws.terminate()
-            }
+            if (ws.isAlive === false) return ws.terminate()
             // @ts-ignore
             ws.isAlive = false
             ws.ping()
         })
-        console.log(`Alive ${numClients - terminated} / ${numClients}`)
         this.pingTimeout = setTimeout(() => this.ping(), pingInterval)
     }
 
