@@ -12,6 +12,7 @@ class ChannelServer {
     ws: WebSocketServer
     clients = new Map<WebSocket, { channels: Set<string> }>()
     channels = new Map<string, { subscribers: Set<WebSocket> }>()
+    timeout?: ReturnType<typeof setTimeout>
     dispose: () => void
 
     constructor(props: ChannelServerProps) {
@@ -21,17 +22,19 @@ class ChannelServer {
         this.ws = new WebSocketServer({ noServer: true })
         this.ws.on("connection", this.onConnect.bind(this))
 
-        const timeout = setInterval(() => {
-            // TODO handle many clients?
-            this.ws.clients.forEach((ws) => {
-                // @ts-ignore
-                if (ws.isAlive === false) return ws.terminate()
-                // @ts-ignore
-                ws.isAlive = false
-                ws.ping()
-            })
-        }, pingInterval)
-        this.dispose = () => clearInterval(timeout)
+        this.timeout = setTimeout(() => this.ping(), pingInterval)
+        this.dispose = () => clearInterval(this.timeout)
+    }
+
+    ping() {
+        this.ws.clients.forEach((ws) => {
+            // @ts-ignore
+            if (ws.isAlive === false) return ws.terminate()
+            // @ts-ignore
+            ws.isAlive = false
+            ws.ping()
+        })
+        this.timeout = setTimeout(() => this.ping(), pingInterval)
     }
 
     async onConnect(ws: WebSocket) {

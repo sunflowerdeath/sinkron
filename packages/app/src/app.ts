@@ -315,6 +315,7 @@ class App {
     async destroy() {
         await this.db.destroy()
         this.channels.dispose()
+        this.sinkronServer.dispose()
     }
 
     async handleUpgrade(

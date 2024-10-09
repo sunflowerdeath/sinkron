@@ -108,6 +108,7 @@ const validateMessage = createValidator()
 
 const serializeDate = (d: Date) => d.toISOString()
 
+const pingInterval = 30000
 const clientDisconnectTimeout = 10000
 
 interface SinkronServerOptions {
@@ -155,14 +156,13 @@ type Client = {
 class SinkronServer {
     sinkron: Sinkron
     ws: WebSocketServer
-
     clients = new Map<WebSocket, Client>()
     collections = new Map<string, { subscribers: Set<WebSocket> }>()
     queue?: MessageQueue<WsMessage>
-
     logger: Logger<string>
-
     profile?: ProfilerSegment
+    pingTimeout?: ReturnType<typeof setTimeout>
+    dispose: () => void
 
     constructor(options: SinkronServerOptions) {
         const { sinkron, host, port, logger, sync } = {
@@ -183,6 +183,26 @@ class SinkronServer {
 
         this.ws = new WebSocketServer({ noServer: true })
         this.ws.on("connection", this.onConnect.bind(this))
+
+        this.pingTimeout = setTimeout(() => this.ping(), pingInterval)
+        this.dispose = () => clearInterval(this.pingTimeout)
+    }
+
+    ping() {
+        const numClients = this.ws.clients.size
+        let terminated = 0
+        this.ws.clients.forEach((ws) => {
+            // @ts-ignore
+            if (ws.isAlive === false) {
+                terminated++
+                return ws.terminate()
+            }
+            // @ts-ignore
+            ws.isAlive = false
+            ws.ping()
+        })
+        console.log(`Alive ${numClients - terminated} / ${numClients}`)
+        this.pingTimeout = setTimeout(() => this.ping(), pingInterval)
     }
 
     upgrade(
@@ -223,6 +243,12 @@ class SinkronServer {
                 this.onMessage([ws, msg])
             })
         }
+        // @ts-ignore
+        ws.isAlive = true
+        ws.on("pong", () => {
+            // @ts-ignore
+            ws.isAlive = true
+        })
         ws.on("close", () => this.onDisconnect(ws))
     }
 
