@@ -48,8 +48,8 @@
         "react-image": "^4.1.0",
         "react-use": "^17.4.0",
         "sinkron-client": "0.0.1",
-        "slate": "^0.102.0",
-        "slate-react": "^0.102.0",
+        "slate": "^0.103.0",
+        "slate-react": "^0.110.1",
         "uuid": "^9.0.0",
         "wouter": "^3.0.0"
     }

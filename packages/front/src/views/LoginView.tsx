@@ -7,7 +7,8 @@ import logoSvg from "../logo.svg"
 import { AuthStore } from "../store"
 import { Button, Input, Icon } from "../ui"
 
-const validateEmail = (s: string) => s.match(/^.+@.+\..+$/g) !== null // a@a.a
+const validateEmail = (s: string) =>
+    s.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) !== null // a@a.a
 
 interface EmailStepProps {
     store: AuthStore
@@ -145,7 +146,7 @@ const LoginView = observer((props: LoginViewProps) => {
                 height: "100%",
                 width: 320,
                 margin: "auto",
-                paddingTop: "4rem"
+                paddingTop: "3rem"
             }}
             gap={16}
         >
@@ -155,7 +156,7 @@ const LoginView = observer((props: LoginViewProps) => {
                     alignSelf: "center",
                     width: 200,
                     opacity: 0.5,
-                    marginBottom: "2rem"
+                    marginBottom: "0rem"
                 }}
                 fill="var(--color-secondary)"
             />

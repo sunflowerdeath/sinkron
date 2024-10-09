@@ -14,7 +14,7 @@ const initialRetryTimeout = 555
 const maxRetryTimeout = 10000
 const autoRetry = (cb: (retry: () => void) => void) => {
     let timeout = initialRetryTimeout
-    let timer = -1
+    let timer: ReturnType<typeof setTimeout> | undefined
     const retry = () => {
         timer = setTimeout(() => cb(retry), timeout)
         timeout = Math.min(maxRetryTimeout, timeout * 2)
@@ -65,22 +65,13 @@ class UserStore {
             localStorage.setItem("user", json)
         })
 
+        this.setSpace()
         reaction(
             () => this.spaceId,
             () => {
-                this.space?.dispose()
-                const space = this.user.spaces.find(
-                    (s) => s.id === this.spaceId
-                )!
-                if (space !== undefined) {
-                    this.space = new SpaceStore(space, this)
-                    localStorage.setItem("space", space.id)
-                } else {
-                    this.space = undefined
-                    localStorage.removeItem("space")
-                }
+                this.setSpace()
             },
-            { fireImmediately: true }
+            { fireImmediately: false }
         )
 
         const token = this.api.getToken()
@@ -93,6 +84,18 @@ class UserStore {
                 }
             }
         })
+    }
+
+    setSpace() {
+        this.space?.dispose()
+        const space = this.user.spaces.find((s) => s.id === this.spaceId)!
+        if (space !== undefined) {
+            this.space = new SpaceStore(space, this)
+            localStorage.setItem("space", space.id)
+        } else {
+            this.space = undefined
+            localStorage.removeItem("space")
+        }
     }
 
     dispose() {
