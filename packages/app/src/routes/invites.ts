@@ -140,7 +140,7 @@ const invitesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             const getSpaceRes = await app.services.spaces.getUserSpace(
                 app.models,
                 userId,
-                invite.spaceId
+                invite.space.id
             )
             if (!getSpaceRes.isOk) {
                 reply.code(500).send(getSpaceRes.error)
