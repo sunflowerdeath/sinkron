@@ -10,6 +10,7 @@ import { Result, ResultType } from "./result"
 import { Action } from "./permissions"
 import {
     ErrorCode,
+    HeartbeatMessage,
     SyncMessage,
     SyncErrorMessage,
     SyncCompleteMessage,
@@ -29,74 +30,9 @@ import {
     AsyncMessageQueue,
     WsMessage
 } from "./messageQueue"
+import { clientMessageSchema } from "./schema"
 
 const enableProfiling = process.env.ENABLE_PROFILING === "1"
-
-const getMessageSchema = {
-    type: "object",
-    properties: {
-        kind: { const: "get" },
-        id: { type: "string" }
-    },
-    required: ["kind", "id"],
-    additionalProperties: false
-}
-
-const syncMessageSchema = {
-    type: "object",
-    properties: {
-        kind: { const: "sync" },
-        // token: { type: 'string' },
-        col: { type: "string" },
-        colrev: { type: "integer" }
-    },
-    required: ["kind", "col"],
-    additionalProperties: false
-}
-
-const changeMessageSchema = {
-    type: "object",
-    properties: {
-        kind: { const: "change" },
-        col: { type: "string" },
-        id: { type: "string" },
-        changeid: { type: "string" },
-        op: { type: "string" },
-        data: {
-            oneOf: [
-                { type: "string" },
-                { type: "array", items: { type: "string" } }
-            ]
-        }
-    },
-    required: ["kind", "col", "id", "changeid", "op"],
-    additionalProperties: false,
-    oneOf: [
-        {
-            properties: {
-                op: { const: Op.Create },
-                data: { type: "string" }
-            },
-            required: ["data"]
-        },
-        {
-            properties: {
-                op: { const: Op.Modify },
-                data: { type: "array", items: { type: "string" } }
-            },
-            required: ["data"]
-        },
-        {
-            properties: {
-                op: { const: Op.Delete }
-            }
-        }
-    ]
-}
-
-const clientMessageSchema = {
-    oneOf: [getMessageSchema, syncMessageSchema, changeMessageSchema]
-}
 
 const createValidator = () => {
     const ajv = new Ajv()
@@ -108,7 +44,17 @@ const validateMessage = createValidator()
 
 const serializeDate = (d: Date) => d.toISOString()
 
-const pingInterval = 30000
+const ns = 1e9
+
+// Time for considering client as inactive. It should be higher that heartbeat 
+// interval on client (30s)
+const inactiveDisconnectTimeout = BigInt(60 * ns) // 60s
+
+// How often to perform check for inactive clients
+const checkAliveInterval = 60000 // 60s
+
+// Disconnecting idle client that doesnt subscribe to anything
+// TODO fix it
 const clientDisconnectTimeout = 10000
 
 interface SinkronServerOptions {
@@ -161,7 +107,7 @@ class SinkronServer {
     queue?: MessageQueue<WsMessage>
     logger: Logger<string>
     profile?: ProfilerSegment
-    pingTimeout?: ReturnType<typeof setTimeout>
+    checkAliveTimeout?: ReturnType<typeof setTimeout>
     dispose: () => void
 
     constructor(options: SinkronServerOptions) {
@@ -184,19 +130,30 @@ class SinkronServer {
         this.ws = new WebSocketServer({ noServer: true })
         this.ws.on("connection", this.onConnect.bind(this))
 
-        this.pingTimeout = setTimeout(() => this.ping(), pingInterval)
-        this.dispose = () => clearInterval(this.pingTimeout)
+        this.checkAliveTimeout = setTimeout(
+            () => this.checkAlive(),
+            checkAliveInterval
+        )
+        this.dispose = () => clearInterval(this.checkAliveTimeout)
     }
 
-    ping() {
+    checkAlive() {
+        const now = process.hrtime.bigint()
         this.ws.clients.forEach((ws) => {
             // @ts-ignore
-            if (ws.isAlive === false) return ws.terminate()
-            // @ts-ignore
-            ws.isAlive = false
-            ws.ping()
+            const lastActive: bigint = ws.lastActive
+            if (now - lastActive > inactiveDisconnectTimeout) {
+                const inactive = (now - lastActive) / BigInt(ns)
+                console.log(
+                    `terminated inactive client, inactive for ${inactive}`
+                )
+                ws.terminate()
+            }
         })
-        this.pingTimeout = setTimeout(() => this.ping(), pingInterval)
+        this.checkAliveTimeout = setTimeout(
+            () => this.checkAlive(),
+            checkAliveInterval
+        )
     }
 
     upgrade(
@@ -237,12 +194,10 @@ class SinkronServer {
                 this.onMessage([ws, msg])
             })
         }
+
         // @ts-ignore
-        ws.isAlive = true
-        ws.on("pong", () => {
-            // @ts-ignore
-            ws.isAlive = true
-        })
+        ws.lastActive = process.hrtime.bigint()
+
         ws.on("close", () => this.onDisconnect(ws))
     }
 
@@ -293,13 +248,22 @@ class SinkronServer {
             return
         }
 
-        if (parsed.kind === "sync") {
+        if (parsed.kind === "h") {
+            this.handleHeartbeatMessage(ws, parsed)
+        } else if (parsed.kind === "sync") {
             await this.handleSyncMessage(ws, parsed)
         } else if (parsed.kind === "change") {
             await this.handleChangeMessage(parsed, ws)
         } else if (parsed.kind === "get") {
             await this.handleGetMessage(ws, parsed)
         }
+    }
+
+    handleHeartbeatMessage(ws: WebSocket, msg: HeartbeatMessage) {
+        // @ts-ignore
+        ws.lastActive = process.hrtime.bigint()
+        const reply = { kind: "h", i: msg.i + 1 }
+        ws.send(JSON.stringify(reply))
     }
 
     async handleGetMessage(ws: WebSocket, msg: GetMessage) {

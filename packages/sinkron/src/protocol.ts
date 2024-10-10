@@ -14,7 +14,7 @@ export enum ErrorCode {
     // Requested entity not found
     NotFound = "not_found",
 
-    InternalServerError = "internal_server_error",
+    InternalServerError = "internal_server_error"
 }
 
 export type SyncMessage = {
@@ -54,7 +54,7 @@ export type SyncCompleteMessage = {
 export enum Op {
     Create = "+",
     Modify = "M",
-    Delete = "-",
+    Delete = "-"
 }
 
 interface BaseChangeMessage {
@@ -94,7 +94,16 @@ export type ErrorMessage = {
     changeid: string
 }
 
-export type ClientMessage = SyncMessage | ChangeMessage | GetMessage
+export type HeartbeatMessage = {
+    kind: "h"
+    i: number
+}
+
+export type ClientMessage =
+    | SyncMessage
+    | ChangeMessage
+    | GetMessage
+    | HeartbeatMessage
 
 export type ServerMessage =
     | SyncErrorMessage
@@ -102,3 +111,4 @@ export type ServerMessage =
     | DocMessage
     | ChangeMessage
     | ErrorMessage
+    | HeartbeatMessage

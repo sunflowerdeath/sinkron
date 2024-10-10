@@ -30,7 +30,8 @@ import type {
     ModifyMessage,
     ErrorMessage,
     ClientMessage,
-    ServerMessage
+    ServerMessage,
+    HeartbeatMessage
 } from "sinkron/types/protocol.d.ts"
 
 type MessageHandler = (msg: string) => void
@@ -51,7 +52,6 @@ class WebSocketTransport implements Transport {
     constructor(props: WebSocketTransportProps) {
         const { url, webSocketImpl } = props
         this.url = url
-        // @ts-ignore
         this.webSocketImpl = webSocketImpl || global.WebSocket
     }
 
@@ -348,6 +348,12 @@ const createItem = <T>(values: ItemInitialValues<T>): Item<T> =>
 const flushDelay = 1000
 const flushMaxWait = 2000
 
+// Interval between hearbeats. Should be less than disconnect timeout for being
+// inactive on the server
+const heartbeatInterval = 30000 // 30s
+// Max wait time of the server's reply to heartbeat before closing connection.
+const disconnectTimeout = 3000
+
 export enum ConnectionStatus {
     Disconnected = "disconnected",
     Connected = "connected",
@@ -412,10 +418,17 @@ class Collection<T extends object> {
     backupQueue = new Set<string>()
     flushQueue = new Set<string>()
 
+    // timeout for sending next heartbeat
+    heartbeatTimeout?: ReturnType<typeof setTimeout>
+    // timeout for disconnecting if not recieved hearbeat response
+    disconnectTimeout?: ReturnType<typeof setTimeout>
+
     destroy() {
         this.isDestroyed = true
         this.stopAutoReconnect?.()
         this.store?.dispose()
+        clearTimeout(this.heartbeatTimeout)
+        clearTimeout(this.disconnectTimeout)
     }
 
     async init() {
@@ -430,6 +443,8 @@ class Collection<T extends object> {
             this.logger.debug("Connection closed")
             this.status = ConnectionStatus.Disconnected
             this.flushDebounced.cancel()
+            clearTimeout(this.heartbeatTimeout)
+            clearTimeout(this.disconnectTimeout)
         })
         this.transport.emitter.on("message", (msg: string) => {
             try {
@@ -484,6 +499,35 @@ class Collection<T extends object> {
         this.logger.trace("Sending message: %s", msg)
         this.transport.send(JSON.stringify(msg))
         this.status = ConnectionStatus.Sync
+
+        this.heartbeat(0)
+    }
+
+    heartbeat(i: number) {
+        this.logger.trace("Sending heartbeat")
+
+        const heartbeat = { kind: "h", i }
+        this.transport.send(JSON.stringify(heartbeat))
+
+        this.disconnectTimeout = setTimeout(() => {
+            this.logger.warn(
+                "No response from server for too long, disconnecting"
+            )
+            this.transport.close()
+        }, disconnectTimeout)
+    }
+
+    handleHeartbeat(msg: HeartbeatMessage) {
+        this.logger.trace("Recieved hearbeat response")
+
+        // cancel disconnect by timeout
+        clearTimeout(this.disconnectTimeout)
+
+        // schedule next hearbeat
+        this.heartbeatTimeout = setTimeout(
+            () => this.heartbeat(msg.i + 1),
+            heartbeatInterval
+        )
     }
 
     onMessage(msg: string) {
@@ -495,7 +539,9 @@ class Collection<T extends object> {
             this.logger.error("Couldn't parse message JSON: %m", msg)
             return
         }
-        if (parsed.kind === "doc") {
+        if (parsed.kind === "h") {
+            this.handleHeartbeat(parsed)
+        } else if (parsed.kind === "doc") {
             this.handleDocMessage(parsed)
         } else if (parsed.kind === "sync_complete") {
             this.onSyncComplete(parsed)
