@@ -1,6 +1,11 @@
 import { observer } from "mobx-react-lite"
 import { useMedia } from "react-use"
 import { Route, Switch, Redirect } from "wouter"
+import { useFavicon } from "react-use"
+import { ConnectionStatus } from "sinkron-client"
+
+import defaultFaviconUrl from "../favicon.ico"
+import offFaviconUrl from "../favicon_off.ico"
 
 import { SpaceContext, useStore } from "../store"
 
@@ -21,6 +26,11 @@ import SwitchSpaceView from "./SwitchSpaceView"
 const SpaceView = observer(() => {
     const store = useStore()
     const isMobile = useMedia("(max-width: 1023px)")
+
+    useFavicon(
+        store.space!.collection.status === ConnectionStatus.Disconnected
+            ? offFaviconUrl
+            : defaultFaviconUrl)
 
     const routes = (
         <>

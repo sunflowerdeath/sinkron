@@ -36,7 +36,7 @@ const rules = [
         type: "asset/source"
     },
     {
-        test: /\.png/i,
+        test: /\.(png|ico)/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
         type: "asset/resource"
     }
@@ -80,7 +80,7 @@ module.exports = {
     },
     mode: "none",
     optimization: {
-        minimize: isProduction
+        minimize: false // isProduction
     },
     target: "web",
     resolve: {

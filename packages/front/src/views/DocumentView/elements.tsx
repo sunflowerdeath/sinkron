@@ -10,7 +10,7 @@ import {
     RenderLeafProps
 } from "slate-react"
 import { Popup, mergeRefs } from "oriente"
-import { observer } from "mobx-react"
+import { observer } from "mobx-react-lite"
 import { Img } from "react-image"
 
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"

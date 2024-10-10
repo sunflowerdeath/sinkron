@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { makeAutoObservable, action } from "mobx"
-import { observer } from "mobx-react"
+import { observer } from "mobx-react-lite"
 import { fromPromise } from "mobx-utils"
 import { Col } from "oriente"
 import { parseISO, format } from "date-fns"

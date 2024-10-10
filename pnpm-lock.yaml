@@ -84,9 +84,6 @@ importers:
       '@rspack/core':
         specifier: ^1.0.8
         version: 1.0.8
-      '@types/bcrypt':
-        specifier: ^5.0.2
-        version: 5.0.2
       '@types/lodash':
         specifier: ^4.17.10
         version: 4.17.10
@@ -150,12 +147,9 @@ importers:
       mobx:
         specifier: ^6.13.3
         version: 6.13.3
-      mobx-react:
-        specifier: ^7.6.0
-        version: 7.6.0(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1)
       mobx-react-lite:
-        specifier: ^3.4.3
-        version: 3.4.3(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1)
+        specifier: ^4.0.7
+        version: 4.0.7(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1)
       mobx-utils:
         specifier: ^6.1.0
         version: 6.1.0(mobx@6.13.3)
@@ -2424,9 +2418,6 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
-  '@types/bcrypt@5.0.2':
-    resolution: {integrity: sha512-6atioO8Y75fNcbmj0G7UjI9lXN2pQ/IGJ2FWT4a/btd0Lk9lQalHLKhkgKVZ3r+spnmWUKfbMi1GEe9wyHQfNQ==}
-
   '@types/body-parser@1.19.5':
     resolution: {integrity: sha512-fB3Zu92ucau0iQ0JMCFQE7b/dv8Ot07NI3KaZIkIUNXq82k4eBAqUaneXfleGY9JWskeS9y+u0nXMyspcuQrCg==}
 
@@ -2510,9 +2501,6 @@ packages:
 
   '@types/node@18.19.55':
     resolution: {integrity: sha512-zzw5Vw52205Zr/nmErSEkN5FLqXPuKX/k5d1D7RKHATGqU7y6YfX9QxZraUzUrFGqH6XzOzG196BC35ltJC4Cw==}
-
-  '@types/node@22.7.5':
-    resolution: {integrity: sha512-jML7s2NAzMWc//QSJ1a3prpk78cOPchGvXJsC3C6R6PSMoooztvRVQEz89gmBTBY1SPMaqo5teB4uNHPdetShQ==}
 
   '@types/nodemailer@6.4.16':
     resolution: {integrity: sha512-uz6hN6Pp0upXMcilM61CoKyjT7sskBoOWpptkjjJp8jIMlTdc3xG01U7proKkXzruMS4hS0zqtHNkNPFB20rKQ==}
@@ -4640,23 +4628,10 @@ packages:
   mnemonist@0.39.6:
     resolution: {integrity: sha512-A/0v5Z59y63US00cRSLiloEIw3t5G+MiKz4BhX21FI+YBJXBOGW0ohFxTxO08dsOYlzxo87T7vGfZKYp2bcAWA==}
 
-  mobx-react-lite@3.4.3:
-    resolution: {integrity: sha512-NkJREyFTSUXR772Qaai51BnE1voWx56LOL80xG7qkZr6vo8vEaLF3sz1JNUVh+rxmUzxYaqOhfuxTfqUh0FXUg==}
+  mobx-react-lite@4.0.7:
+    resolution: {integrity: sha512-RjwdseshK9Mg8On5tyJZHtGD+J78ZnCnRaxeQDSiciKVQDUbfZcXhmld0VMxAwvcTnPEHZySGGewm467Fcpreg==}
     peerDependencies:
-      mobx: ^6.1.0
-      react: ^16.8.0 || ^17 || ^18
-      react-dom: '*'
-      react-native: '*'
-    peerDependenciesMeta:
-      react-dom:
-        optional: true
-      react-native:
-        optional: true
-
-  mobx-react@7.6.0:
-    resolution: {integrity: sha512-+HQUNuh7AoQ9ZnU6c4rvbiVVl+wEkb9WqYsVDzGLng+Dqj1XntHu79PvEWKtSMoMj67vFp/ZPXcElosuJO8ckA==}
-    peerDependencies:
-      mobx: ^6.1.0
+      mobx: ^6.9.0
       react: ^16.8.0 || ^17 || ^18
       react-dom: '*'
       react-native: '*'
@@ -6039,9 +6014,6 @@ packages:
 
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
-
-  undici-types@6.19.8:
-    resolution: {integrity: sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==}
 
   unicode-canonical-property-names-ecmascript@2.0.1:
     resolution: {integrity: sha512-dA8WbNeb2a6oQzAQ55YlT5vQAWGV9WXOsi3SskE3bcCdM0P4SDd+24zS/OCacdRq5BkdsRj9q3Pg6YyQoxIGqg==}
@@ -8142,14 +8114,14 @@ snapshots:
     dependencies:
       '@jest/fake-timers': 29.7.0
       '@jest/types': 29.6.3
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       jest-mock: 29.7.0
 
   '@jest/fake-timers@29.7.0':
     dependencies:
       '@jest/types': 29.6.3
       '@sinonjs/fake-timers': 10.3.0
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       jest-message-util: 29.7.0
       jest-mock: 29.7.0
       jest-util: 29.7.0
@@ -8162,7 +8134,7 @@ snapshots:
     dependencies:
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       '@types/yargs': 15.0.19
       chalk: 4.1.2
 
@@ -8171,7 +8143,7 @@ snapshots:
       '@jest/schemas': 29.6.3
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       '@types/yargs': 17.0.33
       chalk: 4.1.2
 
@@ -9215,10 +9187,6 @@ snapshots:
       '@tauri-apps/cli-win32-ia32-msvc': 1.6.2
       '@tauri-apps/cli-win32-x64-msvc': 1.6.2
 
-  '@types/bcrypt@5.0.2':
-    dependencies:
-      '@types/node': 18.19.55
-
   '@types/body-parser@1.19.5':
     dependencies:
       '@types/connect': 3.4.38
@@ -9314,10 +9282,6 @@ snapshots:
   '@types/node@18.19.55':
     dependencies:
       undici-types: 5.26.5
-
-  '@types/node@22.7.5':
-    dependencies:
-      undici-types: 6.19.8
 
   '@types/nodemailer@6.4.16':
     dependencies:
@@ -10062,7 +10026,7 @@ snapshots:
 
   chrome-launcher@0.15.2:
     dependencies:
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 1.4.2
@@ -10075,7 +10039,7 @@ snapshots:
 
   chromium-edge-launcher@1.0.0:
     dependencies:
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 1.4.2
@@ -11233,7 +11197,7 @@ snapshots:
       '@jest/environment': 29.7.0
       '@jest/fake-timers': 29.7.0
       '@jest/types': 29.6.3
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       jest-mock: 29.7.0
       jest-util: 29.7.0
 
@@ -11254,13 +11218,13 @@ snapshots:
   jest-mock@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       jest-util: 29.7.0
 
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
@@ -11283,7 +11247,7 @@ snapshots:
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 22.7.5
+      '@types/node': 18.19.55
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
@@ -11724,19 +11688,11 @@ snapshots:
     dependencies:
       obliterator: 2.0.4
 
-  mobx-react-lite@3.4.3(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1):
+  mobx-react-lite@4.0.7(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1):
     dependencies:
       mobx: 6.13.3
       react: 18.3.1
-    optionalDependencies:
-      react-dom: 18.3.1(react@18.3.1)
-      react-native: 0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1)
-
-  mobx-react@7.6.0(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1):
-    dependencies:
-      mobx: 6.13.3
-      mobx-react-lite: 3.4.3(mobx@6.13.3)(react-dom@18.3.1(react@18.3.1))(react-native@0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1))(react@18.3.1)
-      react: 18.3.1
+      use-sync-external-store: 1.2.2(react@18.3.1)
     optionalDependencies:
       react-dom: 18.3.1(react@18.3.1)
       react-native: 0.73.5(@babel/core@7.25.7)(@babel/preset-env@7.24.0(@babel/core@7.25.7))(react@18.3.1)
@@ -13263,8 +13219,6 @@ snapshots:
   typescript@5.6.3: {}
 
   undici-types@5.26.5: {}
-
-  undici-types@6.19.8: {}
 
   unicode-canonical-property-names-ecmascript@2.0.1: {}
 
