@@ -6,7 +6,7 @@
     "browser": "build/main.browser.js",
     "types": "types/index.d.ts",
     "scripts": {
-        "lint": "eslint src",
+        "lint": "oxlint -c ./oxlintrc.json src",
         "build-rspack": "NODE_ENV=production rspack --config rspack.config.js",
         "build": "NODE_ENV=production webpack --config rspack.config.js"
     },

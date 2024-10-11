@@ -3,7 +3,7 @@
     "version": "0.0.1",
     "description": "",
     "scripts": {
-        "lint": "eslint src",
+        "lint": "oxlint src",
         "build": "NODE_ENV=production rspack --config webpack.config.js",
         "run-client": "NODE_ENV=production node ./build/benchmark_client.js",
         "run-server": "NODE_ENV=production ENABLE_PROFILING=1 node ./build/benchmark_server.js"
@@ -17,9 +17,6 @@
         "@types/node": "^18.11.9",
         "@types/ws": "^8.5.7",
         "esbuild-loader": "^4.1.0",
-        "typescript": "^5.3.3",
-        "webpack": "^5.74.0",
-        "webpack-cli": "^4.10.0",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {

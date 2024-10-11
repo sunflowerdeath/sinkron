@@ -73,7 +73,7 @@ const testOps: { [key: string]: Operation } = {
     }
 }
 
-const logObject = (obj: Object) => {
+const logObject = (obj: object) => {
     console.log(util.inspect(obj, { depth: null }))
 }
 

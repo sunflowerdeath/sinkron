@@ -3,6 +3,7 @@
     "private": true,
     "description": "",
     "scripts": {
+        "lint": "pnpm -r lint",
         "build-app": "pnpm --F=sinkron-app... build",
         "start-app-prod": "cd packages/app && pnpm start",
         "start-app-dev": "pnpm build-app && cd packages/app && SINKRON_CONFIG=$(cat config.dev.json) pnpm start",

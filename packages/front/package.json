@@ -4,12 +4,12 @@
     "version": "0.0.1",
     "description": "",
     "scripts": {
+        "lint": "oxlint src",
         "start": "rspack serve --config rspack.config.js",
         "build": "NODE_ENV=production rspack --config rspack.config.js",
         "test": "rspack --config rspack.test.config.js && mocha ./build/test.js",
         "tauri-dev": "pnpm tauri dev",
-        "tauri-build": "pnpm tauri build",
-        "lint": "eslint src/index.tsx"
+        "tauri-build": "pnpm tauri build"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

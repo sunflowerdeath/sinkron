@@ -110,7 +110,7 @@ const getDocumentListItemData = (
                 if (subtitle.length >= 75) break
             }
         }
-    } catch (_) {
+    } catch {
         // just in case
     }
 

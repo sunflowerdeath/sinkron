@@ -1,5 +1,4 @@
 import assert from "node:assert"
-import cookie from "@fastify/cookie"
 
 // import { Sinkron } from "sinkron"
 import { App } from "../app"
@@ -11,7 +10,7 @@ describe("Spaces", () => {
     let headers: { [key: string]: string }
 
     beforeEach(async () => {
-        app = new App({})
+        app = new App()
         await app.init()
 
         const res = await app.services.users.create(

@@ -5,7 +5,7 @@
     "main": "build/main.js",
     "types": "types/index.d.ts",
     "scripts": {
-        "lint": "oxlint src",
+        "lint": "oxlint -c ./oxlintrc.json src",
         "build-rspack": "NODE_ENV=production rspack --config rspack.config.js",
         "build": "NODE_ENV=production webpack --config rspack.config.js",
         "test": "rspack --config rspack.test.config.js && mocha ./build/test.js"

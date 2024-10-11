@@ -31,7 +31,7 @@ if (configStr === undefined || configStr.length === 0) {
 let config: SinkronConfig
 try {
     config = JSON.parse(configStr)
-} catch (e) {
+} catch {
     console.error("Couldn't parse config json:")
     console.error(process.env.SINKRON_CONFIG)
     process.exit(1)

@@ -94,7 +94,7 @@ export const checkSelectionPoint = (editor: Editor, point: Point) => {
         let res
         try {
             res = nodes.next()
-        } catch (e) {
+        } catch {
             error = true
             break
         }

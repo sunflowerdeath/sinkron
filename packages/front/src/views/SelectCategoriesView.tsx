@@ -83,6 +83,7 @@ const CategoriesTree = (props: CategoriesTreeProps) => {
         <Col style={{ alignSelf: "stretch" }}>
             {categories.map((c) => (
                 <CategoriesTreeItem
+                    key={c.id}
                     category={c}
                     value={value}
                     onChange={onChange}

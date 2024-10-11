@@ -4,6 +4,7 @@
     "private": true,
     "description": "",
     "scripts": {
+        "lint": "oxlint src",
         "migrate": "typeorm migration:run -d ./build/app-db.js && typeorm migration:run -d ./build/sinkron-db.js",
         "start": "pnpm migrate && node ./build/main.js",
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
@@ -22,7 +23,6 @@
         "better-sqlite3": "^9.6.0",
         "esbuild-loader": "^4.2.2",
         "mocha": "^10.7.3",
-        "typescript": "^5.6.3",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
