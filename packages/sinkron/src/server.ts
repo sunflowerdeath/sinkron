@@ -1,7 +1,7 @@
 import { IncomingMessage } from "node:http"
 import { Duplex } from "node:stream"
 
-import Ajv, { JSONSchemaType } from "ajv"
+import Ajv from "ajv"
 import { WebSocketServer, WebSocket } from "ws"
 import pino, { Logger } from "pino"
 
@@ -13,7 +13,6 @@ import {
     HeartbeatMessage,
     SyncMessage,
     SyncErrorMessage,
-    SyncCompleteMessage,
     Op,
     ChangeMessage,
     ModifyMessage,
@@ -24,12 +23,7 @@ import {
     GetMessage,
     ClientMessage
 } from "./protocol"
-import {
-    MessageQueue,
-    SequentialMessageQueue,
-    AsyncMessageQueue,
-    WsMessage
-} from "./messageQueue"
+import { MessageQueue, SequentialMessageQueue, WsMessage } from "./messageQueue"
 import { clientMessageSchema } from "./schema"
 
 const enableProfiling = process.env.ENABLE_PROFILING === "1"
@@ -46,7 +40,7 @@ const serializeDate = (d: Date) => d.toISOString()
 
 const ns = 1e9
 
-// Time for considering client as inactive. It should be higher that heartbeat 
+// Time for considering client as inactive. It should be higher that heartbeat
 // interval on client (30s)
 const inactiveDisconnectTimeout = BigInt(60 * ns) // 60s
 
@@ -111,7 +105,7 @@ class SinkronServer {
     dispose: () => void
 
     constructor(options: SinkronServerOptions) {
-        const { sinkron, host, port, logger, sync } = {
+        const { sinkron, logger, sync } = {
             ...defaultServerOptions,
             ...options
         }
@@ -169,7 +163,7 @@ class SinkronServer {
 
     async onConnect(
         ws: WebSocket,
-        request: IncomingMessage,
+        _request: IncomingMessage,
         client: { id: string }
     ) {
         this.logger.debug("Client connected, id: " + client.id)
@@ -230,7 +224,7 @@ class SinkronServer {
         let parsed: ClientMessage
         try {
             parsed = JSON.parse(msg.toString("utf-8"))
-        } catch (e) {
+        } catch {
             this.logger.debug("Invalid JSON in message")
             if (this.profile) this.profile.failedMessages += 1
             return
@@ -267,7 +261,7 @@ class SinkronServer {
     }
 
     async handleGetMessage(ws: WebSocket, msg: GetMessage) {
-        const { col, id } = msg
+        const { id } = msg
 
         const client = this.clients.get(ws)
         if (!client) return
@@ -414,7 +408,7 @@ class SinkronServer {
         msg: CreateMessage,
         ws: WebSocket
     ): Promise<ResultType<DocumentView, RequestError>> {
-        const { id, col, changeid, data } = msg
+        const { id, col, data } = msg
 
         const client = this.clients.get(ws)
         if (!client) {
@@ -443,7 +437,7 @@ class SinkronServer {
         msg: DeleteMessage,
         ws: WebSocket
     ): Promise<ResultType<DocumentView, RequestError>> {
-        const { col, id, changeid } = msg
+        const { col, id } = msg
 
         const client = this.clients.get(ws)
         if (!client) {
@@ -469,7 +463,7 @@ class SinkronServer {
         msg: ModifyMessage,
         ws: WebSocket
     ): Promise<ResultType<DocumentView, RequestError>> {
-        const { id, changeid, col, data } = msg
+        const { id, data } = msg
 
         const client = this.clients.get(ws)
         if (!client) {
@@ -552,7 +546,7 @@ class SinkronServer {
         const { doc, changes } = res.value
         const collection = this.collections.get(doc.col)
         if (collection) {
-            const { col, colrev, updatedAt, createdAt } = doc
+            const { col, colrev, updatedAt } = doc
             const msg: ChangeMessage = {
                 kind: "change",
                 op: Op.Modify,

@@ -5,13 +5,7 @@ import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { nanoid } from "nanoid"
 import pino, { Logger } from "pino"
-import {
-    makeObservable,
-    makeAutoObservable,
-    action,
-    observable,
-    ObservableMap
-} from "mobx"
+import { makeObservable, makeAutoObservable, observable } from "mobx"
 import { debounce } from "lodash-es"
 import { parseISO } from "date-fns"
 
@@ -29,12 +23,10 @@ import type {
     ChangeMessage,
     ModifyMessage,
     ErrorMessage,
-    ClientMessage,
-    ServerMessage,
     HeartbeatMessage
 } from "sinkron/types/protocol.d.ts"
 
-type MessageHandler = (msg: string) => void
+// type MessageHandler = (msg: string) => void
 
 interface Transport {
     open(): void
@@ -63,7 +55,7 @@ class WebSocketTransport implements Transport {
     open() {
         console.log("Connecting to websocket:", this.url)
         this.ws = new this.webSocketImpl(this.url)
-        this.ws.addEventListener("open", (event) => {
+        this.ws.addEventListener("open", () => {
             console.log("Connected to websocket!")
             this.emitter.emit("open")
         })
@@ -125,6 +117,7 @@ const automergeToBase64 = <T>(doc: Automerge.Doc<T>) =>
 const automergeFromBase64 = <T>(data: string) =>
     Automerge.load<T>(Base64.toUint8Array(data))
 
+/*
 const serializeItem = <T>(item: Item<T>) => {
     const serialized = {
         remote: item.remote ? automergeToBase64(item.remote) : null,
@@ -140,6 +133,7 @@ const deserializeItem = <T>(data: string) => {
         local: parsed.local ? automergeFromBase64(parsed.local) : null
     }
 }
+*/
 
 type StoredItem<T> = {
     id: string
@@ -181,7 +175,7 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
         this.key = key
         const deferred = new Deferred<void>()
         const req = indexedDB.open(key)
-        req.onsuccess = (event) => {
+        req.onsuccess = () => {
             this.db = req.result
             deferred.resolve()
         }
@@ -287,7 +281,7 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
             const req = indexedDB.deleteDatabase(id)
             const deferred = new Deferred<void>()
             req.onsuccess = () => deferred.resolve()
-            await deferred
+            await deferred.promise
             localStorage.removeItem(`stored_collection/${id}`)
             console.log(`Deleted local storage for ${id}`)
         }
@@ -535,7 +529,7 @@ class Collection<T extends object> {
         let parsed
         try {
             parsed = JSON.parse(msg)
-        } catch (e) {
+        } catch {
             this.logger.error("Couldn't parse message JSON: %m", msg)
             return
         }
@@ -661,7 +655,7 @@ class Collection<T extends object> {
     }
 
     handleModifyMessage(msg: ModifyMessage) {
-        const { id, data, updatedAt } = msg
+        const { id, data } = msg
 
         const item = this.items.get(id)
         if (!item) {
@@ -681,7 +675,7 @@ class Collection<T extends object> {
             if (item.local !== null) {
                 ;[item.local] = Automerge.applyChanges(item.local, changes)
             }
-        } catch (e) {
+        } catch {
             this.logger.warn("Can't apply changes, automerge error: %s", id)
             return
         }
@@ -745,7 +739,6 @@ class Collection<T extends object> {
                 col: this.col
             }
 
-            let change
             if (item.remote === null && item.local !== null) {
                 msg.op = Op.Create
                 msg.data = Base64.fromUint8Array(Automerge.save(item.local))

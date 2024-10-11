@@ -1,13 +1,4 @@
-import {
-    EntitySchema,
-    DataSource,
-    Repository,
-    MoreThan,
-    MoreThanOrEqual,
-    EntityManager,
-    FindOptionsSelect
-} from "typeorm"
-import { without, remove, isEqual, uniq } from "lodash"
+import { DataSource, Repository, MoreThan, FindOptionsSelect } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 import { LRUCache } from "lru-cache"
@@ -15,26 +6,8 @@ import { LRUCache } from "lru-cache"
 import { createDataSource } from "./db"
 import type { Document, Collection, Ref, Group, GroupMember } from "./entities"
 import { Result, ResultType } from "./result"
-import {
-    Permissions,
-    emptyPermissionsTable,
-    PermissionsTable,
-    Action
-} from "./permissions"
-import {
-    ErrorCode,
-    SyncMessage,
-    SyncErrorMessage,
-    SyncCompleteMessage,
-    Op,
-    ChangeMessage,
-    ModifyMessage,
-    CreateMessage,
-    DeleteMessage,
-    ErrorMessage,
-    DocMessage,
-    ClientMessage
-} from "./protocol"
+import { Permissions, PermissionsTable, Action } from "./permissions"
+import { ErrorCode } from "./protocol"
 import type { DbConfig } from "./db"
 
 export type CollectionView = {
@@ -372,7 +345,7 @@ class Sinkron {
     }
 
     async deleteCollection(
-        id: string
+        _id: string
     ): Promise<ResultType<true, RequestError>> {
         // TODO
         return Result.ok(true)
@@ -530,7 +503,7 @@ class Sinkron {
         const nextColrev = incrementColrevRes.value
 
         // TODO returning ?
-        const updateRes = await models.documents.update(doc.id, {
+        await models.documents.update(doc.id, {
             ...update,
             colrev: nextColrev
         })
@@ -544,6 +517,7 @@ class Sinkron {
             /* isRemoved */ update.data === null
         )
         if (!incrementRefColrevsRes.isOk) return incrementRefColrevsRes
+        // TODO return colrev
         const colrevs = [
             { col: doc.col, colrev: nextColrev },
             ...incrementRefColrevsRes.value
@@ -565,8 +539,6 @@ class Sinkron {
         id: string,
         data: Uint8Array[] | null
     ): Promise<ResultType<DocumentView, RequestError>> {
-        const models = this.models
-
         const doc = await this.getDocument(id)
         if (doc === null) return Result.err({ code: ErrorCode.NotFound })
         if (doc.data === null) {
@@ -588,7 +560,7 @@ class Sinkron {
         let automerge = Automerge.load(doc.data)
         try {
             ;[automerge] = Automerge.applyChanges(automerge, data)
-        } catch (e) {
+        } catch {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
                 details: "Unable to apply changes"
@@ -606,8 +578,6 @@ class Sinkron {
         id: string,
         cb: Automerge.ChangeFn<T>
     ): Promise<ResultType<UpdateResult, RequestError>> {
-        const models = this.models
-
         const doc = await this.getDocument(id)
         if (doc === null) return Result.err({ code: ErrorCode.NotFound })
         if (doc.data === null) {
@@ -620,7 +590,7 @@ class Sinkron {
         let automerge = Automerge.load<T>(doc.data)
         try {
             automerge = Automerge.change(automerge, cb)
-        } catch (e) {
+        } catch {
             return Result.err({
                 code: ErrorCode.InternalServerError,
                 details: "Unable to apply changes"
