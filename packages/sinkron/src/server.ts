@@ -18,7 +18,7 @@ import {
     ModifyMessage,
     CreateMessage,
     DeleteMessage,
-    ErrorMessage,
+    ChangeErrorMessage,
     DocMessage,
     GetMessage,
     ClientMessage
@@ -278,15 +278,21 @@ class SinkronServer {
 
         const doc = await this.sinkron.getDocument(id)
         if (doc === null) {
+            // TODO
             // doc not found
+            // const notFound: ChangeErrorMessage = {
+            // kind: "error",
+            // id,
+            // code: ErrorCode.NotFound
+            // }
+            // ws.send(JSON.stringify(notFound))
             return
         }
 
         const response: DocMessage = {
             kind: "doc",
             id,
-            // @ts-ignore
-            data: doc.data ? doc.data.toString("base64") : null,
+            data: doc.data ? Buffer.from(doc.data).toString("base64") : null,
             createdAt: serializeDate(doc.createdAt),
             updatedAt: serializeDate(doc.updatedAt)
         }
@@ -375,8 +381,8 @@ class SinkronServer {
                 res.error.code,
                 res.error.details
             )
-            const errorMsg: ErrorMessage = {
-                kind: "error",
+            const errorMsg: ChangeErrorMessage = {
+                kind: "change_error",
                 id: msg.id,
                 changeid: msg.changeid,
                 code: res.error.code
@@ -437,7 +443,7 @@ class SinkronServer {
         msg: DeleteMessage,
         ws: WebSocket
     ): Promise<ResultType<DocumentView, RequestError>> {
-        const { col, id } = msg
+        const { id } = msg
 
         const client = this.clients.get(ws)
         if (!client) {
@@ -446,8 +452,8 @@ class SinkronServer {
                 details: "Client not found"
             })
         }
-        const checkRes = await this.sinkron.checkCollectionPermission({
-            id: col,
+        const checkRes = await this.sinkron.checkDocumentPermission({
+            id,
             user: client.id,
             action: Action.delete
         })
@@ -455,7 +461,6 @@ class SinkronServer {
             return Result.err({ code: ErrorCode.AccessDenied })
         }
 
-        // TODO send col or check permissions on document
         return await this.sinkron.deleteDocument(id)
     }
 

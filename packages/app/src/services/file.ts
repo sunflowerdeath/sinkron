@@ -134,7 +134,7 @@ class FileService {
             }
             const res = await image.jpeg({ quality: 87 }).toBuffer()
             return Result.ok(res)
-        } catch (e) {
+        } catch {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
                 message: "Couldn't process image file"

@@ -33,7 +33,7 @@ describe("Sinkron", () => {
         await sinkron.init()
         await sinkron.createCollection({
             id: "test",
-            permissions: emptyPermissionsTable
+            permissions: emptyPermissionsTable()
         })
     })
 
@@ -181,7 +181,7 @@ describe("Sinkron", () => {
     it("refs", async () => {
         const res = await sinkron.createCollection({
             id: "ref_test",
-            permissions: emptyPermissionsTable,
+            permissions: emptyPermissionsTable(),
             ref: true
         })
         assert(res.isOk, "res")

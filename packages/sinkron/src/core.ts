@@ -424,8 +424,8 @@ class Sinkron {
         const colPermissions = Permissions.parse(colEntity.permissions)
         const docPermissions = {
             create: [],
-            read: [],
-            delete: [],
+            read: colPermissions.table.read,
+            delete: colPermissions.table.delete,
             update: colPermissions.table.update
         }
         const insertRes = await models.documents.insert({

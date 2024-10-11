@@ -25,6 +25,17 @@ const spaceParamsSchema = {
     additionalProperties: false
 }
 
+const spaceLockSchema = {
+    type: "object",
+    properties: {
+        spaceId: { type: "string", format: "uuid" },
+        docId: { type: "string", format: "uuid" },
+        action: { type: "string", enum: ["lock", "unlock"] }
+    },
+    required: ["spaceId", "docId", "action"],
+    additionalProperties: false
+}
+
 const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Body: SpaceCreateBody }>(
         "/spaces/new",
@@ -53,11 +64,13 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const { spaceId } = request.params
             const { name } = request.body
-            const role = await app.services.spaces.getMemberRole(app.models, {
+
+            const allowed = await app.services.spaces.checkMemberRole({
                 userId: request.token.userId,
-                spaceId
+                spaceId,
+                roles: ["admin", "owner"]
             })
-            if (role === null || !["admin", "owner"].includes(role)) {
+            if (!allowed) {
                 reply.code(500).send()
                 return
             }
@@ -184,11 +197,12 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         async (request, reply) => {
             const { spaceId, fileId } = request.params
 
-            const role = await app.services.spaces.getMemberRole(app.models, {
+            const allowed = await app.services.spaces.checkMemberRole({
                 userId: request.token.userId,
-                spaceId
+                spaceId,
+                roles: ["admin", "owner", "editor"]
             })
-            if (role === null || !["admin", "owner", "editor"].includes(role)) {
+            if (!allowed) {
                 reply.code(500).send({ error: { message: "Not permitted" } })
                 return
             }
@@ -211,7 +225,19 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         "/spaces/:spaceId/delete_orphans",
         { schema: { params: spaceParamsSchema } },
         async (request, reply) => {
+            const userId = request.token.userId
             const { spaceId } = request.params
+
+            const allowed = await app.services.spaces.checkMemberRole({
+                userId,
+                spaceId,
+                roles: ["admin", "owner"]
+            })
+            if (!allowed) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
             await app.services.file.deleteOrphanFiles(app.models, spaceId)
 
             const space = await app.models.spaces.findOne({
@@ -223,6 +249,38 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 return
             }
             reply.send({ usedStorage: space.usedStorage })
+        }
+    )
+
+    fastify.post<{
+        Params: { spaceId: string; docId: string; action: string }
+    }>(
+        "/spaces/:spaceId/:action/:docId",
+        { schema: { params: spaceLockSchema } },
+        async (request, reply) => {
+            const { spaceId, action, docId } = request.params
+            const userId = request.token.userId
+
+            const allowed = await app.services.spaces.checkMemberRole({
+                userId,
+                spaceId,
+                roles: ["admin", "owner"]
+            })
+            if (!allowed) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const res = await app.services.spaces.lockDocument({
+                spaceId,
+                docId,
+                lock: action === "lock"
+            })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+            reply.send({})
         }
     )
 }

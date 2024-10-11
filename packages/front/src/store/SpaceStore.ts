@@ -486,6 +486,33 @@ class SpaceStore {
         })
         return res
     }
+
+    lockDocument(docId: string) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/lock/${docId}`
+            })
+        )
+        res.then(() => {
+            console.log("Locked")
+        })
+        return res
+    }
+
+    unlockDocument(docId: string) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/unlock/${docId}`
+            })
+        )
+        res.then(() => {
+            console.log("Unlocked")
+        })
+        return res
+    }
+
 }
 
 export default SpaceStore

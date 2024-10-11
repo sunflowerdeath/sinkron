@@ -22,7 +22,7 @@ import type {
     CreateMessage,
     ChangeMessage,
     ModifyMessage,
-    ErrorMessage,
+    ChangeErrorMessage,
     HeartbeatMessage
 } from "sinkron/types/protocol.d.ts"
 
@@ -78,7 +78,7 @@ class WebSocketTransport implements Transport {
     }
 
     send(msg: string) {
-        if (this.ws) {
+        if (this.ws && this.ws.readyState === 1 /* open */) {
             this.ws.send(msg)
         } else {
             throw new Error("Couldn't send message: connection is closed")
@@ -291,7 +291,8 @@ class IndexedDbCollectionStore<T> implements CollectionStore<T> {
 export enum ItemState {
     Changed = 1,
     ChangesSent = 2,
-    Synchronized = 3
+    Synchronized = 3,
+    Error = 4
 }
 
 export interface Item<T> {
@@ -543,8 +544,8 @@ class Collection<T extends object> {
             this.handleSyncError(parsed)
         } else if (parsed.kind === "change") {
             this.handleChangeMessage(parsed)
-        } else if (parsed.kind === "error") {
-            this.handleErrorMessage(parsed)
+        } else if (parsed.kind === "change_error") {
+            this.handleChangeErrorMessage(parsed)
         }
     }
 
@@ -563,17 +564,48 @@ class Collection<T extends object> {
         this.errorHandler?.(msg)
     }
 
-    handleErrorMessage(msg: ErrorMessage) {
-        const { id, changeid } = msg
+    handleChangeErrorMessage(msg: ChangeErrorMessage) {
+        const { id, changeid, code } = msg
 
-        if (this.items.has(id)) {
-            const item = this.items.get(id)!
-            if (item.sentChanges.has(changeid)) {
-                this.logger.debug("Rejected own change: %s", changeid)
-                item.sentChanges.delete(changeid)
-            }
+        const item = this.items.get(id)
+        if (item === undefined) return
+
+        if (changeid !== undefined && item.sentChanges.has(changeid)) {
+            this.logger.warn("Rejected own change: %s", changeid)
+            item.sentChanges.delete(changeid)
         }
 
+        if (code === "auth_failed") {
+            this.logger.warn("Auth failed: %s", id)
+            // TODO should reconnect
+            return
+        }
+
+        // Client is referencing document that does not exist on server
+        // To not lose data client should re-create document
+        if (code === "not_found") {
+            this.logger.warn("Document not found: %s", id)
+            item.remote = null
+            this.flushQueue.add(id)
+            return
+        }
+
+        // Operation not permitted
+        if (code === "access_denied") {
+            this.logger.warn("Access denied: %s", id)
+            if (item.remote === null) {
+                // If client tried to create document - it should be removed
+                this.items.delete(id)
+            } else {
+                // If client tried to modify or delete document - should restore
+                // last known remote state
+                item.local = Automerge.clone(item.remote)
+                item.state = ItemState.Synchronized
+            }
+            return
+        }
+
+        // Server couldn't apply change - should reload entire document
         this.transport.send(JSON.stringify({ kind: "get", id }))
     }
 
@@ -613,7 +645,8 @@ class Collection<T extends object> {
         }
         const doc = Automerge.load<T>(Base64.toUint8Array(data))
 
-        if (!this.items.has(id)) {
+        const item = this.items.get(id)
+        if (item === undefined || item.state === ItemState.Error) {
             const item = createItem({
                 id,
                 remote: doc,
@@ -739,7 +772,7 @@ class Collection<T extends object> {
                 col: this.col
             }
 
-            if (item.remote === null && item.local !== null) {
+            if (item.local !== null && item.remote === null) {
                 msg.op = Op.Create
                 msg.data = Base64.fromUint8Array(Automerge.save(item.local))
             } else if (item.local === null && item.remote !== null) {

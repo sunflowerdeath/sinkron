@@ -87,11 +87,11 @@ export interface DeleteMessage extends BaseChangeMessage {
 
 export type ChangeMessage = CreateMessage | ModifyMessage | DeleteMessage
 
-export type ErrorMessage = {
-    kind: "error"
+export type ChangeErrorMessage = {
+    kind: "change_error"
     code: ErrorCode
     id: string
-    changeid: string
+    changeid?: string
 }
 
 export type HeartbeatMessage = {
@@ -110,5 +110,5 @@ export type ServerMessage =
     | SyncCompleteMessage
     | DocMessage
     | ChangeMessage
-    | ErrorMessage
+    | ChangeErrorMessage
     | HeartbeatMessage

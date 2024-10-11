@@ -37,6 +37,12 @@ export type SpaceMemberView = {
     role: string
 }
 
+export type LockDocumentProps = {
+    spaceId: string
+    docId: string
+    lock: boolean
+}
+
 const spaceNameSchema = ajv.compile({
     type: "string",
     minLength: 1,
@@ -188,6 +194,17 @@ class SpaceService {
         return member ? member.role : null
     }
 
+    async checkMemberRole(props: {
+        spaceId: string
+        userId: string
+        roles: SpaceRole[]
+    }) {
+        const models = this.app.models
+        const { spaceId, userId, roles } = props
+        const role = await this.getMemberRole(models, { spaceId, userId })
+        return role !== null && roles.includes(role)
+    }
+
     async getUserSpace(
         models: AppModels,
         userId: string,
@@ -264,6 +281,48 @@ class SpaceService {
             spaces.find((s) => s.id === item.id)!.membersCount = item.count
         })
         return Result.ok(spaces)
+    }
+
+    async lockDocument({
+        spaceId,
+        docId,
+        lock
+    }: LockDocumentProps): Promise<ResultType<true, RequestError>> {
+        const res = await this.app.sinkron.updateDocumentPermissions(
+            docId,
+            (p) => {
+                const group = Role.group(`spaces/${spaceId}/members`)
+                if (lock) {
+                    p.remove(Action.update, group)
+                    p.remove(Action.delete, group)
+                } else {
+                    p.add(Action.update, group)
+                    p.add(Action.delete, group)
+                }
+            }
+        )
+        if (!res.isOk) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Couldn't set permissions"
+            })
+        }
+
+        const updateRes =
+            await this.app.sinkronServer.updateDocumentWithCallback(
+                docId,
+                (doc) => {
+                    doc.isLocked = lock
+                }
+            )
+        if (!updateRes.isOk) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Couldn't update document"
+            })
+        }
+
+        return Result.ok(true)
     }
 }
 

@@ -162,6 +162,15 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const menu = () => (
         <>
+            {doc.isLocked ? (
+                <MenuItem onSelect={() => spaceStore.unlockDocument(id)}>
+                    Unlock document
+                </MenuItem>
+            ) : (
+                <MenuItem onSelect={() => spaceStore.lockDocument(id)}>
+                    Lock document
+                </MenuItem>
+            )}
             <MenuItem isDisabled={true}>Copy to another space</MenuItem>
             <MenuItem onSelect={() => setView("share")}>
                 Share & Access

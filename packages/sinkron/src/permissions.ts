@@ -18,22 +18,22 @@ export type PermissionsTable = {
 }
 
 export type User = {
-    id: string,
+    id: string
     groups: string[]
 }
 
-const emptyPermissionsTable = {
+const emptyPermissionsTable = () => ({
     read: [],
     create: [],
     update: [],
     delete: []
-}
+})
 
 class Permissions {
     table: PermissionsTable
 
     constructor(table?: PermissionsTable) {
-        this.table = table || emptyPermissionsTable
+        this.table = table || emptyPermissionsTable()
     }
 
     // Adds permission to the table
@@ -43,9 +43,7 @@ class Permissions {
 
     // Removes permission from the table
     remove(action: Action, role: string) {
-        this.table[action] = this.table[action].filter(
-            (r) => r !== role
-        )
+        this.table[action] = this.table[action].filter((r) => r !== role)
     }
 
     // Checks if user has permission (issued directly on him or on his

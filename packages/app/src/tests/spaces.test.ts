@@ -1,11 +1,16 @@
 import assert from "node:assert"
 
+import * as Automerge from "@automerge/automerge"
+import { v4 as uuidv4 } from "uuid"
+import { Action } from "sinkron"
+
 // import { Sinkron } from "sinkron"
 import { App } from "../app"
+import { User } from "../entities"
 
 describe("Spaces", () => {
     let app: App
-    let user
+    let user: User | undefined
     // let user2
     let headers: { [key: string]: string }
 
@@ -33,7 +38,7 @@ describe("Spaces", () => {
             userId: user.id
         })
         assert(tokenRes.isOk)
-        headers = { 'x-sinkron-auth-token': tokenRes.value.token }
+        headers = { "x-sinkron-auth-token": tokenRes.value.token }
     })
 
     afterEach(async () => {
@@ -76,5 +81,85 @@ describe("Spaces", () => {
             headers
         })
         assert.strictEqual(res4.statusCode, 200, "delete space")
+    })
+
+    it("lock, unlock", async () => {
+        // create space
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/spaces/new",
+            headers,
+            payload: { name: "test" }
+        })
+        assert.strictEqual(res.statusCode, 200, "create space")
+        const space = JSON.parse(res.payload)
+
+        // create doc
+        const docId = uuidv4()
+        const doc = Automerge.from({
+            content: [],
+            isLocked: false
+        })
+        const res2 = await app.sinkron.createDocument(
+            docId,
+            `spaces/${space.id}`,
+            Automerge.save(doc)
+        )
+        assert(res2.isOk, "create doc")
+
+        // lock
+        const res3 = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/lock/${docId}`,
+            headers
+        })
+        assert.strictEqual(res3.statusCode, 200, "locked")
+
+        // check is locked
+        const res4 = await app.sinkron.checkDocumentPermission({
+            id: docId,
+            user: user!.id,
+            action: Action.update
+        })
+        assert(res4.isOk, "check permissions")
+        assert(!res4.value, "update not permitted")
+
+        const res5 = await app.sinkron.checkDocumentPermission({
+            id: docId,
+            user: user!.id,
+            action: Action.delete
+        })
+        assert(res5.isOk, "check permissions")
+        assert(!res5.value, "delete not permitted")
+
+        const res6 = await app.sinkron.getDocument(docId)
+        assert(res6 !== null, "doc")
+        const lockedDoc = Automerge.load(res6.data!)
+        assert("isLocked" in lockedDoc && lockedDoc.isLocked, "is locked")
+
+        // unlock
+        const res7 = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/unlock/${docId}`,
+            headers
+        })
+        assert.strictEqual(res7.statusCode, 200, "unlocked")
+
+        // check is unlocked
+        const res8 = await app.sinkron.checkDocumentPermission({
+            id: docId,
+            user: user!.id,
+            action: Action.update
+        })
+        assert(res8.isOk, "check permissions")
+        assert(res8.value, "permitted")
+
+        const res9 = await app.sinkron.getDocument(docId)
+        assert(res9 !== null, "doc")
+        const unlockedDoc = Automerge.load(res9.data!)
+        assert(
+            "isLocked" in unlockedDoc && !unlockedDoc.isLocked,
+            "is unlocked"
+        )
     })
 })
