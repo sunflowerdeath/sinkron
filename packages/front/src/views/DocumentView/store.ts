@@ -1,8 +1,8 @@
 import { Transforms, Editor, Element } from "slate"
 import { ReactEditor } from "slate-react"
 
-import SpaceStore from "../../store/SpaceStore"
-import { ImageElement } from "../../types"
+import SpaceStore from "~/store/SpaceStore"
+import { ImageElement } from "~/types"
 
 import { createSinkronEditor } from "./editor"
 

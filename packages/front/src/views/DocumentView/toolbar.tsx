@@ -11,8 +11,8 @@ import formatItalicSvg from "@material-design-icons/svg/outlined/format_italic.s
 import formatUnderlinedSvg from "@material-design-icons/svg/outlined/format_underlined.svg"
 import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_strikethrough.svg"
 
-import { LinkElement } from "../../types"
-import { Button, Icon, Input } from "../../ui"
+import { LinkElement } from "~/types"
+import { Button, Icon, Input } from "~/ui"
 
 import { DocumentViewStore } from "./store"
 import type { TextMarkType } from "./helpers"
@@ -93,6 +93,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             })
         } else {
             Transforms.setNodes(editor, { type: "code-line" })
+            // @ts-expect-error wrap doesn't require full element
             Transforms.wrapNodes(editor, { type: "code-block" })
         }
     }
@@ -103,6 +104,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             Transforms.setNodes(editor, { type: "paragraph" })
         } else {
             Transforms.setNodes(editor, { type: "list-item" })
+            // @ts-expect-error wrap doesn't require full element
             Transforms.wrapNodes(editor, { type: "list" })
         }
     }
@@ -113,6 +115,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             Transforms.setNodes(editor, { type: "paragraph" })
         } else {
             Transforms.setNodes(editor, { type: "list-item" })
+            // @ts-expect-error wrap doesn't require full element
             Transforms.wrapNodes(editor, { type: "ordered-list" })
         }
     }
@@ -123,6 +126,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             Transforms.setNodes(editor, { type: "paragraph" })
         } else {
             Transforms.setNodes(editor, { type: "check-list-item" })
+            // @ts-expect-error wrap doesn't require full element
             Transforms.wrapNodes(editor, { type: "check-list" })
         }
     }

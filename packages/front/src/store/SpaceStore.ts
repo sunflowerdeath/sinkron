@@ -12,11 +12,11 @@ import {
 import { compareDesc } from "date-fns"
 import { Node, Path } from "slate"
 
-import env from "../env"
-import { Space, Document, Category, Metadata } from "../entities"
-import { toAutomerge, AutomergeNode } from "../slate"
-import { Api } from "../api"
-import { TransformedMap } from "../utils/transformedMap"
+import env from "~/env"
+import { Space, Document, Category, Metadata } from "~/entities"
+import { toAutomerge, AutomergeNode } from "~/slate"
+import { Api } from "~/api"
+import { TransformedMap } from "~/utils/transformedMap"
 
 import UserStore from "./UserStore"
 
@@ -38,7 +38,7 @@ export type DocumentListItemData = {
     subtitle: string | null
 }
 
-type UploadState = {
+export type UploadState = {
     id: string
     content: Blob
     state: IPromiseBasedObservable<object>
@@ -133,7 +133,8 @@ const makeInitialDocument = (): Document => ({
         ]
     }),
     categories: [],
-    isPublished: false
+    isPublished: false,
+    isLocked: false
 })
 
 const isMeta = (item: Document | Metadata): item is Metadata => {
@@ -319,7 +320,8 @@ class SpaceStore {
         const doc = {
             content: toAutomerge(content),
             categories: [],
-            isPublished: false
+            isPublished: false,
+            isLocked: false
         }
         const id = this.collection.create(doc)
         return id
@@ -487,6 +489,8 @@ class SpaceStore {
         return res
     }
 
+    // Lock & unlock
+
     lockDocument(docId: string) {
         const res = fromPromise(
             this.api.fetch({
@@ -512,7 +516,6 @@ class SpaceStore {
         })
         return res
     }
-
 }
 
 export default SpaceStore

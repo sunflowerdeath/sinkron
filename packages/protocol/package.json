@@ -1,0 +1,8 @@
+{
+    "name": "sinkron-protocol",
+    "version": "0.0.1",
+    "description": "",
+    "types": "protocol.d.ts",
+    "author": "sunflowerdeath",
+    "license": "Unlicense"
+}

@@ -84,7 +84,10 @@ module.exports = {
     },
     target: "web",
     resolve: {
-        extensions: [".js", ".jsx", ".ts", ".tsx"]
+        extensions: [".js", ".jsx", ".ts", ".tsx"],
+        alias: {
+            "~": src
+        }
     },
     module: { rules },
     devtool: "cheap-module-source-map",

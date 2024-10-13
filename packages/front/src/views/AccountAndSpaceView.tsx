@@ -4,7 +4,7 @@ import { fromPromise } from "mobx-utils"
 import { ConnectionStatus } from "sinkron-client"
 import { Col, Row, useModal } from "oriente"
 
-import numForm from "../utils/numForm"
+import numForm from "~/utils/numForm"
 import {
     Modal,
     Heading,
@@ -13,11 +13,10 @@ import {
     Button,
     useActionState,
     useStateToast
-} from "../ui"
-import ButtonsGrid from "../ui/ButtonsGrid"
-import Container from "../ui/Container"
-
-import { useStore, useSpace } from "../store"
+} from "~/ui"
+import ButtonsGrid from "~/ui/ButtonsGrid"
+import Container from "~/ui/Container"
+import { useStore, useSpace } from "~/store"
 
 const statusMap = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",

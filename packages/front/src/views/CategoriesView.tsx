@@ -7,10 +7,10 @@ import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 import keyboardArrowDownSvg from "@material-design-icons/svg/outlined/keyboard_arrow_down.svg"
 import keyboardArrowUpSvg from "@material-design-icons/svg/outlined/keyboard_arrow_up.svg"
 
-import { Menu, MenuItem, Button, LinkButton, Icon } from "../ui"
-import Container from "../ui/Container"
-import { useSpace } from "../store"
-import type { CategoryTreeNode, SpaceView } from "../store/SpaceStore"
+import { Menu, MenuItem, Button, LinkButton, Icon } from "~/ui"
+import Container from "~/ui/Container"
+import { useSpace } from "~/store"
+import type { CategoryTreeNode, SpaceView } from "~/store/SpaceStore"
 
 type CategoriesListItemProps = {
     category: CategoryTreeNode

@@ -2,10 +2,10 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Row } from "oriente"
 
-import { useStore } from "../store"
-import Container from "../ui/Container"
-import { Button, LinkButton, Avatar } from "../ui"
-import ButtonsGrid from "../ui/ButtonsGrid"
+import { useStore } from "~/store"
+import Container from "~/ui/Container"
+import { Button, LinkButton, Avatar } from "~/ui"
+import ButtonsGrid from "~/ui/ButtonsGrid"
 
 const AccountSettingsView = observer(() => {
     const [_location, navigate] = useLocation()

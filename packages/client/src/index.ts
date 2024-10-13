@@ -24,18 +24,16 @@ import type {
     ModifyMessage,
     ChangeErrorMessage,
     HeartbeatMessage
-} from "sinkron/types/protocol.d.ts"
+} from "sinkron-protocol"
 
-// type MessageHandler = (msg: string) => void
-
-interface Transport {
+export interface Transport {
     open(): void
     close(): void
     send(msg: string): void
     emitter: ReturnType<typeof createNanoEvents>
 }
 
-type WebSocketTransportProps = {
+export type WebSocketTransportProps = {
     url: string
     webSocketImpl?: typeof WebSocket
 }
@@ -512,7 +510,31 @@ class Collection<T extends object> {
         }, disconnectTimeout)
     }
 
-    handleHeartbeat(msg: HeartbeatMessage) {
+    onMessage(msg: string) {
+        this.logger.trace("Received message: %o", msg)
+        let parsed
+        try {
+            parsed = JSON.parse(msg)
+        } catch {
+            this.logger.error("Couldn't parse message JSON: %m", msg)
+            return
+        }
+        if (parsed.kind === "h") {
+            this.handleHeartbeatMessage(parsed)
+        } else if (parsed.kind === "doc") {
+            this.handleDocMessage(parsed)
+        } else if (parsed.kind === "sync_complete") {
+            this.handleSyncCompleteMessage(parsed)
+        } else if (parsed.kind === "sync_error") {
+            this.handleSyncError(parsed)
+        } else if (parsed.kind === "change") {
+            this.handleChangeMessage(parsed)
+        } else if (parsed.kind === "change_error") {
+            this.handleChangeErrorMessage(parsed)
+        }
+    }
+
+    handleHeartbeatMessage(msg: HeartbeatMessage) {
         this.logger.trace("Recieved hearbeat response")
 
         // cancel disconnect by timeout
@@ -525,31 +547,7 @@ class Collection<T extends object> {
         )
     }
 
-    onMessage(msg: string) {
-        this.logger.trace("Received message: %o", msg)
-        let parsed
-        try {
-            parsed = JSON.parse(msg)
-        } catch {
-            this.logger.error("Couldn't parse message JSON: %m", msg)
-            return
-        }
-        if (parsed.kind === "h") {
-            this.handleHeartbeat(parsed)
-        } else if (parsed.kind === "doc") {
-            this.handleDocMessage(parsed)
-        } else if (parsed.kind === "sync_complete") {
-            this.onSyncComplete(parsed)
-        } else if (parsed.kind === "sync_error") {
-            this.handleSyncError(parsed)
-        } else if (parsed.kind === "change") {
-            this.handleChangeMessage(parsed)
-        } else if (parsed.kind === "change_error") {
-            this.handleChangeErrorMessage(parsed)
-        }
-    }
-
-    onSyncComplete(msg: SyncCompleteMessage) {
+    handleSyncCompleteMessage(msg: SyncCompleteMessage) {
         this.colrev = msg.colrev
         this.flush()
         this.status = ConnectionStatus.Ready

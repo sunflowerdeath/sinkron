@@ -14,7 +14,7 @@ export {
     createDataSource
 }
 
-export { Op } from "./protocol"
+export { Op } from "sinkron-protocol"
 export type {
     SyncCompleteMessage,
     DocMessage,
@@ -23,4 +23,4 @@ export type {
     ModifyMessage,
     ClientMessage,
     ServerMessage
-} from "./protocol"
+} from "sinkron-protocol"

@@ -2,12 +2,12 @@ import { DataSource, Repository, MoreThan, FindOptionsSelect } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
 import * as Automerge from "@automerge/automerge"
 import { LRUCache } from "lru-cache"
+import { ErrorCode } from "sinkron-protocol"
 
 import { createDataSource } from "./db"
 import type { Document, Collection, Ref, Group, GroupMember } from "./entities"
 import { Result, ResultType } from "./result"
 import { Permissions, PermissionsTable, Action } from "./permissions"
-import { ErrorCode } from "./protocol"
 import type { DbConfig } from "./db"
 
 export type CollectionView = {
@@ -110,7 +110,7 @@ class Sinkron {
         const count = await models.collections.countBy({ id })
         if (count > 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Duplicate col id"
             })
         }
@@ -163,7 +163,7 @@ class Sinkron {
 
         if (colrev < 0 || colrev > colEntity.colrev) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Invalid colrev"
             })
         }
@@ -222,7 +222,7 @@ class Sinkron {
 
         if (colrev < 0 || colrev > colEntity.colrev) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Invalid colrev"
             })
         }
@@ -256,7 +256,7 @@ class Sinkron {
             where: { id: col },
             select: { id: true, colrev: true, ref: true }
         })
-        if (colEntity === null) return Result.err({ code: ErrorCode.NotFound })
+        if (colEntity === null) return Result.err({ code: "not_found" })
 
         return colEntity.ref
             ? this.#syncRefCollection(colEntity, colrev)
@@ -275,13 +275,13 @@ class Sinkron {
         })
         if (colEntity === null) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Collection not found"
             })
         }
         if (colEntity.ref !== true) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Only ref collections support adding documents"
             })
         }
@@ -289,7 +289,7 @@ class Sinkron {
         const docCount = await models.documents.countBy({ id: doc })
         if (docCount === 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Document not found"
             })
         }
@@ -297,7 +297,7 @@ class Sinkron {
         const refCount = await models.refs.countBy({ docId: doc, colId: col })
         if (refCount !== 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Document is already in collection"
             })
         }
@@ -329,7 +329,7 @@ class Sinkron {
         })
         if (ref === null) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Ref not found"
             })
         }
@@ -393,7 +393,7 @@ class Sinkron {
         const docCnt = await models.documents.countBy({ id })
         if (docCnt > 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Duplicate doc id: " + id
             })
         }
@@ -404,13 +404,13 @@ class Sinkron {
         })
         if (colEntity === null) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Collection not found"
             })
         }
         if (colEntity.ref === true) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Ref collections don't support creating documents"
             })
         }
@@ -483,7 +483,7 @@ class Sinkron {
         })
         if (col === null) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Collection not found"
             })
         }
@@ -518,10 +518,10 @@ class Sinkron {
         )
         if (!incrementRefColrevsRes.isOk) return incrementRefColrevsRes
         // TODO return colrev
-        const colrevs = [
+        /*const colrevs = [
             { col: doc.col, colrev: nextColrev },
             ...incrementRefColrevsRes.value
-        ]
+        ]*/
 
         const updated: DocumentView = {
             ...doc,
@@ -540,10 +540,10 @@ class Sinkron {
         data: Uint8Array[] | null
     ): Promise<ResultType<DocumentView, RequestError>> {
         const doc = await this.getDocument(id)
-        if (doc === null) return Result.err({ code: ErrorCode.NotFound })
+        if (doc === null) return Result.err({ code: "not_found" })
         if (doc.data === null) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Unable to update deleted document"
             })
         }
@@ -562,7 +562,7 @@ class Sinkron {
             ;[automerge] = Automerge.applyChanges(automerge, data)
         } catch {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Unable to apply changes"
             })
         }
@@ -579,10 +579,10 @@ class Sinkron {
         cb: Automerge.ChangeFn<T>
     ): Promise<ResultType<UpdateResult, RequestError>> {
         const doc = await this.getDocument(id)
-        if (doc === null) return Result.err({ code: ErrorCode.NotFound })
+        if (doc === null) return Result.err({ code: "not_found" })
         if (doc.data === null) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Unable to update deleted document"
             })
         }
@@ -592,7 +592,7 @@ class Sinkron {
             automerge = Automerge.change(automerge, cb)
         } catch {
             return Result.err({
-                code: ErrorCode.InternalServerError,
+                code: "invalid_request",
                 details: "Unable to apply changes"
             })
         }
@@ -601,7 +601,7 @@ class Sinkron {
         if (change === undefined) {
             // nothing changed
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Empty change"
             })
         }
@@ -635,7 +635,7 @@ class Sinkron {
         })
         if (colEntity === null) {
             return Result.err({
-                code: ErrorCode.NotFound,
+                code: "not_found",
                 details: "Collection not found"
             })
         }
@@ -660,7 +660,7 @@ class Sinkron {
         })
         if (doc === null) {
             return Result.err({
-                code: ErrorCode.NotFound,
+                code: "not_found",
                 details: "Document not found"
             })
         }
@@ -699,7 +699,7 @@ class Sinkron {
         })
         if (doc === null) {
             return Result.err({
-                code: ErrorCode.NotFound,
+                code: "not_found",
                 details: "Document not found"
             })
         }
@@ -722,7 +722,7 @@ class Sinkron {
         })
         if (col === null) {
             return Result.err({
-                code: ErrorCode.NotFound,
+                code: "not_found",
                 details: "Collection not found"
             })
         }
@@ -741,7 +741,7 @@ class Sinkron {
         const count = await models.groups.countBy({ id })
         if (count > 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Duplicate id"
             })
         }
@@ -756,7 +756,7 @@ class Sinkron {
         const count = await models.collections.countBy({ id })
         if (count === 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Group not exist"
             })
         }
@@ -776,7 +776,7 @@ class Sinkron {
         const count = await models.groups.countBy({ id: group })
         if (count === 0) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: "invalid_request",
                 details: "Group not exist"
             })
         }

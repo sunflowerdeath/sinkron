@@ -1,9 +1,9 @@
 import { makeAutoObservable } from "mobx"
 import { IndexedDbCollectionStore } from "sinkron-client"
 
-import env from "../env"
-import { User } from "../entities"
-import { Api } from "../api"
+import env from "~/env"
+import { User } from "~/entities"
+import { Api } from "~/api"
 
 import UserStore from "./UserStore"
 

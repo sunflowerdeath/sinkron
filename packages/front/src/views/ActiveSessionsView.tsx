@@ -4,9 +4,9 @@ import { Col } from "oriente"
 import { useLocation } from "wouter"
 import { format, parseISO } from "date-fns"
 
-import { useStore } from "../store"
-import Container from "../ui/Container"
-import { Button, ActionStateView, useActionState } from "../ui"
+import { useStore } from "~/store"
+import Container from "~/ui/Container"
+import { Button, ActionStateView, useActionState } from "~/ui"
 
 interface Session {
     isCurrent: boolean

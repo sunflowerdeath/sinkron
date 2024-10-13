@@ -12,6 +12,10 @@
         "lib": ["es6", "es7", "es2015", "dom", "esnext"],
         "jsx": "react-jsx",
 
+        "paths": {
+            "~/*": ["./src/*"]
+        },
+
         "outDir": "build",
         "declaration": true,
         "declarationDir": "./types",

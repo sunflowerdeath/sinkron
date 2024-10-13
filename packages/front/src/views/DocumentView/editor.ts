@@ -9,6 +9,7 @@ import {
     Text
 } from "slate"
 import { withReact, ReactEditor } from "slate-react"
+
 import {
     isAtEndOfNode,
     isAfterNode,

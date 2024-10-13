@@ -62,6 +62,7 @@ export type Document = {
     content: AutomergeNode
     categories: string[]
     isPublished: boolean
+    isLocked: boolean
 }
 
 export type Post = {

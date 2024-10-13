@@ -4,9 +4,8 @@ import { useMedia } from "react-use"
 
 import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 
-import { Button } from "../ui/button"
-import { Icon } from "../ui/icon"
-import { useSpace } from "../store"
+import { Button, Icon } from "~/ui"
+import { useSpace } from "~/store"
 
 interface CategoryListItemProps {
     item: { id: string; name: string }

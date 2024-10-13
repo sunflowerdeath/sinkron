@@ -16,8 +16,8 @@ import { Img } from "react-image"
 import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
-import env from "../../env"
-import { Button, Icon } from "../../ui"
+import env from "~/env"
+import { Button, Icon } from "~/ui"
 import {
     SinkronTextElement,
     TitleElement,
@@ -25,7 +25,7 @@ import {
     CheckListItemElement,
     ImageElement,
     LinkElement
-} from "../../types"
+} from "~/types"
 
 export type CustomRenderElementProps<T> = Omit<
     RenderElementProps,
@@ -284,9 +284,10 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
                     minWidth: 100,
                     maxHeight: "66vh",
                     maxWidth: "100%",
-                    outline: (isFocused && isSelected)
-                        ? "4px solid var(--color-link)"
-                        : "none",
+                    outline:
+                        isFocused && isSelected
+                            ? "4px solid var(--color-link)"
+                            : "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center"

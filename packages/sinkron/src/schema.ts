@@ -1,4 +1,4 @@
-import { Op } from "./protocol"
+import { Op } from "sinkron-protocol"
 
 const heartbeatMessageSchema = {
     type: "object",

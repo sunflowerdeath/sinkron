@@ -1,21 +1,15 @@
-export enum ErrorCode {
+export type ErrorCode =
     // Invalid request format
-    InvalidRequest = "invalid_request",
-
-    // User could not be authenticated, connection will be closed
-    AuthenticationFailed = "auth_failed",
-
+    | "invalid_request"
+    // User could not be authenticated
+    | "auth_failed"
     // User doesn't have permission to perform the operation
-    AccessDenied = "access_denied",
-
+    | "access_denied"
     // Operation cannot be performed
-    UnprocessableRequest = "unprocessable_request",
-
+    | "unprocessable_request"
     // Requested entity not found
-    NotFound = "not_found",
-
-    InternalServerError = "internal_server_error"
-}
+    | "not_found"
+    | "internal_server_error"
 
 export type SyncMessage = {
     kind: "sync"
@@ -33,12 +27,6 @@ export type DocMessage = {
     updatedAt: string // iso8601 time
 }
 
-export type GetMessage = {
-    kind: "get"
-    id: string
-    col?: string
-}
-
 export type SyncErrorMessage = {
     kind: "sync_error"
     col: string
@@ -49,6 +37,12 @@ export type SyncCompleteMessage = {
     kind: "sync_complete"
     col: string
     colrev: number
+}
+
+export type GetMessage = {
+    kind: "get"
+    id: string
+    col?: string
 }
 
 export enum Op {

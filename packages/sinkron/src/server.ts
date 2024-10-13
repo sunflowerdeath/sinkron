@@ -9,7 +9,6 @@ import { Sinkron, RequestError, DocumentView } from "./core"
 import { Result, ResultType } from "./result"
 import { Action } from "./permissions"
 import {
-    ErrorCode,
     HeartbeatMessage,
     SyncMessage,
     SyncErrorMessage,
@@ -22,7 +21,7 @@ import {
     DocMessage,
     GetMessage,
     ClientMessage
-} from "./protocol"
+} from "sinkron-protocol"
 import { MessageQueue, SequentialMessageQueue, WsMessage } from "./messageQueue"
 import { clientMessageSchema } from "./schema"
 
@@ -316,7 +315,7 @@ class SinkronServer {
             const errorMsg: SyncErrorMessage = {
                 kind: "sync_error",
                 col,
-                code: ErrorCode.AccessDenied
+                code: "access_denied"
             }
             ws.send(JSON.stringify(errorMsg))
             return
@@ -365,14 +364,17 @@ class SinkronServer {
     async handleChangeMessage(msg: ChangeMessage, ws: WebSocket) {
         const { op, col } = msg
 
+        const client = this.clients.get(ws)
+        if (!client) return
+
         let res: ResultType<DocumentView, RequestError>
         if (op === Op.Create) {
-            res = await this.handleCreateMessage(msg, ws)
+            res = await this.handleCreateMessage(ws, client, msg)
         } else if (op === Op.Delete) {
-            res = await this.handleDeleteMessage(msg, ws)
+            res = await this.handleDeleteMessage(ws, client, msg)
         } else {
             // if (op === Op.Modify)
-            res = await this.handleModifyMessage(msg, ws)
+            res = await this.handleModifyMessage(ws, client, msg)
         }
         if (!res.isOk) {
             this.logger.debug(
@@ -411,25 +413,19 @@ class SinkronServer {
     }
 
     async handleCreateMessage(
-        msg: CreateMessage,
-        ws: WebSocket
+        _ws: WebSocket,
+        client: Client,
+        msg: CreateMessage
     ): Promise<ResultType<DocumentView, RequestError>> {
         const { id, col, data } = msg
 
-        const client = this.clients.get(ws)
-        if (!client) {
-            return Result.err({
-                code: ErrorCode.InternalServerError,
-                details: "Client not found"
-            })
-        }
         const checkRes = await this.sinkron.checkCollectionPermission({
             id: col,
             user: client.id,
             action: Action.create
         })
         if (!checkRes.isOk || !checkRes.value === true) {
-            return Result.err({ code: ErrorCode.AccessDenied })
+            return Result.err({ code: "access_denied" })
         }
 
         return await this.sinkron.createDocument(
@@ -440,43 +436,30 @@ class SinkronServer {
     }
 
     async handleDeleteMessage(
+        _ws: WebSocket,
+        client: Client,
         msg: DeleteMessage,
-        ws: WebSocket
     ): Promise<ResultType<DocumentView, RequestError>> {
         const { id } = msg
 
-        const client = this.clients.get(ws)
-        if (!client) {
-            return Result.err({
-                code: ErrorCode.InternalServerError,
-                details: "Client not found"
-            })
-        }
         const checkRes = await this.sinkron.checkDocumentPermission({
             id,
             user: client.id,
             action: Action.delete
         })
         if (!checkRes.isOk || !checkRes.value === true) {
-            return Result.err({ code: ErrorCode.AccessDenied })
+            return Result.err({ code: "access_denied" })
         }
 
         return await this.sinkron.deleteDocument(id)
     }
 
     async handleModifyMessage(
+        _ws: WebSocket,
+        client: Client,
         msg: ModifyMessage,
-        ws: WebSocket
     ): Promise<ResultType<DocumentView, RequestError>> {
         const { id, data } = msg
-
-        const client = this.clients.get(ws)
-        if (!client) {
-            return Result.err({
-                code: ErrorCode.InternalServerError,
-                details: "Client not found"
-            })
-        }
 
         const checkRes = await this.sinkron.checkDocumentPermission({
             id,
@@ -484,7 +467,7 @@ class SinkronServer {
             action: Action.update
         })
         if (!checkRes.isOk || !checkRes.value) {
-            return Result.err({ code: ErrorCode.AccessDenied })
+            return Result.err({ code: "access_denied" })
         }
 
         return await this.sinkron.updateDocument(
