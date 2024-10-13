@@ -45,16 +45,13 @@ export type GetMessage = {
     col?: string
 }
 
-export enum Op {
-    Create = "+",
-    Modify = "M",
-    Delete = "-"
-}
+export type Op = "+" | "M" | "-"
 
 interface BaseChangeMessage {
     kind: "change"
 
     // These fields are sent by both client and server:
+    op: Op
     col: string
     id: string
     changeid: string
@@ -66,17 +63,17 @@ interface BaseChangeMessage {
 }
 
 export interface CreateMessage extends BaseChangeMessage {
-    op: Op.Create
+    op: "+"
     data: string
 }
 
 export interface ModifyMessage extends BaseChangeMessage {
-    op: Op.Modify
+    op: "M"
     data: string[]
 }
 
 export interface DeleteMessage extends BaseChangeMessage {
-    op: Op.Delete
+    op: "-"
 }
 
 export type ChangeMessage = CreateMessage | ModifyMessage | DeleteMessage

@@ -1,5 +1,3 @@
-import { Op } from "sinkron-protocol"
-
 const heartbeatMessageSchema = {
     type: "object",
     properties: {
@@ -52,21 +50,21 @@ const changeMessageSchema = {
     oneOf: [
         {
             properties: {
-                op: { const: Op.Create },
+                op: { const: "+" },
                 data: { type: "string" }
             },
             required: ["data"]
         },
         {
             properties: {
-                op: { const: Op.Modify },
+                op: { const: "M" },
                 data: { type: "array", items: { type: "string" } }
             },
             required: ["data"]
         },
         {
             properties: {
-                op: { const: Op.Delete }
+                op: { const: "-" }
             }
         }
     ]

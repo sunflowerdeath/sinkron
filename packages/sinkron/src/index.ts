@@ -14,7 +14,6 @@ export {
     createDataSource
 }
 
-export { Op } from "sinkron-protocol"
 export type {
     SyncCompleteMessage,
     DocMessage,

@@ -20,6 +20,7 @@ import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
+import env from "~/env"
 import { useSpace } from "~/store"
 import type { Document } from "~/entities"
 import { fromAutomerge, applySlateOps } from "~/slate"
@@ -27,7 +28,7 @@ import SelectCategoriesView from "~/views/SelectCategoriesView"
 import ShareAndAccessView from "~/views/ShareAndAccessView"
 import PublishView from "~/views/PublishView"
 import CategoriesList from "~/components/CategoriesList"
-import { Button, LinkButton, Icon, Menu, MenuItem } from "~/ui"
+import { Button, LinkButton, Icon, Menu, MenuItem, useStateToast } from "~/ui"
 
 import { DocumentViewStore } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
@@ -53,10 +54,10 @@ const EditorView = observer((props: EditorViewProps) => {
     const { id, doc, onChange, onDelete } = props
 
     const spaceStore = useSpace()
-    const canDelete = spaceStore.space.role !== "readonly"
 
+    const toast = useStateToast()
     const documentViewStore = useMemo(
-        () => new DocumentViewStore(spaceStore),
+        () => new DocumentViewStore({ spaceStore, toast, id }),
         []
     )
     const editor = documentViewStore.editor
@@ -159,27 +160,77 @@ const EditorView = observer((props: EditorViewProps) => {
         )
     }
 
-    const menu = () => (
-        <>
-            {doc.isLocked ? (
-                <MenuItem onSelect={() => spaceStore.unlockDocument(id)}>
-                    Unlock document
+    const menu = () => {
+        const isLocked = doc.isLocked
+        const canDelete = spaceStore.space.role !== "readonly"
+
+        const canLock = ["admin", "owner"].includes(spaceStore.space.role)
+        const lockItems = (
+            <>
+                {isLocked && (
+                    <>
+                        <div style={{ padding: 10 }}>Document is locked</div>
+                        <hr />
+                    </>
+                )}
+                {isLocked ? (
+                    <MenuItem
+                        isDisabled={!canLock}
+                        onSelect={() => documentViewStore.unlock()}
+                    >
+                        Unlock
+                    </MenuItem>
+                ) : (
+                    <MenuItem
+                        isDisabled={!canLock}
+                        onSelect={() => documentViewStore.lock()}
+                    >
+                        Lock
+                    </MenuItem>
+                )}
+            </>
+        )
+
+        const open = () => {
+            const host = env.isProductionEnv
+                ? "https://sinkron.xyz"
+                : "http://localhost:1337"
+            const url = `${host}/posts/${id}`
+            window.open(url)
+        }
+
+        const canPublish = ["admin", "owner"].includes(spaceStore.space.role)
+        const publishItems = (
+            <>
+                {canPublish && (
+                    <MenuItem onSelect={() => setView("publish")}>
+                        Publish
+                    </MenuItem>
+                )}
+                {doc.isPublished && (
+                    <MenuItem onSelect={open}>Open published version</MenuItem>
+                )}
+            </>
+        )
+
+        return (
+            <>
+                {lockItems}
+                {publishItems}
+                {/*<MenuItem onSelect={() => setView("share")}>
+                    Share & Access
+                </MenuItem>*/}
+                {/*<MenuItem isDisabled={true}>Copy link to document</MenuItem>*/}
+                {/*<MenuItem isDisabled={true}>Copy to another space</MenuItem>*/}
+                <MenuItem
+                    onSelect={onDelete}
+                    isDisabled={!canDelete || isLocked}
+                >
+                    Delete
                 </MenuItem>
-            ) : (
-                <MenuItem onSelect={() => spaceStore.lockDocument(id)}>
-                    Lock document
-                </MenuItem>
-            )}
-            <MenuItem isDisabled={true}>Copy to another space</MenuItem>
-            <MenuItem onSelect={() => setView("share")}>
-                Share & Access
-            </MenuItem>
-            <MenuItem onSelect={() => setView("publish")}>Publish</MenuItem>
-            <MenuItem onSelect={onDelete} isDisabled={!canDelete}>
-                Delete
-            </MenuItem>
-        </>
-    )
+            </>
+        )
+    }
 
     const menuButton = (
         <Menu
@@ -225,7 +276,7 @@ const EditorView = observer((props: EditorViewProps) => {
         [editor]
     )
 
-    const readOnly = spaceStore.space.role === "readonly"
+    const readOnly = spaceStore.space.role === "readonly" || doc.isLocked
     const editorElem = (
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
             <Editable

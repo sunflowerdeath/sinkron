@@ -498,9 +498,6 @@ class SpaceStore {
                 url: `/spaces/${this.space.id}/lock/${docId}`
             })
         )
-        res.then(() => {
-            console.log("Locked")
-        })
         return res
     }
 
@@ -511,9 +508,6 @@ class SpaceStore {
                 url: `/spaces/${this.space.id}/unlock/${docId}`
             })
         )
-        res.then(() => {
-            console.log("Unlocked")
-        })
         return res
     }
 }

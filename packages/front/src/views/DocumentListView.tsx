@@ -6,6 +6,7 @@ import { ItemState } from "sinkron-client"
 import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
 import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
+import lockSvg from "@material-design-icons/svg/outlined/lock.svg"
 import folderSvg from "@material-design-icons/svg/outlined/folder.svg"
 import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
@@ -107,11 +108,20 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
                 {title}
                 {subtitle}
             </Col>
-            <div>
-                {data.item.state !== ItemState.Synchronized ? (
-                    <Icon svg={syncSvg} />
-                ) : null}
-            </div>
+            <Row gap={4}>
+                {data.item.local?.isLocked && (
+                    <Icon
+                        svg={lockSvg}
+                        style={{ fill: "var(--color-secondary)" }}
+                    />
+                )}
+                {data.item.state !== ItemState.Synchronized && (
+                    <Icon
+                        svg={syncSvg}
+                        style={{ fill: "var(--color-secondary)" }}
+                    />
+                )}
+            </Row>
         </Row>
     )
 })

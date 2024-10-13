@@ -12,7 +12,6 @@ import {
     HeartbeatMessage,
     SyncMessage,
     SyncErrorMessage,
-    Op,
     ChangeMessage,
     ModifyMessage,
     CreateMessage,
@@ -368,12 +367,12 @@ class SinkronServer {
         if (!client) return
 
         let res: ResultType<DocumentView, RequestError>
-        if (op === Op.Create) {
+        if (op === "+") {
             res = await this.handleCreateMessage(ws, client, msg)
-        } else if (op === Op.Delete) {
+        } else if (op === "-") {
             res = await this.handleDeleteMessage(ws, client, msg)
         } else {
-            // if (op === Op.Modify)
+            // if (op === "M")
             res = await this.handleModifyMessage(ws, client, msg)
         }
         if (!res.isOk) {
@@ -401,7 +400,7 @@ class SinkronServer {
             const { colrev, updatedAt, createdAt } = doc
             const response: ChangeMessage = { ...msg, colrev }
             response.updatedAt = serializeDate(updatedAt)
-            if (msg.op === Op.Create) {
+            if (msg.op === "+") {
                 response.createdAt = serializeDate(createdAt)
             }
             const reponseMsg = JSON.stringify(response)
@@ -438,7 +437,7 @@ class SinkronServer {
     async handleDeleteMessage(
         _ws: WebSocket,
         client: Client,
-        msg: DeleteMessage,
+        msg: DeleteMessage
     ): Promise<ResultType<DocumentView, RequestError>> {
         const { id } = msg
 
@@ -457,7 +456,7 @@ class SinkronServer {
     async handleModifyMessage(
         _ws: WebSocket,
         client: Client,
-        msg: ModifyMessage,
+        msg: ModifyMessage
     ): Promise<ResultType<DocumentView, RequestError>> {
         const { id, data } = msg
 
@@ -537,9 +536,8 @@ class SinkronServer {
             const { col, colrev, updatedAt } = doc
             const msg: ChangeMessage = {
                 kind: "change",
-                op: Op.Modify,
+                op: "M",
                 id,
-                // @ts-ignore
                 data: changes.map((c) => Buffer.from(c).toString("base64")),
                 col,
                 colrev,
