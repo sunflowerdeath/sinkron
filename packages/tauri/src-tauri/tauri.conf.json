@@ -1,0 +1,36 @@
+{
+    "$schema": "https://schema.tauri.app/config/2.0.0",
+    "productName": "sinkron",
+    "version": "0.1.0",
+    "identifier": "xyz.sinkon.app",
+    "build": {
+        "beforeDevCommand": "cd ../front && TAURI=1 pnpm start",
+        "devUrl": "http://localhost:1337",
+        "beforeBuildCommand": "cd ../front && TAURI=1 pnpm tauri-build",
+        "frontendDist": "../app/build"
+    },
+    "app": {
+        "withGlobalTauri": true,
+        "windows": [
+            {
+                "title": "sinkron",
+                "width": 1024,
+                "height": 728
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": [
+            "icons/32x32.png",
+            "icons/128x128.png",
+            "icons/128x128@2x.png",
+            "icons/icon.icns",
+            "icons/icon.ico"
+        ]
+    }
+}

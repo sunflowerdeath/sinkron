@@ -7,6 +7,7 @@ WORKDIR /app
 RUN rm -rf packages/benchmark
 RUN rm -rf packages/client
 RUN rm -rf packages/front
+RUN rm -rf packages/tauri
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build-app
 WORKDIR /app
