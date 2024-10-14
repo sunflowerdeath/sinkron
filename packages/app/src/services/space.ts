@@ -104,18 +104,20 @@ class SpaceService {
             permissions: p.table
         })
 
-        await this.addMember(models, {
-            userId: ownerId,
-            spaceId: space.id,
-            role: "owner"
-        })
-
         const meta = Automerge.from({ meta: true, categories: {} })
         await this.app.sinkron.createDocument(
             uuidv4(),
             col,
             Automerge.save(meta)
         )
+
+        // TODO create in transaction, throw if sinkron failed
+
+        await this.addMember(models, {
+            userId: ownerId,
+            spaceId: space.id,
+            role: "owner"
+        })
 
         return Result.ok(space)
     }
@@ -312,6 +314,7 @@ class SpaceService {
             await this.app.sinkronServer.updateDocumentWithCallback(
                 docId,
                 (doc) => {
+                    // @ts-expect-error doc untyped
                     doc.isLocked = lock
                 }
             )

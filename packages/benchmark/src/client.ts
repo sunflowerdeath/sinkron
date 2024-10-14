@@ -1,5 +1,3 @@
-import { createServer } from "node:http"
-
 import * as Automerge from "@automerge/automerge"
 import { random, sample } from "lodash"
 import WebSocket from "ws"
@@ -40,7 +38,7 @@ const client = (userid: string, colid: string) => {
         const n = random(20)
         if (col.items.size == 0 || n === 1 || n == 2) {
             // 10% to create document
-            const id = col.create(makeDoc())
+            col.create(makeDoc())
         } else if (n === 3) {
             // 5% to delete document
             const id = sample(Array.from(col.items.keys()))!

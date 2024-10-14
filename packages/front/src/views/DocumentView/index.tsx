@@ -379,7 +379,9 @@ const EditorView = observer((props: EditorViewProps) => {
             justify="end"
             style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}
         >
-            <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
+            {!readOnly && (
+                <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
+            )}
             {menuButton}
         </Row>
     )
@@ -400,8 +402,10 @@ const EditorView = observer((props: EditorViewProps) => {
             onChange={() => {
                 // Prevent bug firing twice on Android
                 if (editor.operations.length === 0) return
+                // @ts-expect-error fired
                 if (!editor.operations.fired) {
                     onChange?.(editor)
+                    // @ts-expect-error fired
                     editor.operations.fired = true
                 }
             }}

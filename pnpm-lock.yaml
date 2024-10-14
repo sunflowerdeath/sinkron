@@ -252,8 +252,8 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
       oriente:
-        specifier: ^0.1.4
-        version: 0.1.4(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)(webpack@5.95.0)
+        specifier: ^0.1.5
+        version: 0.1.5(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)(webpack@5.95.0)
       query-string:
         specifier: ^9.1.1
         version: 9.1.1
@@ -2865,8 +2865,8 @@ packages:
     resolution: {integrity: sha512-ur5UIdyw5Y7yEj9wLzhqXiy6GZ3Mwx0yGI+5sMn2r0N0v3cKJvUmFH5yPP+WXh9e0xfyzyJX95D8l088DNFj7A==}
     hasBin: true
 
-  oriente@0.1.4:
-    resolution: {integrity: sha512-I9qnkgwNkQZY5iLdMmJ0ni0EDboIfAMS+8Q4Gc8YiziWhRkyL2iOIlQja4pBp0PngUb/+0M5TVMvJo2RPJp7xA==}
+  oriente@0.1.5:
+    resolution: {integrity: sha512-o8Kf20YYmxl+oBcNpTb4NQNQkfc73efyDGxpw5axc25A2pIAaMI452AWUcVami8F9Wvb2TvqwLKpstlD8J0kig==}
 
   oxlint@0.9.10:
     resolution: {integrity: sha512-bKiiFN7Hnoaist/rditTRBXz+GXKYuLd53/NB7Q6zHB/bifELJarSoRLkAUGElIJKl4PSr3lTh1g6zehh+rX0g==}
@@ -6757,7 +6757,7 @@ snapshots:
 
   opener@1.5.2: {}
 
-  oriente@0.1.4(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)(webpack@5.95.0):
+  oriente@0.1.5(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)(webpack@5.95.0):
     dependencies:
       lodash-es: 4.17.21
       react-focus-lock: 2.13.2(@types/react@18.3.11)(react@18.3.1)
