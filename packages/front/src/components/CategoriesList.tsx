@@ -9,12 +9,13 @@ import { useSpace } from "~/store"
 
 interface CategoryListItemProps {
     item: { id: string; name: string }
+    readOnly: boolean
     onSelect: () => void
     onRemove: () => void
 }
 
 const CategoryListItem = (props: CategoryListItemProps) => {
-    const { item, onSelect, onRemove } = props
+    const { item, onSelect, onRemove, readOnly } = props
     return (
         <Row align="center" style={{ background: "#444" }} key={item.id}>
             <Button
@@ -39,20 +40,23 @@ const CategoryListItem = (props: CategoryListItemProps) => {
                     {item.name}
                 </div>
             </Button>
-            <Button kind="transparent" size="s" onClick={onRemove}>
-                <Icon svg={closeSvg} />
-            </Button>
+            {!readOnly && (
+                <Button kind="transparent" size="s" onClick={onRemove}>
+                    <Icon svg={closeSvg} />
+                </Button>
+            )}
         </Row>
     )
 }
 
 interface CategoriesListProps {
     items: { id: string; name: string }[]
+    readOnly: boolean
     onRemove: (id: string) => void
 }
 
 const CategoriesList = (props: CategoriesListProps) => {
-    const { items, onRemove } = props
+    const { items, onRemove, readOnly } = props
     const spaceStore = useSpace()
     const [_location, navigate] = useLocation()
     const isMobile = useMedia("(max-width: 1023px)")
@@ -66,6 +70,7 @@ const CategoriesList = (props: CategoriesListProps) => {
                         spaceStore.view = { kind: "category", id: item.id }
                         if (isMobile) navigate("/")
                     }}
+                    readOnly={readOnly}
                     onRemove={() => onRemove(item.id)}
                 />
             ))}

@@ -13,10 +13,11 @@ interface CategoriesTreeItemProps {
     value: string[]
     onChange: (value: string[]) => void
     category: CategoryTreeNode
+    readOnly: boolean
 }
 
 const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
-    const { category, value, onChange } = props
+    const { category, value, onChange, readOnly } = props
 
     const hasChildren = category.children.length > 0
     const isSelected = value.includes(category.id)
@@ -35,7 +36,9 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
                         justifyContent: "start",
                         gap: 8,
                         overflow: "hidden",
-                        flexShrink: 1
+                        flexShrink: 1,
+                        cursor: "default",
+                        opacity: 1
                     }}
                     onClick={() => {
                         const nextValue = isSelected
@@ -43,6 +46,7 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
                             : [...value, category.id]
                         onChange(nextValue)
                     }}
+                    isDisabled={readOnly}
                 >
                     <Icon svg={isSelected ? checkBoxSvg : checkBoxOutlineSvg} />
                     <div
@@ -63,6 +67,7 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
                         value={value}
                         onChange={onChange}
                         categories={category.children}
+                        readOnly={readOnly}
                     />
                 </div>
             )}
@@ -73,11 +78,12 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
 interface CategoriesTreeProps {
     value: string[]
     onChange: (value: string[]) => void
+    readOnly: boolean
     categories: CategoryTreeNode[]
 }
 
 const CategoriesTree = (props: CategoriesTreeProps) => {
-    const { categories, value, onChange } = props
+    const { categories, value, onChange, readOnly } = props
 
     return (
         <Col style={{ alignSelf: "stretch" }}>
@@ -87,6 +93,7 @@ const CategoriesTree = (props: CategoriesTreeProps) => {
                     category={c}
                     value={value}
                     onChange={onChange}
+                    readOnly={readOnly}
                 />
             ))}
         </Col>
@@ -97,11 +104,12 @@ interface SelectCategoriesViewProps {
     value: string[]
     onChange: (value: string[]) => void
     categoryTree: CategoryTree
+    readOnly: boolean
     onClose: () => void
 }
 
 const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
-    const { categoryTree, onChange, onClose, value } = props
+    const { categoryTree, readOnly, onChange, onClose, value } = props
 
     const treeElem =
         categoryTree.nodes.length > 0 ? (
@@ -109,6 +117,7 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
                 categories={categoryTree.nodes}
                 value={value}
                 onChange={onChange}
+                readOnly={readOnly}
             />
         ) : (
             <Row
@@ -140,6 +149,7 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
             >
                 <CategoriesList
                     items={value.map((id) => categoryTree.map[id]!)}
+                    readOnly={readOnly}
                     onRemove={(id) => onChange(without(value, id))}
                 />
             </div>

@@ -62,6 +62,8 @@ const EditorView = observer((props: EditorViewProps) => {
     )
     const editor = documentViewStore.editor
 
+    const readOnly = spaceStore.space.role === "readonly" || doc.isLocked
+
     const forceUpdate = useForceUpdate()
     const value = useMemo(() => {
         return (fromAutomerge(doc.content) as any).children
@@ -124,6 +126,7 @@ const EditorView = observer((props: EditorViewProps) => {
                                     doc.categories = without(doc.categories, c)
                                 })
                             }}
+                            readOnly={readOnly}
                         />
                     </div>
                     <Button size="s" onClick={() => setView("categories")}>
@@ -276,7 +279,6 @@ const EditorView = observer((props: EditorViewProps) => {
         [editor]
     )
 
-    const readOnly = spaceStore.space.role === "readonly" || doc.isLocked
     const editorElem = (
         <ErrorBoundary fallback={<p>Something went wrong</p>}>
             <Editable
@@ -327,6 +329,7 @@ const EditorView = observer((props: EditorViewProps) => {
             content = (
                 <SelectCategoriesView
                     value={doc.categories}
+                    readOnly={readOnly}
                     onChange={(value) => {
                         spaceStore.collection.change(id, (doc) => {
                             doc.categories = value

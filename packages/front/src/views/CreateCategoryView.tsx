@@ -161,16 +161,16 @@ const CreateCategoryView = observer(() => {
                 : search.parent
             : null
 
-    const space = useSpace()
+    const spaceStore = useSpace()
     const [_location, navigate] = useLocation()
 
     const create = (values: { name: string; parent: string | null }) => {
-        const id = space.createCategory(values)
-        space.view = { kind: "category", id }
+        const id = spaceStore.createCategory(values)
+        spaceStore.view = { kind: "category", id }
         navigate("/")
     }
 
-    if (!space.collection.initialSyncCompleted) {
+    if (!spaceStore.collection.initialSyncCompleted) {
         return "Loading..."
     }
 
@@ -180,7 +180,7 @@ const CreateCategoryView = observer(() => {
                 initialValues={{ name: "", parent: initialParent }}
                 onSubmit={create}
                 submitButtonText="Create"
-                categoryTree={space.categoryTree}
+                categoryTree={spaceStore.categoryTree}
                 disabledItems={[]}
             />
         </Container>
@@ -194,16 +194,16 @@ interface EditCategoryViewProps {
 const EditCategoryView = observer((props: EditCategoryViewProps) => {
     const { id } = props
 
-    const space = useSpace()
+    const spaceStore = useSpace()
     const [_location, navigate] = useLocation()
 
-    if (!space.collection.initialSyncCompleted) {
+    if (!spaceStore.collection.initialSyncCompleted) {
         return "Loading..."
     }
 
-    const category = space.meta.categories[id]
+    const category = spaceStore.meta.categories[id]
     const update = async (values: { name: string; parent: string | null }) => {
-        await space.updateCategory(id, values)
+        spaceStore.updateCategory(id, values)
         navigate("/categories")
     }
 
@@ -213,7 +213,7 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
                 initialValues={category}
                 onSubmit={update}
                 submitButtonText="Save"
-                categoryTree={space.categoryTree}
+                categoryTree={spaceStore.categoryTree}
                 disabledItems={[id]}
             />
         </Container>

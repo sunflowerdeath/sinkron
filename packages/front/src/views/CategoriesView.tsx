@@ -14,12 +14,13 @@ import type { CategoryTreeNode, SpaceView } from "~/store/SpaceStore"
 
 type CategoriesListItemProps = {
     category: CategoryTreeNode
+    readOnly: boolean
     onDelete: (id: string) => void
     onSelect: (id: string) => void
 }
 
 const CategoryListItem = (props: CategoriesListItemProps) => {
-    const { category, onSelect, onDelete } = props
+    const { category, readOnly, onSelect, onDelete } = props
 
     const [isCollapsed, setIsCollapsed] = useState(true)
     const [_location, navigate] = useLocation()
@@ -93,23 +94,26 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                         </div>
                     </Row>
                 </Button>
-                <Menu
-                    menu={menu}
-                    styles={{ list: { background: "#555" } }}
-                    placement={{ padding: 0, offset: 8, align: "end" }}
-                    autoSelectFirstItem={false}
-                >
-                    {(ref, { open }) => (
-                        <Button onClick={open} ref={ref}>
-                            <Icon svg={moreHorizSvg} />
-                        </Button>
-                    )}
-                </Menu>
+                {!readOnly && (
+                    <Menu
+                        menu={menu}
+                        styles={{ list: { background: "#555" } }}
+                        placement={{ padding: 0, offset: 8, align: "end" }}
+                        autoSelectFirstItem={false}
+                    >
+                        {(ref, { open }) => (
+                            <Button onClick={open} ref={ref}>
+                                <Icon svg={moreHorizSvg} />
+                            </Button>
+                        )}
+                    </Menu>
+                )}
             </Row>
             {hasChildren && !isCollapsed && (
                 <Col style={{ marginLeft: 32, alignSelf: "normal" }}>
                     <CategoryList
                         categories={category.children}
+                        readOnly={readOnly}
                         onSelect={onSelect}
                         onDelete={onDelete}
                     />
@@ -121,18 +125,20 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
 
 interface CategoryListProps {
     categories: CategoryTreeNode[]
+    readOnly: boolean
     onDelete: (id: string) => void
     onSelect: (id: string) => void
 }
 
 const CategoryList = (props: CategoryListProps) => {
-    const { categories, onSelect, onDelete } = props
+    const { categories, readOnly, onSelect, onDelete } = props
     return (
         <Col style={{ alignSelf: "stretch" }} gap={8}>
             {categories.map((c) => (
                 <CategoryListItem
                     key={c.id}
                     category={c}
+                    readOnly={readOnly}
                     onSelect={onSelect}
                     onDelete={onDelete}
                 />
@@ -154,8 +160,16 @@ const CategoriesView = observer(() => {
         navigate("/")
     }
 
-    let list
+    let content
     if (spaceStore.collection.initialSyncCompleted) {
+        const readOnly = spaceStore.space.role === "readonly"
+
+        const createButton = !readOnly && (
+            <LinkButton style={{ alignSelf: "normal" }} to="/categories/new">
+                Create category
+            </LinkButton>
+        )
+
         const allDocumentsButton = (
             <Button
                 style={{
@@ -193,32 +207,32 @@ const CategoriesView = observer(() => {
             </Button>
         )
 
-        list = (
+        const list = (
+            <Col gap={8} style={{ alignSelf: "stretch" }}>
+                {allDocumentsButton}
+                {publishedButton}
+                <CategoryList
+                    readOnly={readOnly}
+                    categories={spaceStore.categoryTree.nodes}
+                    onDelete={onDelete}
+                    onSelect={(id) => setView({ kind: "category", id })}
+                />
+            </Col>
+        )
+
+        content = (
             <Col gap={8}>
-                <LinkButton
-                    style={{ alignSelf: "normal" }}
-                    to="/categories/new"
-                >
-                    Create category
-                </LinkButton>
-                <Col gap={8} style={{ alignSelf: "stretch" }}>
-                    {allDocumentsButton}
-                    {publishedButton}
-                    <CategoryList
-                        categories={spaceStore.categoryTree.nodes}
-                        onDelete={onDelete}
-                        onSelect={(id) => setView({ kind: "category", id })}
-                    />
-                </Col>
+                {createButton}
+                {list}
             </Col>
         )
     } else {
-        list = "Loading..."
+        content = "Loading..."
     }
 
     return (
         <Container title="Categories" onClose={() => navigate("/")}>
-            {list}
+            {content}
         </Container>
     )
 })

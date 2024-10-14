@@ -1,4 +1,4 @@
-import { reaction, makeObservable, computed, observable } from "mobx"
+import { reaction, makeObservable, computed, observable, autorun } from "mobx"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { v4 as uuidv4 } from "uuid"
 import { without } from "lodash-es"
@@ -159,14 +159,13 @@ class SpaceStore {
     store: UserStore
     collection: Collection<Document | Metadata>
     loadedState: IPromiseBasedObservable<void>
-
     view: SpaceView = { kind: "all" }
-
     documentList: TransformedMap<
         Item<Document | Metadata>,
         DocumentListItemData
     >
     api: Api
+    dispose: () => void
 
     constructor(space: Space, store: UserStore) {
         this.api = store.api
@@ -227,10 +226,21 @@ class SpaceStore {
             viewProps: computed,
             categoryTree: computed
         })
-    }
 
-    dispose() {
-        this.collection.destroy()
+        // React if current category being deleted
+        const disposeAutorun = autorun(() => {
+            if (this.view.kind === "category") {
+                const list = Object.keys(this.meta.categories)
+                if (!list.includes(this.view.id)) {
+                    this.view = { kind: "all" }
+                }
+            }
+        })
+
+        this.dispose = () => {
+            disposeAutorun()
+            this.collection.destroy()
+        }
     }
 
     updateSpace(space: Space) {
