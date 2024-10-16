@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify"
 import { Not, Equal } from "typeorm"
 
+import { SpaceRole } from "../entities"
 import { App } from "../app"
 
 const uploadFileSizeLimit = 20 * 1024 * 1024 // 20Mb
@@ -33,6 +34,25 @@ const spaceLockSchema = {
         action: { type: "string", enum: ["lock", "unlock"] }
     },
     required: ["spaceId", "docId", "action"],
+    additionalProperties: false
+}
+
+const deleteUpdateMemberParamsSchema = {
+    type: "object",
+    properties: {
+        spaceId: { type: "string", format: "uuid" },
+        memberId: { type: "string", format: "uuid" }
+    },
+    required: ["spaceId", "memberId"],
+    additionalProperties: false
+}
+
+const updateMemberBodySchema = {
+    type: "object",
+    properties: {
+        role: { type: "string", enum: ["readonly", "editor", "admin", "owner"] }
+    },
+    required: ["role"],
     additionalProperties: false
 }
 
@@ -152,21 +172,33 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
         }
     )
 
-    fastify.post("/spaces/:id/members/:member/update", () => {
-        // update member of a space (change role)
-        // TODO
-    })
-
-    fastify.post<{ Params: { spaceId: string; userId: string } }>(
-        "/spaces/:spaceId/members/:userId/remove",
+    fastify.post<{
+        Params: { spaceId: string; userId: string }
+        Body: { role: SpaceRole }
+    }>(
+        "/spaces/:spaceId/members/:userId/update",
+        {
+            schema: {
+                params: deleteUpdateMemberParamsSchema,
+                body: updateMemberBodySchema
+            }
+        },
         async (request, reply) => {
             const { spaceId, userId } = request.params
+            const { role } = request.body
 
-            const memberRole = await app.services.spaces.getMemberRole(
-                app.models,
-                { userId, spaceId }
-            )
-            if (memberRole === null) {
+            if (request.token.userId === userId) {
+                reply
+                    .code(500)
+                    .send({ error: { message: "Can't change own role" } })
+                return
+            }
+
+            const member = await app.models.members.findOne({
+                where: { userId, spaceId },
+                select: { id: true, role: true }
+            })
+            if (member === null) {
                 reply.code(500).send({ error: { message: "Member not found" } })
                 return
             }
@@ -175,18 +207,67 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 app.models,
                 { userId: request.token.userId, spaceId }
             )
-            const isPermitted =
-                currentUserRole !== null &&
-                memberRole !== "owner" &&
-                (memberRole === "admin"
-                    ? currentUserRole === "owner"
-                    : ["admin", "owner"].includes(currentUserRole))
+
+            let isPermitted
+            if (currentUserRole === "owner") {
+                isPermitted = true
+            } else if (currentUserRole === "admin") {
+                isPermitted =
+                    !["admin", "owner"].includes(member.role) &&
+                    ["editor", "redaonly"].includes(role)
+            } else {
+                isPermitted = false
+            }
             if (!isPermitted) {
                 reply.code(500).send({ error: { message: "Not permitted" } })
                 return
             }
 
-            await app.models.members.delete({ id: userId })
+            await app.models.members.update(member.id, { role })
+            reply.send({ userId, spaceId, role })
+        }
+    )
+
+    fastify.post<{ Params: { spaceId: string; userId: string } }>(
+        "/spaces/:spaceId/members/:userId/remove",
+        { schema: { params: deleteUpdateMemberParamsSchema } },
+        async (request, reply) => {
+            const { spaceId, userId } = request.params
+
+            if (request.token.userId === userId) {
+                reply
+                    .code(500)
+                    .send({ error: { message: "Can't remove self" } })
+                return
+            }
+
+            const member = await app.models.members.findOne({
+                where: { userId, spaceId },
+                select: { id: true, role: true }
+            })
+            if (member === null) {
+                reply.code(500).send({ error: { message: "Member not found" } })
+                return
+            }
+
+            const currentUserRole = await app.services.spaces.getMemberRole(
+                app.models,
+                { userId: request.token.userId, spaceId }
+            )
+            let isPermitted
+            if (currentUserRole === "owner") {
+                isPermitted = true
+            } else if (currentUserRole === "admin") {
+                isPermitted = ["editor", "readonly"].includes(member.role)
+            } else {
+                isPermitted = false
+            }
+            if (!isPermitted) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            await app.models.members.delete({ id: member.id })
             reply.send({})
         }
     )

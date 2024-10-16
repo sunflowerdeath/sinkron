@@ -5,8 +5,8 @@
     "scripts": {
         "lint": "oxlint src",
         "build": "NODE_ENV=production rspack --config webpack.config.js",
-        "run-client": "NODE_ENV=production node ./build/benchmark_client.js",
-        "run-server": "NODE_ENV=production ENABLE_PROFILING=1 node ./build/benchmark_server.js"
+        "client:start": "NODE_ENV=production node ./build/benchmark_client.js",
+        "server:start": "NODE_ENV=production ENABLE_PROFILING=1 node ./build/benchmark_server.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

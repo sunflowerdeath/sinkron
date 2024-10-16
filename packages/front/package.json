@@ -5,9 +5,11 @@
     "description": "",
     "scripts": {
         "lint": "oxlint src",
-        "start": "rspack serve --config rspack.config.js",
         "build": "NODE_ENV=production rspack --config rspack.config.js",
-        "test": "rspack --config rspack.test.config.js && mocha ./build/test.js"
+        "dev": "rspack serve --config rspack.config.js",
+        "test:build": "rspack --config rspack.test.config.js",
+        "test:run": "mocha ./build/test.js",
+        "test": "pnpm test:build && pnpm test:run"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

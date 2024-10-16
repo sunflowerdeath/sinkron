@@ -5,10 +5,15 @@
     "description": "",
     "scripts": {
         "lint": "oxlint src",
-        "migrate": "typeorm migration:run -d ./build/app-db.js && typeorm migration:run -d ./build/sinkron-db.js",
-        "start": "pnpm migrate && node ./build/main.js",
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
-        "test": "rspack --config=rspack.config.test.js && SINKRON_CONFIG=$(cat config.test.json) mocha ./build/test.js"
+        "migrate:app": "typeorm migration:run -d ./build/app-db.js",
+        "migrate:sinkron": "typeorm migration:run -d ./build/sinkron-db.js",
+        "migrate": "pnpm migrate:app && pnpm migrate:sinkron",
+        "start": "pnpm migrate && node ./build/main.js",
+        "dev": "SINKRON_CONFIG=$(cat ./config.dev.json) pnpm start",
+        "test:build": "rspack --config=rspack.config.test.js",
+        "test:run": "SINKRON_CONFIG=$(cat config.test.json) mocha ./build/test.js",
+        "test": "pnpm test:build && pnpm test:run"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

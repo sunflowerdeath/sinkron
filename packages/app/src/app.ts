@@ -5,7 +5,7 @@ import path from "path"
 
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
 import { DataSource, Repository } from "typeorm"
-import * as Bowser from "bowser"
+import Bowser from "bowser"
 import cors from "@fastify/cors"
 import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
 
@@ -375,12 +375,12 @@ class App {
         fastify.addContentTypeParser(
             "application/octet-stream",
             { parseAs: "buffer" },
-            (req, body, done) => {
+            (_req, body, done) => {
                 done(null, body)
             }
         )
 
-        fastify.setErrorHandler((error, request, reply) => {
+        fastify.setErrorHandler((error, _request, reply) => {
             if (error.validation) {
                 reply.status(422).send({
                     error: {
@@ -396,7 +396,7 @@ class App {
             }
         })
 
-        fastify.get("/", (request, reply) => {
+        fastify.get("/", (_request, reply) => {
             reply.send("Sinkron API")
         })
 

@@ -4,11 +4,15 @@ import { useTitle } from "react-use"
 import { observer } from "mobx-react-lite"
 import { Router, Switch, Route, Redirect } from "wouter"
 import { OrienteProvider } from "oriente"
+import { configure } from "mobx"
 
 import { AuthStore, StoreContext } from "./store"
 import SpaceView from "./views/SpaceView"
 import { LoginView } from "./views/LoginView"
 import CreateSpaceView from "./views/CreateSpaceView"
+
+// Disable mobx strict mode
+configure({ enforceActions: "never" })
 
 const Root = observer(() => {
     const authStore = useMemo(() => {

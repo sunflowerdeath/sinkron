@@ -1,7 +1,6 @@
 import { forwardRef, createElement } from "react"
 import { Link } from "wouter"
 import { omit } from "lodash-es"
-
 import {
     useTaply,
     TapState,
@@ -95,9 +94,10 @@ interface LinkButtonProps extends Omit<ButtonProps, "as"> {
     to: string
 }
 
-const LinkButton = forwardRef((props: LinkButtonProps) => {
+const LinkButton = forwardRef((props: LinkButtonProps, ref) => {
     const { to, ...rest } = props
-    return <Button as={Link} to={to} {...rest} />
+    // @ts-expect-error "to" prop
+    return <Button as={Link} ref={ref} to={to} {...rest} />
 })
 
 export { Button, LinkButton }

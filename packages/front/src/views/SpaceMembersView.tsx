@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { observer } from "mobx-react-lite"
 import { makeAutoObservable } from "mobx"
 import { useLocation } from "wouter"
@@ -8,7 +8,7 @@ import { Col, Row } from "oriente"
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useStore, useSpace, SpaceStore } from "../store"
-import { SpaceRole, SpaceMember, Invite } from "../entities"
+import { SpaceRole, spaceRoleMap, SpaceMember, Invite } from "../entities"
 import {
     Avatar,
     Button,
@@ -19,8 +19,12 @@ import {
     ActionStateView,
     initialActionState,
     useActionState,
-    useStateToast
+    useStateToast,
+    useDialog,
+    Heading,
+    Select
 } from "../ui"
+import ButtonsGrid from "../ui/ButtonsGrid"
 import Container from "../ui/Container"
 
 type SpaceMembersStoreProps = {
@@ -83,7 +87,76 @@ class SpaceMembersStore {
         )
         return state
     }
+
+    updateMember(userId: string, role: SpaceRole) {
+        const state = this.space.updateMember(userId, role)
+        state.then(
+            () => {
+                // update member
+            },
+            (error) => {
+                this.toast.error(<>Couldn't update member: {error.message}</>)
+            }
+        )
+        return state
+    }
 }
+
+interface UpdateRoleDialogProps {
+    membersStore: SpaceMembersStore
+    member: SpaceMember
+    onClose: () => void
+}
+
+const UpdateRoleDialog = observer((props: UpdateRoleDialogProps) => {
+    const { membersStore, member, onClose } = props
+
+    const [role, setRole] = useState<string | undefined>(member.role)
+
+    const [updateState, setUpdateState] = useActionState()
+    const update = () => {
+        setUpdateState(membersStore.updateMember(member.id, role as SpaceRole))
+    }
+
+    const roles: SpaceRole[] =
+        membersStore.space.space.role === "owner"
+            ? ["readonly", "editor", "admin"]
+            : ["readonly", "editor"]
+    const options = roles.map((r) => ({ value: r, label: spaceRoleMap[r] }))
+
+    return (
+        <Col gap={16}>
+            <Heading>Change member role</Heading>
+            <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
+                <Avatar name={member.email} />
+                <Col style={{ flexGrow: 1 }}>
+                    <div>{member.email}</div>
+                    <div style={{ color: "var(--color-secondary)" }}>
+                        {spaceRoleMap[member.role]}
+                    </div>
+                </Col>
+            </Row>
+            <Col gap={8} style={{ alignSelf: "stretch" }}>
+                Role
+                <Select
+                    value={role}
+                    onChange={setRole}
+                    options={options}
+                    placeholder="Select role"
+                />
+            </Col>
+            <ButtonsGrid>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button
+                    onClick={update}
+                    isDisabled={updateState.state === "pending"}
+                >
+                    Change role
+                </Button>
+            </ButtonsGrid>
+        </Col>
+    )
+})
 
 type SpaceMemberListItemProps = {
     member: SpaceMember
@@ -103,11 +176,21 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
     const menu = () => {
         return (
             <>
-                <MenuItem>Change role</MenuItem>
+                <MenuItem onSelect={() => updateDialog.open()}>
+                    Change role
+                </MenuItem>
                 <MenuItem onSelect={remove}>Remove from space</MenuItem>
             </>
         )
     }
+
+    const updateDialog = useDialog((close) => (
+        <UpdateRoleDialog
+            membersStore={store}
+            member={member}
+            onClose={close}
+        />
+    ))
 
     const isCurrentUser = member.id === currentUserId
 
@@ -137,12 +220,13 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
             <Avatar name={member.email} />
             <Col style={{ flexGrow: 1 }}>
                 <div>{member.email}</div>
-                <div style={{ opacity: ".6" }}>
-                    {member.role}
+                <div style={{ color: "var(--color-secondary)" }}>
+                    {spaceRoleMap[member.role]}
                     {isCurrentUser && " (You)"}
                 </div>
             </Col>
             {actionsButton}
+            {updateDialog.render()}
         </Row>
     )
 })
@@ -238,31 +322,6 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
                     store={membersStore}
                 />
             ))}
-            {/*<Row gap={8} style={{ alignSelf: "stretch" }} align="center">
-                <Avatar name="Usernamelonglonglong" />
-                <Col style={{ flexGrow: 1 }}>
-                    <div>Usernamelonglonglong</div>
-                    <div style={{ opacity: ".6" }}>
-                        Guest (Has access to 2 documents)
-                    </div>
-                </Col>
-                <Menu
-                    menu={() => (
-                        <>
-                            <MenuItem>Review and change access</MenuItem>
-                            <MenuItem>Remove from space</MenuItem>
-                        </>
-                    )}
-                    placement={{ align: "end", offset: 8 }}
-                >
-                    {(ref, { open }) => (
-                        <Button ref={ref} onClick={open}>
-                            <Icon svg={expandMoreSvg} />
-                        </Button>
-                    )}
-                </Menu>
-            </Row>
-            */}
         </Col>
     )
 })

@@ -4,18 +4,17 @@
     "description": "",
     "scripts": {
         "lint": "pnpm -r lint",
-        "build-app": "pnpm --F=sinkron-app... build",
-        "start-app-prod": "cd packages/app && pnpm start",
-        "start-app-dev": "pnpm build-app && cd packages/app && SINKRON_CONFIG=$(cat config.dev.json) pnpm start",
-        "build-front": "pnpm --F=sinkron-front... build",
-        "start-front": "cd packages/front && pnpm start",
+        "app:build": "pnpm --F=sinkron-app... build",
+        "app:start": "pnpm --F=sinkron-app start",
+        "app:dev": "pnpm app:build && pnpm --F=sinkron-app dev",
+        "front:build": "pnpm --F=sinkron-front... build",
+        "front:dev": "pnpm --F=sinkron-front dev",
         "test": "pnpm -r run test"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "packageManager": "pnpm@9.12.1+sha256.91452fdfa46234ae447d46d5c4fc4e7e0a7058f90495c4b6f77f8beebbb154e3",
     "devDependencies": {
-        "globals": "^14.0.0",
         "oxlint": "^0.9.10",
         "prettier": "^2.8.8",
         "typescript": "^5.6.3"

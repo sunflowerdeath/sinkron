@@ -4,6 +4,7 @@ import { fromPromise } from "mobx-utils"
 import { ConnectionStatus } from "sinkron-client"
 import { Col, Row, useModal } from "oriente"
 
+import { spaceRoleMap } from "~/entities"
 import numForm from "~/utils/numForm"
 import {
     Modal,
@@ -18,18 +19,12 @@ import ButtonsGrid from "~/ui/ButtonsGrid"
 import Container from "~/ui/Container"
 import { useStore, useSpace } from "~/store"
 
-const statusMap = {
+const statusMap: { [key in ConnectionStatus]: string } = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",
     [ConnectionStatus.Connected]: "Connecting...",
     [ConnectionStatus.Sync]: "Receiving changes...",
-    [ConnectionStatus.Ready]: "Connected to server"
-}
-
-const roleMap = {
-    readonly: "Read-only",
-    editor: "Editor",
-    admin: "Admin",
-    owner: "Owner"
+    [ConnectionStatus.Ready]: "Connected to server",
+    [ConnectionStatus.Error]: "Connection error"
 }
 
 const AccountAndSpaceView = observer(() => {
@@ -112,7 +107,7 @@ const AccountAndSpaceView = observer(() => {
                                 one: "member",
                                 many: "members"
                             })}{" "}
-                            &ndash; {roleMap[role]}
+                            &ndash; {spaceRoleMap[role]}
                         </div>
                     </Col>
                 </Row>

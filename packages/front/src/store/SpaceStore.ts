@@ -13,7 +13,7 @@ import { compareDesc } from "date-fns"
 import { Node, Path } from "slate"
 
 import env from "~/env"
-import { Space, Document, Category, Metadata } from "~/entities"
+import { Space, SpaceRole, Document, Category, Metadata } from "~/entities"
 import { toAutomerge, AutomergeNode } from "~/slate"
 import { Api } from "~/api"
 import { TransformedMap } from "~/utils/transformedMap"
@@ -425,6 +425,16 @@ class SpaceStore {
                 method: "POST",
                 url: "/invites/new",
                 data: { spaceId: this.space.id, toEmail, role }
+            })
+        )
+    }
+
+    updateMember(userId: string, role: SpaceRole) {
+        return fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/members/${userId}/update`,
+                data: { role }
             })
         )
     }

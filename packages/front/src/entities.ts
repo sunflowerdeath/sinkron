@@ -11,6 +11,13 @@ export interface Space {
 
 export type SpaceRole = "readonly" | "editor" | "admin" | "owner"
 
+export const spaceRoleMap: { [key in SpaceRole]: string } = {
+    editor: "Editor",
+    readonly: "Read-only",
+    admin: "Admin",
+    owner: "Owner"
+}
+
 export type InviteStatus =
     | "sent"
     | "cancelled"
@@ -30,9 +37,9 @@ export type Invite = {
 }
 
 export type SpaceMember = {
-    role: string
-    email: string
     id: string
+    email: string
+    role: SpaceRole 
 }
 
 export type Credentials = {

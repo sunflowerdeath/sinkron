@@ -6,8 +6,8 @@
     "build": {
         "beforeDevCommand": "cd ../front && TAURI=1 pnpm start",
         "devUrl": "http://localhost:1337",
-        "beforeBuildCommand": "cd ../front && TAURI=1 pnpm tauri-build",
-        "frontendDist": "../app/build"
+        "beforeBuildCommand": "cd ../front && TAURI=1 pnpm build",
+        "frontendDist": "../../front/build"
     },
     "app": {
         "withGlobalTauri": true,
