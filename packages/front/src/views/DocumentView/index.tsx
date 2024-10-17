@@ -352,7 +352,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     position: "absolute",
                     top: 0,
                     left: 0,
-                    height: "100dvh",
+                    height: env.tauri ? "100vh" : "100dvh",
                     width: "100%",
                     background: "var(--color-background)",
                     overflow: "scroll"
@@ -387,7 +387,13 @@ const EditorView = observer((props: EditorViewProps) => {
     )
 
     const content = (
-        <Col align="stretch" style={{ height: "100dvh", position: "relative" }}>
+        <Col
+            align="stretch"
+            style={{
+                height: env.tauri ? "100vh" : "100dvh",
+                position: "relative"
+            }}
+        >
             {topBar}
             <div style={{ flexGrow: 1, overflow: "auto" }}>{editorElem}</div>
             {bottomElem}

@@ -13,6 +13,7 @@ import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirecto
 import { useStore, useSpace } from "../store"
 import type { DocumentListItemData } from "../store/SpaceStore"
 import { Avatar, Button, LinkButton, Icon, ActionStateView } from "../ui"
+import env from "~/env"
 
 interface DocumentListCategoryItemProps {
     name: string
@@ -276,7 +277,13 @@ const DocumentListView = observer(() => {
     )
 
     return (
-        <Col style={{ alignItems: "stretch", height: "100dvh" }} gap={8}>
+        <Col
+            style={{
+                alignItems: "stretch",
+                height: env.tauri ? "100vh" : "100dvh"
+            }}
+            gap={8}
+        >
             {topBar}
             {list}
             {bottomBar}

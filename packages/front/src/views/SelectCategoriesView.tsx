@@ -133,6 +133,7 @@ const SelectCategoriesView = (props: SelectCategoriesViewProps) => {
         <Container
             title="Select categories"
             onClose={onClose}
+            style={{ height: "100%" }}
             styles={{ content: { paddingBottom: 0 } }}
         >
             <LinkButton to="/categories">Manage categories</LinkButton>

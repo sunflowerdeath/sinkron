@@ -16,19 +16,29 @@ const rules = [
         use: [
             {
                 loader: "esbuild-loader",
-                options: { loader: "jsx", jsx: "automatic" }
+                options: { loader: "jsx", jsx: "automatic", target: "es6" }
             }
         ]
     },
     {
         test: /\.ts$/,
         include: [src],
-        use: [{ loader: "esbuild-loader", options: { loader: "ts" } }]
+        use: [
+            {
+                loader: "esbuild-loader",
+                options: { loader: "ts", target: "es6" }
+            }
+        ]
     },
     {
         test: /\.tsx$/,
         include: [src],
-        use: [{ loader: "esbuild-loader", options: { loader: "tsx" } }]
+        use: [
+            {
+                loader: "esbuild-loader",
+                options: { loader: "tsx", target: "es6" }
+            }
+        ]
     },
     {
         test: /\.svg$/i,
