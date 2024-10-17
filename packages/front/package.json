@@ -32,6 +32,7 @@
         "@maskito/react": "^2.5.0",
         "@material-design-icons/svg": "^0.14.13",
         "ajv": "^8.17.1",
+        "core-js": "^3.38.1",
         "date-fns": "^2.30.0",
         "lodash-es": "^4.17.21",
         "mobx": "^6.13.3",

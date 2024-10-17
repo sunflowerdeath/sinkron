@@ -1,3 +1,5 @@
+import 'core-js/stable'
+
 import { useMemo } from "react"
 import { createRoot } from "react-dom/client"
 import { useTitle } from "react-use"

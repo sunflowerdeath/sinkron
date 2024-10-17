@@ -369,7 +369,12 @@ const EditorView = observer((props: EditorViewProps) => {
                 <Icon svg={arrowBackSvg} />
             </LinkButton>
             <Row gap={8}>
-                <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
+                <Button
+                    onClick={() => setShowToolbar((v) => !v)}
+                    preventFocusSteal
+                >
+                    A
+                </Button>
                 {menuButton}
             </Row>
         </Row>

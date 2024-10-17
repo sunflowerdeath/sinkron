@@ -11,22 +11,21 @@ const src = path.resolve(__dirname, "src")
 
 const rules = [
     {
-        test: /\.(js|jsx)$/,
-        include: [src],
-        use: [
-            {
-                loader: "esbuild-loader",
-                options: { loader: "jsx", jsx: "automatic", target: "es6" }
-            }
-        ]
-    },
-    {
         test: /\.ts$/,
         include: [src],
         use: [
             {
-                loader: "esbuild-loader",
-                options: { loader: "ts", target: "es6" }
+                loader: "builtin:swc-loader",
+                options: {
+                    env: {
+                        targets: "Chrome >= 91",
+                        mode: "entry",
+                        coreJs: "3.38"
+                    },
+                    jsc: {
+                        parser: { syntax: "typescript" }
+                    }
+                }
             }
         ]
     },
@@ -35,8 +34,18 @@ const rules = [
         include: [src],
         use: [
             {
-                loader: "esbuild-loader",
-                options: { loader: "tsx", target: "es6" }
+                loader: "builtin:swc-loader",
+                options: {
+                    env: {
+                        targets: "Chrome >= 91",
+                        mode: "entry",
+                        coreJs: "3.38"
+                    },
+                    jsc: {
+                        parser: { syntax: "typescript", jsx: true },
+                        transform: { react: { runtime: "automatic" } }
+                    }
+                }
             }
         ]
     },
@@ -112,13 +121,6 @@ module.exports = {
                 { from: /^\/posts/, to: "/post.html" }
             ]
         },
-        proxy: [
-            {
-                context: "/api",
-                target: "http://localhost:80",
-                pathRewrite: { "^/api": "" }
-            }
-        ],
         client: {
             overlay: {
                 errors: true,
