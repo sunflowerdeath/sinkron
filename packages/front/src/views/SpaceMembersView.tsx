@@ -53,22 +53,6 @@ class SpaceMembersStore {
         })
     }
 
-    removeMember(member: SpaceMember) {
-        const { id, email } = member
-        const state = this.space.removeMember(member.id)
-        state.then(
-            () => {
-                const idx = this.members.findIndex((m) => m.id === id)
-                this.members.splice(idx, 1)
-                this.toast.success(<>Member {email} is removed from space</>)
-            },
-            (error) => {
-                this.toast.error(<>Can't remove member: {error.message}</>)
-            }
-        )
-        return state
-    }
-
     cancelInvite(invite: Invite) {
         const state = this.space.cancelInvite(invite.id)
         state.then(
@@ -88,11 +72,30 @@ class SpaceMembersStore {
         return state
     }
 
+    removeMember(member: SpaceMember) {
+        const { id, email } = member
+        const state = this.space.removeMember(member.id)
+        state.then(
+            () => {
+                const idx = this.members.findIndex((m) => m.id === id)
+                this.members.splice(idx, 1)
+                this.toast.success(
+                    <>Member "{email}" has been removed from the space</>
+                )
+            },
+            (error) => {
+                this.toast.error(<>Couldn't remove member: {error.message}</>)
+            }
+        )
+        return state
+    }
+
     updateMember(userId: string, role: SpaceRole) {
         const state = this.space.updateMember(userId, role)
         state.then(
             () => {
-                // update member
+                const member = this.members.find((m) => m.id === userId)
+                if (member !== undefined) member.role = role
             },
             (error) => {
                 this.toast.error(<>Couldn't update member: {error.message}</>)
@@ -115,7 +118,9 @@ const UpdateRoleDialog = observer((props: UpdateRoleDialogProps) => {
 
     const [updateState, setUpdateState] = useActionState()
     const update = () => {
-        setUpdateState(membersStore.updateMember(member.id, role as SpaceRole))
+        const state = membersStore.updateMember(member.id, role as SpaceRole)
+        setUpdateState(state)
+        state.then(onClose)
     }
 
     const roles: SpaceRole[] =

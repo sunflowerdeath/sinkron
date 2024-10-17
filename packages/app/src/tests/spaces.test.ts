@@ -162,4 +162,63 @@ describe("Spaces", () => {
             "is unlocked"
         )
     })
+
+    it("members update / remove", async () => {
+        // create space
+        const res = await app.fastify.inject({
+            method: "POST",
+            url: "/spaces/new",
+            headers,
+            payload: { name: "test" }
+        })
+        assert.strictEqual(res.statusCode, 200, "create space")
+        const space = JSON.parse(res.payload)
+
+        const createUserRes = await app.services.users.create(
+            app.models,
+            "user@sinkron.xyz"
+        )
+        assert(createUserRes.isOk, "create user")
+        const memberUser = createUserRes.value
+
+        await app.services.spaces.addMember(app.models, {
+            userId: memberUser.id,
+            spaceId: space.id,
+            role: "admin"
+        })
+
+        // update role
+        const updateRoleResSelf = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/members/${user!.id}/update`,
+            headers,
+            payload: { role: "readonly" }
+        })
+        assert.notStrictEqual(updateRoleResSelf.statusCode, 200, "update self")
+
+        const updateRoleRes = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/members/${memberUser.id}/update`,
+            headers,
+            payload: { role: "readonly" }
+        })
+        assert.strictEqual(updateRoleRes.statusCode, 200, "update")
+        const updated = JSON.parse(updateRoleRes.payload)
+        assert.strictEqual(updated.role, "readonly", "update")
+
+        // remove member
+        const removeResSelf = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/members/${user!.id}/remove`,
+            headers
+        })
+        assert.notStrictEqual(removeResSelf.statusCode, 200, "remove self")
+
+        const removeRes = await app.fastify.inject({
+            method: "POST",
+            url: `/spaces/${space.id}/members/${memberUser.id}/remove`,
+            headers
+        })
+        assert.strictEqual(removeRes.statusCode, 200, "remove")
+    })
 })

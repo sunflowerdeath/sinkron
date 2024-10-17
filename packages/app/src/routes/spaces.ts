@@ -41,9 +41,9 @@ const deleteUpdateMemberParamsSchema = {
     type: "object",
     properties: {
         spaceId: { type: "string", format: "uuid" },
-        memberId: { type: "string", format: "uuid" }
+        userId: { type: "string", format: "uuid" }
     },
-    required: ["spaceId", "memberId"],
+    required: ["spaceId", "userId"],
     additionalProperties: false
 }
 
@@ -214,7 +214,7 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             } else if (currentUserRole === "admin") {
                 isPermitted =
                     !["admin", "owner"].includes(member.role) &&
-                    ["editor", "redaonly"].includes(role)
+                    ["editor", "readonly"].includes(role)
             } else {
                 isPermitted = false
             }
@@ -223,8 +223,16 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 return
             }
 
-            await app.models.members.update(member.id, { role })
-            reply.send({ userId, spaceId, role })
+            const res = await app.services.spaces.changeMemberRole({
+                spaceId,
+                userId,
+                role
+            })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+            reply.send(res.value)
         }
     )
 
@@ -267,7 +275,14 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 return
             }
 
-            await app.models.members.delete({ id: member.id })
+            const res = await app.services.spaces.removeMember({
+                spaceId,
+                userId
+            })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
             reply.send({})
         }
     )

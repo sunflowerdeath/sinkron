@@ -171,8 +171,7 @@ class SpaceService {
             relations: { user: true },
             select: { user: { id: true, email: true }, role: true }
         })
-        const members = res.map((m) => ({ role: m.role, ...m.user }))
-        return members
+        return res.map((m) => ({ role: m.role, ...m.user }))
     }
 
     async addMember(models: AppModels, props: AddMemberProps) {
@@ -205,6 +204,79 @@ class SpaceService {
         const { spaceId, userId, roles } = props
         const role = await this.getMemberRole(models, { spaceId, userId })
         return role !== null && roles.includes(role)
+    }
+
+    async getMember(props: {
+        spaceId: string
+        userId: string
+    }): Promise<SpaceMemberView | null> {
+        const { userId, spaceId } = props
+        const member = await this.app.models.members.findOne({
+            where: { userId, spaceId },
+            relations: { user: true },
+            select: { id: true, role: true, user: { id: true, email: true } }
+        })
+        if (member === null) return null
+        return { role: member.role, id: userId, email: member.user.email }
+    }
+
+    async changeMemberRole(props: {
+        spaceId: string
+        userId: string
+        role: SpaceRole
+    }): Promise<ResultType<SpaceMemberView, RequestError>> {
+        const { spaceId, userId, role } = props
+        const member = await this.getMember({ spaceId, userId })
+        if (member === null) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "Member not found"
+            })
+        }
+        if (member.role === role) {
+            return Result.err({
+                code: ErrorCode.InvalidRequest,
+                message: "Current and new roles are the same"
+            })
+        }
+
+        const readonlyGroup = `spaces/${spaceId}/readonly`
+        const membersGroup = `spaces/${spaceId}/members`
+        if (member.role === "readonly") {
+            await this.app.sinkron.addMemberToGroup(userId, readonlyGroup)
+            await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
+        } else if (role === "readonly") {
+            await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
+            await this.app.sinkron.addMemberToGroup(userId, membersGroup)
+        }
+        await this.app.models.members.update({ spaceId, userId }, { role })
+
+        return Result.ok({ ...member, role })
+    }
+
+    async removeMember(props: {
+        spaceId: string
+        userId: string
+    }): Promise<ResultType<true, RequestError>> {
+        const { spaceId, userId } = props
+
+        const res = await this.app.models.members.delete({
+            spaceId,
+            userId
+        })
+        if (res.affected === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "Member not found"
+            })
+        }
+
+        const readonlyGroup = `spaces/${spaceId}/readonly`
+        const membersGroup = `spaces/${spaceId}/members`
+        await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
+        await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
+
+        return Result.ok(true)
     }
 
     async getUserSpace(
