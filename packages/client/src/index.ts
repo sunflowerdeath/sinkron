@@ -385,7 +385,8 @@ class Collection<T extends object> {
             store: false,
             logger: false,
             backupQueue: false,
-            flushQueue: false
+            flushQueue: false,
+            flushDebounced: false
         })
         this.flushDebounced = debounce(this.flush.bind(this), flushDelay, {
             maxWait: flushMaxWait

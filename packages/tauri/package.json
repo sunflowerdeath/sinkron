@@ -5,7 +5,10 @@
     "type": "module",
     "scripts": {
         "start": "tauri dev",
-        "build": "tauri build"
+        "macos:build": "tauri build --target aarch64-apple-darwin",
+        "macos:build:debug": "tauri build --target aarch64-apple-darwin --debug",
+        "android:dev": "tauri android dev",
+        "android:build": "tauri android build --split-per-abi --target aarch64 --apk"
     },
     "dependencies": {
         "@tauri-apps/api": "^2.0.2"
