@@ -6,16 +6,15 @@ const src = path.resolve(__dirname, "src")
 
 const rules = [
     {
-        test: /\.js$/,
-        include: [src],
-        use: [{ loader: "esbuild-loader" }]
-    },
-    {
         test: /\.ts$/,
         include: [src],
         use: [
-            { loader: "esbuild-loader", options: { loader: "ts" } },
-            { loader: "ts-loader" }
+            {
+                loader: "builtin:swc-loader",
+                options: {
+                    jsc: { parser: { syntax: "typescript" } }
+                }
+            }
         ]
     }
 ]

@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -9,7 +9,7 @@ RUN rm -rf packages/client
 RUN rm -rf packages/front
 RUN rm -rf packages/tauri
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm run app:build
+RUN node --run app:build
 WORKDIR /app
 EXPOSE 80
-CMD ["pnpm", "app:start"]
+CMD node --run app:start

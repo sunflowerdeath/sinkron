@@ -9,10 +9,11 @@
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "isolatedModules": true,
+        "skipLibCheck": true,
 
         "declaration": true,
         "declarationDir": "./types",
-        // "emitDeclarationOnly": true,
+        "emitDeclarationOnly": true,
 
         "noImplicitAny": true,
         "noImplicitReturns": true,

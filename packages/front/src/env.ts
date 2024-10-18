@@ -1,5 +1,4 @@
-// @ts-expect-error webpack var
-const isProductionEnv = IS_PRODUCTION
+const isProductionEnv = process.env.NODE_ENV === "production"
 
 const tauri = window.location.hostname === "tauri.localhost"
 

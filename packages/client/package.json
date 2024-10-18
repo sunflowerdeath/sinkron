@@ -7,20 +7,15 @@
     "types": "types/index.d.ts",
     "scripts": {
         "lint": "oxlint -c ./oxlintrc.json src",
-        "build-rspack": "NODE_ENV=production rspack --config rspack.config.js",
-        "build": "NODE_ENV=production webpack --config rspack.config.js"
+        "build": "tsc && NODE_ENV=production rspack --config rspack.config.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
-        "@rspack/cli": "^1.0.8",
-        "@rspack/core": "^1.0.8",
+        "@rspack/cli": "^1.0.13",
+        "@rspack/core": "^1.0.13",
         "@types/lodash-es": "^4.17.12",
-        "@types/uuid": "^9.0.8",
-        "esbuild-loader": "^4.2.2",
-        "ts-loader": "^9.5.1",
-        "webpack": "^5.95.0",
-        "webpack-cli": "^4.10.0"
+        "@types/uuid": "^9.0.8"
     },
     "dependencies": {
         "@automerge/automerge": "^2.2.8",

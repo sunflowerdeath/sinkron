@@ -11,12 +11,11 @@
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
-        "@rspack/cli": "^1.0.8",
-        "@rspack/core": "^1.0.8",
+        "@rspack/cli": "^1.0.13",
+        "@rspack/core": "^1.0.13",
         "@types/lodash": "^4.14.202",
         "@types/node": "^18.11.9",
         "@types/ws": "^8.5.7",
-        "esbuild-loader": "^4.1.0",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {

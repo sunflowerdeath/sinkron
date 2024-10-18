@@ -294,27 +294,9 @@ const EditorView = observer((props: EditorViewProps) => {
                     flexGrow: 1,
                     maxWidth: 800,
                     boxSizing: "border-box",
-                    overflow: "auto",
+                    overflow: "auto"
                 }}
                 autoFocus={!isMobile}
-                // placeholder="Empty document"
-                renderPlaceholder={({ children, attributes }) => {
-                    return (
-                        <div
-                            {...attributes}
-                            style={{
-                                opacity: 0.4,
-                                position: "absolute",
-                                top: 20,
-                                left: isMobile ? 10 : 40,
-                                pointerEvents: "none",
-                                userSelect: "none"
-                            }}
-                        >
-                            {children}
-                        </div>
-                    )
-                }}
             />
         </ErrorBoundary>
     )

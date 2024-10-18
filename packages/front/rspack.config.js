@@ -5,10 +5,11 @@ const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 
 const isProduction = process.env.NODE_ENV === "production"
-const isTauriApp = process.env.TAURI === "1"
+const isTauri = process.env.TAURI === "1"
 
 const src = path.resolve(__dirname, "src")
 
+const targets = "Chrome >= 91, iOS >= 15, Firefox >= 115"
 const rules = [
     {
         test: /\.ts$/,
@@ -17,14 +18,8 @@ const rules = [
             {
                 loader: "builtin:swc-loader",
                 options: {
-                    env: {
-                        targets: "Chrome >= 91",
-                        mode: "entry",
-                        coreJs: "3.38"
-                    },
-                    jsc: {
-                        parser: { syntax: "typescript" }
-                    }
+                    env: { targets, mode: "entry", coreJs: "3.38" },
+                    jsc: { parser: { syntax: "typescript" } }
                 }
             }
         ]
@@ -36,11 +31,7 @@ const rules = [
             {
                 loader: "builtin:swc-loader",
                 options: {
-                    env: {
-                        targets: "Chrome >= 91",
-                        mode: "entry",
-                        coreJs: "3.38"
-                    },
+                    env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: {
                         parser: { syntax: "typescript", jsx: true },
                         transform: { react: { runtime: "automatic" } }
@@ -63,8 +54,6 @@ const rules = [
 
 const plugins = [
     new DefinePlugin({
-        IS_PRODUCTION: isProduction,
-        IS_TAURI: isTauriApp,
         // bug in rspack@1.0.0 mode=production not working
         // set mode to "none" and define manually
         "process.env.NODE_ENV": isProduction ? '"production"' : '"development"'
@@ -94,10 +83,10 @@ module.exports = {
     output: {
         clean: true,
         path: path.resolve(__dirname, "./build"),
-        publicPath: isTauriApp ? "/" : isProduction ? "/static/" : "/",
+        publicPath: isTauri ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[fullhash].js"
     },
-    mode: "none",
+    mode: "none", //isProduction ? "production" : "development", // "none",
     optimization: {
         minimize: false // isProduction
     },

@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -9,7 +9,7 @@ RUN rm -rf packages/benchmark
 RUN rm -rf packages/sinkron
 RUN rm -rf packages/tauri
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm run front:build
+RUN node --run front:build
 
 FROM nginx:alpine
 ENV STATIC_FILES_URL="/static"

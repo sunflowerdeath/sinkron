@@ -14,6 +14,21 @@ const base = {
     optimization: { minimize: false }
 }
 
+const rules = [
+    {
+        test: /\.ts$/,
+        include: [src],
+        use: [
+            {
+                loader: "builtin:swc-loader",
+                options: {
+                    jsc: { parser: { syntax: "typescript" } }
+                }
+            }
+        ]
+    }
+]
+
 const node = {
     ...base,
     entry: {
@@ -24,20 +39,7 @@ const node = {
         filename: "main.js",
         library: { type: "commonjs" }
     },
-    module: {
-        rules: [
-            {
-                test: /\.js$/,
-                include: [src],
-                use: [{ loader: "esbuild-loader" }]
-            },
-            {
-                test: /\.ts$/,
-                include: [src],
-                use: [{ loader: "esbuild-loader", options: { loader: "ts" } }]
-            }
-        ]
-    }
+    module: { rules }
     // target: "node"
 }
 
@@ -52,23 +54,7 @@ const browser = {
         library: { type: "module" }
     },
     target: "web",
-    module: {
-        rules: [
-            {
-                test: /\.js$/,
-                include: [src],
-                use: [{ loader: "esbuild-loader" }]
-            },
-            {
-                test: /\.ts$/,
-                include: [src],
-                use: [
-                    { loader: "esbuild-loader", options: { loader: "ts" } },
-                    { loader: "ts-loader" }
-                ]
-            }
-        ]
-    }
+    module: { rules }
 }
 
 module.exports = [node, browser]
