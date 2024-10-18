@@ -34,7 +34,7 @@ const createDataSource = (config: DbConfig) => {
     if (config.type === "sqlite") {
         const { database, synchronize, dropSchema } = config
         return new DataSource({
-            type: "better-sqlite3",
+            type: "sqlite",
             database,
             synchronize,
             dropSchema,
