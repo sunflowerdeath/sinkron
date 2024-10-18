@@ -28,10 +28,10 @@ const createSinkronEditor = (props: CreateEditorProps): ReactEditor => {
     editor.insertData = (data) => {
         const { files } = data
         if (files && files.length > 0) {
-            for (const file of files) {
+            Array.from(files).map((file) => {
                 const [mime] = file.type.split("/")
                 if (mime === "image") props.uploadImage(file)
-            }
+            })
         } else {
             insertData(data)
         }

@@ -47,8 +47,8 @@
         "react-image": "^4.1.0",
         "react-use": "^17.5.1",
         "sinkron-client": "workspace:*",
-        "slate": "^0.103.0",
-        "slate-react": "^0.110.1",
+        "slate": "^0.110.2",
+        "slate-react": "^0.110.2",
         "uuid": "^9.0.1",
         "wouter": "^3.3.5"
     }

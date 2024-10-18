@@ -11,7 +11,7 @@ import {
     RenderElementProps,
     RenderLeafProps
 } from "slate-react"
-import { Row, Col } from "oriente"
+import { Row } from "oriente"
 import { without, isEqual } from "lodash-es"
 import * as Automerge from "@automerge/automerge"
 import { Transforms } from "slate"
@@ -392,18 +392,27 @@ const EditorView = observer((props: EditorViewProps) => {
     )
 
     const content = (
-        <Col
-            align="stretch"
-            style={{
-                height: env.tauri ? "100vh" : "100dvh",
-                position: "relative"
-            }}
-        >
-            {topBar}
-            <div style={{ flexGrow: 1, overflow: "auto" }}>{editorElem}</div>
-            {bottomElem}
+        <div style={{ position: "relative" }}>
+            <div
+                style={{
+                    flexGrow: 1,
+                    overflow: "auto",
+                    height: env.tauri ? "100vh" : "100dvh",
+                    boxSizing: "border-box",
+                    marginBottom: 68,
+                    paddingTop: isMobile ? 68 : 0
+                }}
+            >
+                {editorElem}
+            </div>
+            <div style={{ position: "absolute", top: 0, width: "100%" }}>
+                {topBar}
+            </div>
+            <div style={{ position: "absolute", bottom: 0, width: "100%" }}>
+                {bottomElem}
+            </div>
             {viewElem}
-        </Col>
+        </div>
     )
 
     return (
