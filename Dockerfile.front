@@ -8,7 +8,7 @@ RUN rm -rf packages/app
 RUN rm -rf packages/benchmark
 RUN rm -rf packages/sinkron
 RUN rm -rf packages/tauri
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=node22pnpm9,target=/pnpm/store pnpm install --frozen-lockfile
 RUN node --run front:build
 
 FROM nginx:alpine

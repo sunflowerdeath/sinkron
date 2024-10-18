@@ -8,7 +8,7 @@ RUN rm -rf packages/benchmark
 RUN rm -rf packages/client
 RUN rm -rf packages/front
 RUN rm -rf packages/tauri
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=node22pnpm9,target=/pnpm/store pnpm install --frozen-lockfile
 RUN node --run app:build
 WORKDIR /app
 EXPOSE 80
