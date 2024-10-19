@@ -242,14 +242,18 @@ class SpaceService {
 
         const readonlyGroup = `spaces/${spaceId}/readonly`
         const membersGroup = `spaces/${spaceId}/members`
-        if (member.role === "readonly") {
+        if (member.role !== "readonly" && role === "readonly") {
+            // become readonly
             await this.app.sinkron.addMemberToGroup(userId, readonlyGroup)
             await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
-        } else if (role === "readonly") {
+        } else if (member.role === "readonly" && role !== "readonly") {
+            // become not readony
             await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
             await this.app.sinkron.addMemberToGroup(userId, membersGroup)
         }
         await this.app.models.members.update({ spaceId, userId }, { role })
+
+        this.app.channels.send(`users/${userId}`, "profile")
 
         return Result.ok({ ...member, role })
     }
@@ -275,6 +279,8 @@ class SpaceService {
         const membersGroup = `spaces/${spaceId}/members`
         await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
         await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
+
+        this.app.channels.send(`users/${userId}`, "profile")
 
         return Result.ok(true)
     }

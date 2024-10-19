@@ -82,6 +82,9 @@ class UserStore {
                 if (msg === "notification") {
                     this.user.hasUnreadNotifications = true
                 }
+                if (msg === "profile") {
+                    this.fetchUser()
+                }
             }
         })
     }
@@ -106,6 +109,7 @@ class UserStore {
     }
 
     fetchUser() {
+        this.stopFetchUser?.()
         this.stopFetchUser = autoRetry(async (retry) => {
             console.log("Fetching user...")
             let user
@@ -119,7 +123,7 @@ class UserStore {
                     console.log("Fetch user error")
                     this.logout()
                 } else {
-                    console.log("FetchError user error, will retry")
+                    console.log("Couldn't fetch user, will retry")
                     retry()
                 }
                 return
