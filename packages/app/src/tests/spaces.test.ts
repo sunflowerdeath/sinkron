@@ -22,7 +22,7 @@ describe("Spaces", () => {
             app.models,
             "test@sinkron.xyz"
         )
-        assert(res.isOk)
+        assert(res.isOk, "user")
         user = res.value
 
         /*
@@ -37,7 +37,7 @@ describe("Spaces", () => {
         const tokenRes = await app.services.auth.issueAuthToken(app.models, {
             userId: user.id
         })
-        assert(tokenRes.isOk)
+        assert(tokenRes.isOk, "token")
         headers = { "x-sinkron-auth-token": tokenRes.value.token }
     })
 

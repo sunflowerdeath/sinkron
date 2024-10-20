@@ -156,11 +156,9 @@ class AuthService {
     }
 
     async #deleteExpiredTokens(models: AppModels, userId: string) {
-        const now =
-            this.app.config.db.type === "postgres" ? "NOW()" : "TIME('now')"
         await models.tokens.delete({
             userId,
-            expiresAt: Raw((f) => `${f} IS NOT NULL AND ${f} < ${now}`)
+            expiresAt: Raw((f) => `${f} IS NOT NULL AND ${f} < NOW()`)
         })
     }
 

@@ -1,14 +1,22 @@
 {
     "db": {
-        "type": "sqlite",
-        "database": ":memory:",
-        "synchronize": true
+        "host": "localhost",
+        "port": 5002,
+        "username": "user",
+        "password": "password",
+        "database": "sinkron_app",
+        "synchronize": true,
+        "dropSchema": true
     },
     "sinkron": {
         "db": {
-            "type": "sqlite",
-            "database": ":memory:",
-            "synchronize": true
+            "host": "localhost",
+            "port": 5001,
+            "username": "user",
+            "password": "password",
+            "database": "sinkron",
+            "synchronize": true,
+            "dropSchema": true
         }
     },
     "mail": {

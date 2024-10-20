@@ -8,8 +8,9 @@
         "lint": "oxlint -c ./oxlintrc.json src",
         "build": "tsc && NODE_ENV=production rspack --config rspack.config.js",
         "test:build": "rspack --config rspack.test.config.js",
+        "test:db": "docker compose -f ./postgres-compose.yml up -d --force-recreate",
         "test:run": "mocha ./build/test.js",
-        "test": "pnpm test:build && pnpm test:run"
+        "test": "pnpm test:db && pnpm test:build && pnpm test:run"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
@@ -21,10 +22,8 @@
         "@types/node": "^18.19.55",
         "@types/uuid": "^9.0.8",
         "@types/ws": "^8.5.12",
-        "mkdirp": "^3.0.1",
         "mocha": "^10.7.3",
         "sinkron-protocol": "workspace:*",
-        "sqlite3": "^5.1.7",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
