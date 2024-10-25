@@ -1,0 +1,15 @@
+[package]
+name = "rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7.7"
+base64 = "0.22.1"
+bb8 = "0.8.6"
+chrono = { version = "0.4.38", features = ["serde"] }
+diesel = { version = "2.2.4", features = ["uuid", "chrono"] }
+diesel-async = { version = "0.5", features = ["postgres", "bb8"] }
+serde = { version = "1.0.213", features = ["derive"] }
+tokio = { version = "1.41.0", features = ["rt-multi-thread"] } 
+uuid = { version = "1.11.0", features = ["serde"] }
