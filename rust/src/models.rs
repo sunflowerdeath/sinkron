@@ -23,6 +23,7 @@ pub struct NewCollection {
 
 #[derive(serde::Serialize, Selectable, Queryable)]
 #[diesel(table_name = schema::documents)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Document {
     pub id: uuid::Uuid,
     pub created_at: chrono::DateTime<chrono::Utc>,
