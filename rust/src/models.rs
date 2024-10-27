@@ -45,6 +45,13 @@ pub struct NewDocument {
     pub permissions: String,
 }
 
+#[derive(AsChangeset)]
+#[diesel(table_name = schema::documents)]
+pub struct DocumentUpdate<'a> {
+    pub colrev: i64,
+    pub data: &'a[u8],
+}
+
 #[derive(serde::Serialize, Selectable, Queryable)]
 #[diesel(table_name = schema::refs)]
 #[diesel(check_for_backend(diesel::pg::Pg))]

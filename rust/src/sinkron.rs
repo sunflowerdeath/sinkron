@@ -1,20 +1,7 @@
-use crate::models;
-use crate::protocol::*;
-use crate::schema;
+use crate::{models, protocol::*, schema};
 
-use base64::prelude::*;
-use diesel::prelude::*;
-use diesel_async::{
-    pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection,
-    RunQueryDsl,
-};
-use futures_util::{
-    sink::SinkExt,
-    stream::{SplitSink, SplitStream, StreamExt},
-};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
 
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
@@ -24,10 +11,27 @@ use axum::{
     routing::{any, get, post},
     Json, Router,
 };
+use base64::prelude::*;
+use diesel::prelude::*;
+use diesel_async::{
+    pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection,
+    RunQueryDsl,
+};
+use futures_util::{
+    sink::SinkExt,
+    stream::{SplitSink, StreamExt},
+};
+use loro;
+use tokio::sync::{Mutex, RwLock};
 
 #[derive(serde::Deserialize)]
 struct Id {
     id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct Uuid {
+    id: uuid::Uuid,
 }
 
 type Collection = models::Collection;
@@ -54,12 +58,17 @@ struct CreateDocument {
 }
 
 #[derive(serde::Deserialize)]
+struct UpdateDocument {
+    id: uuid::Uuid,
+    update: String,
+    // col: String,
+}
+
+#[derive(serde::Deserialize)]
 struct AddRemoveDocument {
     id: uuid::Uuid,
     col: String,
 }
-
-// struct UpdateDocument
 
 struct ClientState {
     user: String,
@@ -181,7 +190,11 @@ impl Sinkron {
             idx
         };
 
-        // sync to collection
+        // sync collection
+        // options
+        //      1) lock collection while sync not completed
+        //              updates will not be allowed while someone syncs
+        //      2) lock client while sync not completed ?
 
         loop {
             if let Some(Ok(msg)) = receiver.next().await {
@@ -220,7 +233,6 @@ impl Sinkron {
         }
     }
 
-    /// Send message to a single client
     async fn send_message(
         &self,
         client_id: i32,
@@ -232,7 +244,6 @@ impl Sinkron {
         Ok(())
     }
 
-    /// Broadcast message to all subscribers of the collection
     async fn broadcast(
         &self,
         col: String,
@@ -284,7 +295,8 @@ impl Sinkron {
     ) -> Result<(), SinkronError> {
         // ws.lastActive = process.hrtime.bigint()
         let reply = HeartbeatMessage { i: msg.i + 1 };
-        self.send_message(client_id, ServerMessage::Heartbeat(reply)).await?;
+        self.send_message(client_id, ServerMessage::Heartbeat(reply))
+            .await?;
         Ok(())
     }
 
@@ -339,9 +351,16 @@ impl Sinkron {
                     permissions: None,
                 })
                 .await?;
+                // TODO reply ChangeError
             }
-            Op::Delete => {}
-            Op::Update => {}
+            Op::Update => {
+                self.update_document(msg.id, msg.data).await?;
+                // TODO reply ChangeError
+            }
+            Op::Delete => {
+                // TODO
+                // self.delete_document(msg.id).await?;
+            }
         };
 
         Ok(())
@@ -399,18 +418,32 @@ impl Sinkron {
         Ok(())
     }
 
+    async fn increment_colrev(
+        &self,
+        col_id: &str,
+    ) -> Result<i64, SinkronError> {
+        let mut conn = self.connect().await?;
+        use schema::collections;
+        let colrev: i64 = diesel::update(collections::table)
+            .filter(collections::id.eq(col_id))
+            .set(collections::colrev.eq(collections::colrev + 1))
+            .returning(collections::colrev)
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?; // TODO not_found ?
+        Ok(colrev)
+    }
+
     async fn create_document(
         &self,
         payload: CreateDocument,
     ) -> Result<Document, SinkronError> {
-        use schema::collections;
-
         let mut conn = self.connect().await?;
 
         // TODO check for duplicate doc id ?
 
-        let is_ref = collections::table
-            .select(collections::is_ref)
+        let is_ref = schema::collections::table
+            .select(schema::collections::is_ref)
             .find(&payload.col)
             .first(&mut conn)
             .await
@@ -432,28 +465,21 @@ impl Sinkron {
         let data = BASE64_STANDARD.decode(&payload.data).map_err(|_| {
             (
                 ErrorCode::BadRequest,
-                "Couldn't decode data as base64".to_string(),
+                "Couldn't decode data from base64".to_string(),
             )
         })?;
 
         // increment colrev
-        let colrev: i64 = diesel::update(collections::table)
-            .filter(collections::id.eq(&payload.col))
-            .set(collections::colrev.eq(collections::colrev + 1))
-            .returning(collections::colrev)
-            .get_result(&mut conn)
-            .await
-            .map_err(internal_error)?;
+        let next_colrev = self.increment_colrev(&payload.col).await?;
 
         // create document
         let new_doc = models::NewDocument {
             id: payload.id,
             col_id: payload.col.clone(),
-            colrev,
+            colrev: next_colrev,
             data,
             permissions: "".to_string(), // TODO
         };
-
         let created_at: chrono::DateTime<chrono::Utc> =
             diesel::insert_into(schema::documents::table)
                 .values(&new_doc)
@@ -466,7 +492,7 @@ impl Sinkron {
         let msg = ServerChangeMessage {
             id: payload.id,
             col: payload.col.clone(),
-            colrev,
+            colrev: next_colrev,
             op: Op::Create,
             data: payload.data.clone(),
             created_at: created_at.clone(),
@@ -480,10 +506,10 @@ impl Sinkron {
         let doc = Document {
             id: payload.id,
             created_at: created_at.clone(),
-            updated_at: created_at.clone(),
+            updated_at: created_at,
             data: Some(payload.data),
-            col: payload.col.clone(),
-            colrev,
+            col: payload.col,
+            colrev: next_colrev,
             permissions: "".to_string(),
         };
         Ok(doc)
@@ -517,6 +543,84 @@ impl Sinkron {
         };
 
         Ok(doc)
+    }
+
+    async fn update_document(
+        &self,
+        id: uuid::Uuid,
+        update: String,
+    ) -> Result<Document, SinkronError> {
+        let mut conn = self.connect().await?;
+
+        let doc: models::Document = schema::documents::table
+            .find(id)
+            .first(&mut conn)
+            .await
+            .map_err(|err| match err {
+                diesel::NotFound => {
+                    (ErrorCode::NotFound, "Document not found".to_string())
+                }
+                err => (ErrorCode::InternalServerError, err.to_string()),
+            })?;
+
+        let Some(data) = doc.data else {
+            return Err((
+                ErrorCode::UnprocessableContent,
+                "Couldn't update deleted document".to_string(),
+            ));
+        };
+
+        let loro_doc = loro::LoroDoc::new();
+        if loro_doc.import(&data).is_err() {
+            return Err((
+                ErrorCode::InternalServerError,
+                "Couldn't open document, data might be corrupted".to_string(),
+            ));
+        }
+
+        let decoded_update = BASE64_STANDARD.decode(&update).map_err(|_| {
+            (
+                ErrorCode::BadRequest,
+                "Couldn't decode update from base64".to_string(),
+            )
+        })?;
+        if loro_doc.import(&decoded_update).is_err() {
+            return Err((
+                ErrorCode::UnprocessableContent,
+                "Couldn't import update".to_string(),
+            ));
+        }
+        let snapshot = loro_doc.export_snapshot();
+
+        let colrev = self.increment_colrev(&doc.col_id).await?;
+
+        // TODO increment refs colrev
+
+        let doc_update = models::DocumentUpdate {
+            colrev,
+            data: &snapshot,
+        };
+        let updated_at = diesel::update(schema::documents::table)
+            .filter(schema::documents::id.eq(&id))
+            .set(doc_update)
+            .returning(schema::documents::updated_at)
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        // TODO broadcast change message
+
+        let updated = Document {
+            id: doc.id,
+            created_at: doc.created_at,
+            updated_at,
+            data: Some(BASE64_STANDARD.encode(snapshot)),
+            col: doc.col_id,
+            colrev: doc.colrev,
+            permissions: doc.permissions,
+        };
+
+        Ok(updated)
     }
 
     async fn add_document_to_collection(
@@ -702,15 +806,24 @@ async fn create_document(
 
 async fn get_document(
     State(state): State<Sinkron>,
-) -> Result<String, (StatusCode, String)> {
-    // let mut conn = state.connect().await?;
-
-    Ok("2".to_string())
+    Json(id): Json<Uuid>,
+) -> Result<Json<Document>, (StatusCode, String)> {
+    let doc = state
+        .get_document(id.id)
+        .await
+        .map_err(sinkron_err_to_http)?;
+    Ok(Json(doc))
 }
 
-// { id, changes/data? }
-async fn update_document() -> &'static str {
-    "Hello, World!"
+async fn update_document(
+    State(state): State<Sinkron>,
+    Json(payload): Json<UpdateDocument>,
+) -> Result<Json<Document>, (StatusCode, String)> {
+    let doc = state
+        .update_document(payload.id, payload.update)
+        .await
+        .map_err(sinkron_err_to_http)?;
+    Ok(Json(doc))
 }
 
 // { id }
