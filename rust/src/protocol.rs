@@ -50,7 +50,7 @@ pub struct DocMessage {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Op {
     Create,
     Delete,
@@ -66,6 +66,8 @@ pub struct ClientChangeMessage {
     pub changeid: String,
 }
 
+// TODO remove clone, instead serialize one time only when broadcast
+#[derive(Clone)]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerChangeMessage {
@@ -82,7 +84,7 @@ pub struct ServerChangeMessage {
 #[derive(Serialize, Deserialize)]
 pub struct ChangeErrorMessage {
     pub code: ErrorCode,
-    pub id: String,
+    pub id: uuid::Uuid,
     pub changeid: String,
 }
 
@@ -110,6 +112,9 @@ pub enum ServerMessage {
 
     #[serde(rename = "sync_error")]
     SyncError(SyncErrorMessage),
+
+    #[serde(rename = "get_error")]
+    GetError(GetErrorMessage),
 
     #[serde(rename = "doc")]
     Doc(DocMessage),

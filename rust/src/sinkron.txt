@@ -79,7 +79,7 @@ struct ClientState {
 
 struct CollectionState {
     // id: String,
-    // lock: tokio::sync::Mutex<()>,
+    lock: Arc<Mutex<()>>,
     subscribers: HashSet<i32>,
 }
 
@@ -155,10 +155,49 @@ impl Sinkron {
         self.pool.get_owned().await.map_err(internal_error)
     }
 
-    pub async fn handle_connect(&self, socket: WebSocket) {
-        let (sender, mut receiver) = socket.split();
+    pub async fn lock_collection(
+        &self,
+        id: &str,
+    ) -> Arc<Mutex<()>> {
+        let state = self.state.read().await;
+        let col = state.collections.get(id);
+        if let Some(col) = col {
+            return col.lock.clone();
+        } else {
+            drop(state);
+            let mut state = self.state.write().await;
+            state.collections.insert(
+                id.to_string(),
+                CollectionState {
+                    subscribers: HashSet::new(),
+                    lock: Arc::new(Mutex::new(())),
+                },
+            );
+            let col = state.collections.get(id).unwrap();
+            return col.lock.clone();
+        }
+    }
 
+    pub async fn handle_connect(&self, socket: WebSocket) {
         // auth
+
+        // check permissions & collection exists
+
+        let col = "".to_string();
+
+        let lock = self.lock_collection(&col).await;
+        let guard = lock.lock().await;
+
+        // sync_collection
+
+        // sync_complete || sync_error
+
+        let (mut sender, mut receiver) = socket.split();
+
+        let cl = sender.clone();
+        tokio::spawn(async move {
+            cl.send(Message::Text("".to_string())).await;
+        });
 
         // create client and store in the state
         let client_id = {
@@ -175,26 +214,14 @@ impl Sinkron {
             };
             state.clients.insert(idx, client);
 
-            let col = "".to_string();
             if let Some(item) = state.collections.get_mut(&col) {
                 item.subscribers.insert(idx);
-            } else {
-                state.collections.insert(
-                    col,
-                    CollectionState {
-                        subscribers: HashSet::from([idx]),
-                    },
-                );
             }
 
             idx
         };
 
-        // sync collection
-        // options
-        //      1) lock collection while sync not completed
-        //              updates will not be allowed while someone syncs
-        //      2) lock client while sync not completed ?
+        drop(guard);
 
         loop {
             if let Some(Ok(msg)) = receiver.next().await {
@@ -207,6 +234,30 @@ impl Sinkron {
                 break;
             }
         }
+    }
+
+    async fn sync_collection(
+        &self,
+        col_id: &str,
+        colrev: Option<i64>,
+    ) -> Result<(), SinkronError> {
+        let mut conn = self.connect().await?;
+
+        let req = schema::documents::table
+            .into_boxed()
+            .filter(schema::documents::col_id.eq(col_id));
+        let req = match colrev {
+            // Select all documents, except deleted
+            None => req.filter(schema::documents::is_deleted.eq(false)),
+            // Select all documents since provided colrev, including deleted
+            Some(colrev) => req.filter(schema::documents::colrev.gt(colrev)),
+        };
+        let docs: Vec<models::Document> =
+            req.get_results(&mut conn).await.map_err(internal_error)?;
+
+        // map to messages
+
+        Ok(())
     }
 
     async fn handle_disconnect(&self, client_id: i32) {
@@ -469,6 +520,9 @@ impl Sinkron {
             )
         })?;
 
+        let lock = self.lock_collection(&payload.col).await;
+        let _guard = lock.lock().await;
+
         // increment colrev
         let next_colrev = self.increment_colrev(&payload.col).await?;
 
@@ -508,7 +562,7 @@ impl Sinkron {
             created_at: created_at.clone(),
             updated_at: created_at,
             data: Some(payload.data),
-            col: payload.col,
+            col: payload.col.clone(),
             colrev: next_colrev,
             permissions: "".to_string(),
         };
@@ -644,18 +698,18 @@ impl Sinkron {
             ));
         }
 
+        // TODO increment colrev
+
         let new_ref = models::NewRef {
             doc_id: id,
             col_id: col,
         };
-
         diesel::insert_into(schema::refs::table)
             .values(&new_ref)
             .execute(&mut conn)
             .await
             .map_err(internal_error)?;
 
-        // TODO update colrev
         // TODO send messages
 
         Ok(())
@@ -742,6 +796,7 @@ fn sinkron_err_to_http(err: SinkronError) -> (StatusCode, String) {
     };
     (code, err.1)
 }
+
 async fn root() -> &'static str {
     "Hello, World!"
 }

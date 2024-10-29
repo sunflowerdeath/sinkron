@@ -374,6 +374,31 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
 
+  packages/test:
+    dependencies:
+      nanoevents:
+        specifier: ^7.0.1
+        version: 7.0.1
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.0
+    devDependencies:
+      '@rspack/cli':
+        specifier: ^1.0.13
+        version: 1.0.13(@rspack/core@1.0.13)(@types/express@4.17.21)
+      '@rspack/core':
+        specifier: ^1.0.13
+        version: 1.0.13
+      '@types/node':
+        specifier: ^18.19.55
+        version: 18.19.56
+      '@types/ws':
+        specifier: ^8.5.12
+        version: 8.5.12
+      webpack-node-externals:
+        specifier: ^3.0.0
+        version: 3.0.0
+
 packages:
 
   '@automerge/automerge@2.2.8':
