@@ -1,0 +1,26 @@
+{
+    "name": "@sinkron/api-client",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "lint": "oxlint -c ./oxlintrc.json src",
+        "build": "tsc && NODE_ENV=production rspack --config rspack.config.js"
+    },
+    "keywords": [],
+    "author": "sunflowerdeath",
+    "license": "Unlicense",
+    "devDependencies": {
+        "@rspack/cli": "^1.0.13",
+        "@rspack/core": "^1.0.13",
+        "@types/uuid": "^9.0.8"
+    },
+    "dependencies": {
+        "date-fns": "^3.6.0",
+        "js-base64": "^3.7.7",
+        "loro-crdt": "^1.0.8",
+        "nanoid": "^4.0.2",
+        "sinkron-protocol": "workspace:*",
+        "uuid": "^9.0.1"
+    }
+}

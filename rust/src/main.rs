@@ -2,20 +2,20 @@ mod models;
 mod protocol;
 mod schema;
 // mod sinkron;
+mod db;
 mod sinkron2;
-
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
-    // let config = sinkron::DbConfig {
-        // host: "localhost".to_string(),
-        // port: 5432,
-        // database: "sinkron_rs".to_string(),
-        // user: "sinkron".to_string(),
-        // password: "password".to_string(),
-    // };
+    let config = db::DbConfig {
+        host: "localhost".to_string(),
+        port: 5432,
+        database: "sinkron_rs".to_string(),
+        user: "postgres".to_string(),
+        password: "password".to_string(),
+    };
     /*
     let config = {
         port: 80,
@@ -26,6 +26,6 @@ async fn main() {
     */
     // let sinkron = sinkron::Sinkron::new(config).await;
     // sinkron.listen().await;
-    let sinkron2 = sinkron2::Sinkron::new();
+    let sinkron2 = sinkron2::Sinkron::new(config).await;
     sinkron2.listen().await;
 }

@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "strict": true,
+
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+
+        "declaration": true,
+        "declarationDir": "./types",
+        "emitDeclarationOnly": true,
+        "target": "es2015",
+        "outDir": "build",
+
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true
+    }
+}

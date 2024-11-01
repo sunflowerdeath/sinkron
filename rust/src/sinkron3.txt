@@ -1,0 +1,150 @@
+use log::trace;
+use ractor::{Actor, ActorProcessingErr, ActorRef};
+use tokio::sync::oneshot;
+
+use crate::db;
+use crate::models;
+use crate::protocol::*;
+use crate::schema;
+
+type SinkronError = (ErrorCode, String);
+
+#[derive(serde::Serialize)]
+struct Document {
+    id: uuid::Uuid,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+    data: Option<String>,
+    col: String,
+    colrev: i64,
+    permissions: String,
+}
+
+struct Collection;
+
+enum CollectionMessage {
+    Subscribe {
+        client_id: i32,
+        client: ActorRef<()>,
+    },
+    Unsubscribe {
+        client_id: i32,
+    },
+    Get {
+        id: uuid::Uuid,
+        reply: oneshot::Sender<Result<Document, SinkronError>>,
+    },
+    Sync {
+        colrev: Option<i64>,
+        reply: oneshot::Sender<Result<(), SinkronError>>,
+    },
+    Create {
+        id: uuid::Uuid,
+        data: Vec<i8>,
+        reply: oneshot::Sender<Result<(), SinkronError>>,
+    },
+    Delete {
+        id: uuid::Uuid,
+        reply: oneshot::Sender<Result<(), SinkronError>>,
+    },
+    Update {
+        id: uuid::Uuid,
+        data: Vec<u8>,
+        reply: oneshot::Sender<Result<(), SinkronError>>,
+    },
+}
+
+struct CollectionState {
+    id: String,
+    subscribers: std::collections::HashMap<i32, ActorRef<()>>,
+    pool: db::DbConnectionPool,
+}
+
+#[ractor::async_trait]
+impl Actor for Collection {
+    type Msg = CollectionMessage;
+    type State = CollectionState;
+    type Arguments = CollectionState;
+
+    async fn pre_start(
+        &self,
+        _myself: ActorRef<Self::Msg>,
+        args: Self::Arguments,
+    ) -> Result<Self::State, ActorProcessingErr> {
+        Ok(args)
+    }
+
+    async fn handle(
+        &self,
+        _myself: ActorRef<Self::Msg>,
+        msg: Self::Msg,
+        state: &mut Self::State,
+    ) -> Result<(), ActorProcessingErr> {
+        match msg {
+            CollectionMessage::Subscribe { client_id, client } => {
+                self.handle_subscribe(state, client_id, client).await;
+                trace!(
+                    "col-{}: client subscribed, id: {}",
+                    state.id,
+                    client_id
+                );
+            }
+            CollectionMessage::Unsubscribe { client_id } => {
+                self.handle_unsubscribe(state, client_id).await;
+                trace!(
+                    "col-{}: client unsubscribed, id: {}",
+                    state.id,
+                    client_id
+                );
+            }
+            CollectionMessage::Sync { colrev, reply } => {
+                trace!("col-{}: sync, colrev: {:?}", state.id, colrev);
+            }
+            CollectionMessage::Get { id, reply } => {
+                trace!("col-{}: get document, id: {}", state.id, id);
+                // let res = self.get_document(id).await;
+            }
+            CollectionMessage::Create { id, data, reply } => {
+                trace!("col-{}: create, id: {}", state.id, id);
+                // let res = self.create_document(id, data, None).await;
+            }
+            CollectionMessage::Update { id, data, reply } => {
+                trace!("col-{}: update, id: {}", state.id, id);
+                // let res = self.update_document(id, update).await;
+            }
+            CollectionMessage::Delete { id, reply } => {
+                trace!("col-{}: delete, id: {}", state.id, id);
+                // let res = self.delete_document(id).await;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Collection {
+    async fn handle_subscribe(
+        &self,
+        state: &mut CollectionState,
+        id: i32,
+        client: ActorRef<()>,
+    ) {
+        state.subscribers.insert(id, client);
+        // self.timeout_task = None;
+    }
+
+    async fn handle_unsubscribe(&self, state: &mut CollectionState, id: i32) {
+        state.subscribers.remove(&id);
+    }
+}
+
+struct ClientActor;
+
+struct ClientActorState {
+    client_id: i32,
+    ws_receiver: SplitStream<WebSocket>,
+    collection: CollectionHandle,
+    colrev: Option<i64>,
+    client_chan_sender: mpsc::Sender<ServerMessage>,
+    cancel_token: CancellationToken,
+}
+

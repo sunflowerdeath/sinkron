@@ -1,28 +1,23 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{Query, State},
-    // http::StatusCode,
+    http::StatusCode,
     response::Response,
     routing::{any, get, post},
-    // Json,
-    Router,
+    Json, Router,
 };
 use base64::prelude::*;
 use diesel::prelude::*;
-use diesel_async::{
-    pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection,
-    RunQueryDsl,
-};
-use futures_util::{
-    sink::SinkExt,
-    stream::{SplitSink, SplitStream, StreamExt},
-};
+use diesel_async::RunQueryDsl;
 use log::trace;
-use std::collections::HashMap;
 use tokio::select;
-use tokio::sync::{mpsc, oneshot};
-use tokio_util::sync::CancellationToken;
+use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::time::{sleep, Duration};
 
+use crate::db;
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
@@ -48,77 +43,60 @@ where
     (ErrorCode::InternalServerError, err.to_string())
 }
 
-type DbConnection = bb8::PooledConnection<
-    'static,
-    AsyncDieselConnectionManager<AsyncPgConnection>,
->;
-
-type DbConnectionPool =
-    bb8::Pool<AsyncDieselConnectionManager<diesel_async::AsyncPgConnection>>;
-
-pub struct DbConfig {
-    pub host: String,
-    pub port: i32,
-    pub user: String,
-    pub password: String,
-    pub database: String,
+#[derive(Clone)]
+struct Supervisor {
+    stop: Arc<Notify>,
+    exit: Arc<Notify>,
 }
 
-async fn create_pool(config: DbConfig) -> DbConnectionPool {
-    let config_string = format!(
-        "host={} port={} user={} password={} dbname={}",
-        config.host, config.port, config.user, config.password, config.database,
-    );
-    let manager =
-        AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
-            config_string,
-        );
-    let pool = bb8::Pool::builder().build(manager).await.unwrap();
-    pool
-}
+type ExitCallback = Box<dyn FnOnce() + Send>;
 
-// Actor that forwards messages to the webscoket connection.
-
-struct ClientWriteActor {
-    client_id: i32,
-    ws_sender: SplitSink<WebSocket, Message>,
-    client_chan_receiver: mpsc::Receiver<ServerMessage>,
-}
-
-impl ClientWriteActor {
-    async fn run(&mut self) {
-        trace!("client-{}: sender actor start", self.client_id);
-        while let Some(msg) = self.client_chan_receiver.recv().await {
-            if let Ok(encoded) = serde_json::to_string(&msg) {
-                let _ = self.ws_sender.send(Message::Text(encoded)).await;
-                trace!("client-{}: sent message to websocket", self.client_id);
-            }
-            // TODO handle error
+impl Supervisor {
+    fn new() -> Self {
+        Self {
+            stop: Arc::new(Notify::new()),
+            exit: Arc::new(Notify::new()),
         }
-        trace!("client-{}: sender actor exit", self.client_id);
+    }
+
+    fn spawn<T>(&self, task: T, on_exit: Option<ExitCallback>)
+    where
+        T: std::future::Future + Send + 'static,
+    {
+        let stop = self.stop.clone();
+        let exit = self.exit.clone();
+        tokio::spawn(async move {
+            select! {
+                _ = stop.notified() => {},
+                _ = task => {},
+            }
+            exit.notify_waiters();
+            if let Some(on_exit) = on_exit {
+                on_exit();
+            }
+        });
     }
 }
 
-// Actor that receives messages from the webscoket connection,
+// Client actor receives messages from the webscoket connection,
 // dispatches them to the Collection and when needed waits for the response
 // and replies back.
 
-struct ClientReadActor {
+struct ClientActor {
+    supervisor: Supervisor,
     client_id: i32,
-    ws_receiver: SplitStream<WebSocket>,
+    websocket: WebSocket,
+    receiver: mpsc::Receiver<ServerMessage>,
     collection: CollectionHandle,
     colrev: Option<i64>,
-    client_chan_sender: mpsc::Sender<ServerMessage>,
-    cancel_token: CancellationToken,
 }
 
-impl ClientReadActor {
+impl ClientActor {
     async fn run(&mut self) {
-        trace!("client-{}: receiver actor start", self.client_id);
+        trace!("client-{}: start", self.client_id);
 
         if self.sync(self.colrev).await.is_err() {
             trace!("client-{}: sync failed", self.client_id);
-            self.handle_disconnect().await;
             return;
         } else {
             trace!("client-{}: sync completed", self.client_id);
@@ -126,37 +104,26 @@ impl ClientReadActor {
 
         loop {
             select! {
-                _ = self.cancel_token.cancelled() => {
-                    self.handle_disconnect().await;
-                    break;
-                },
-                msg = self.ws_receiver.next() => {
+                msg = self.websocket.recv() => {
                     match msg {
-                        Some(Ok(msg)) => {
-                            trace!(
-                                "client-{}: receive websocket message",
-                                self.client_id
-                            );
-                            self.handle_message(msg).await;
-                        },
-                        _ => {
-                            self.handle_disconnect().await;
-                            break;
-                        }
+                        Some(Ok(msg)) => self.handle_message(msg).await,
+                        _ => break
                     }
+                },
+                Some(msg) = self.receiver.recv() => {
+                    self.send_message(msg).await;
                 }
             }
         }
-
-        trace!("client-{}: receiver actor exit", self.client_id);
     }
 
-    async fn sync(&self, colrev: Option<i64>) -> Result<(), SinkronError> {
+    async fn sync(&mut self, colrev: Option<i64>) -> Result<(), SinkronError> {
         let (sender, receiver) = oneshot::channel();
-        let _ = self
-            .collection
-            .send(CollectionMessage::Sync(colrev, sender))
-            .await;
+        let msg = CollectionMessage::Sync {
+            colrev,
+            reply: sender,
+        };
+        self.collection.send(msg);
         match receiver.await {
             Ok(Ok(res)) => {
                 // send documents & sync_complete to client
@@ -168,7 +135,7 @@ impl ClientReadActor {
         Ok(())
     }
 
-    async fn handle_message(&self, msg: Message) {
+    async fn handle_message(&mut self, msg: Message) {
         let Message::Text(str) = msg else {
             // unsupported message type
             return;
@@ -185,17 +152,18 @@ impl ClientReadActor {
         };
     }
 
-    async fn handle_heartbeat(&self, msg: HeartbeatMessage) {
+    async fn handle_heartbeat(&mut self, msg: HeartbeatMessage) {
         let reply = HeartbeatMessage { i: msg.i + 1 };
         self.send_message(ServerMessage::Heartbeat(reply)).await;
+        // TODO disconnect timeout
     }
 
-    async fn handle_get(&self, msg: GetMessage) {
+    async fn handle_get(&mut self, msg: GetMessage) {
         let (sender, receiver) = oneshot::channel();
-        let send = self
-            .collection
-            .send(CollectionMessage::Get(msg.id, sender))
-            .await;
+        let send = self.collection.send(CollectionMessage::Get {
+            id: msg.id,
+            reply: sender,
+        });
         if send.is_err() {
             // couldn't send, reply with get error ?
             return;
@@ -231,16 +199,25 @@ impl ClientReadActor {
         }
     }
 
-    async fn handle_change(&self, msg: ClientChangeMessage) {
-        let Ok(data) = BASE64_STANDARD.decode(&msg.data) else {
-            // send change error (decode error)
-            return;
-        };
-
+    async fn handle_change(&mut self, msg: ClientChangeMessage) {
         let (sender, receiver) = oneshot::channel();
-        self.collection
-            .send(CollectionMessage::Update(msg.id, data, sender))
-            .await;
+        let col_msg = match msg.op {
+            Op::Create => CollectionMessage::Create {
+                id: msg.id,
+                data: msg.data,
+                reply: sender,
+            },
+            Op::Update => CollectionMessage::Create {
+                id: msg.id,
+                data: msg.data,
+                reply: sender,
+            },
+            Op::Delete => CollectionMessage::Delete {
+                id: msg.id,
+                reply: sender,
+            },
+        };
+        self.collection.send(col_msg);
         match receiver.await {
             Ok(Ok(_)) => {
                 // change success
@@ -264,59 +241,42 @@ impl ClientReadActor {
         }
     }
 
-    async fn handle_disconnect(&self) {
-        trace!("client-{}: disconnect", self.client_id);
-        self.collection
-            .send(CollectionMessage::Unsubscribe(self.client_id))
-            .await;
-    }
-
-    async fn send_message(&self, msg: ServerMessage) {
-        self.client_chan_sender.send(msg).await;
-        // if couldnt write, then writer actor is dead, so should disconnect ?
+    async fn send_message(&mut self, msg: ServerMessage) {
+        if let Ok(encoded) = serde_json::to_string(&msg) {
+            let _ = self.websocket.send(Message::Text(encoded)).await;
+            trace!("client-{}: sent message to websocket", self.client_id);
+        }
+        // TODO if couldnt write, then writer actor is dead, so should exit
     }
 }
 
-// Client handle is shared by two actors - reader and writer
-
 #[derive(Clone)]
 struct ClientHandle {
-    cancel_token: CancellationToken,
-    client_chan_sender: mpsc::Sender<ServerMessage>,
+    sender: mpsc::Sender<ServerMessage>,
+    supervisor: Supervisor,
 }
 
 impl ClientHandle {
     fn new(
         client_id: i32,
-        ws: WebSocket,
+        websocket: WebSocket,
         collection: CollectionHandle,
         colrev: Option<i64>,
+        on_exit: Option<ExitCallback>,
     ) -> Self {
-        let (ws_sender, ws_receiver) = ws.split();
-
-        let cancel_token = CancellationToken::new();
-        let (client_chan_sender, client_chan_receiver) = mpsc::channel(8);
-        let mut writer = ClientWriteActor {
-            client_id,
-            ws_sender,
-            client_chan_receiver,
-        };
-        tokio::spawn(async move { writer.run().await });
-
-        let mut reader = ClientReadActor {
+        let (sender, receiver) = mpsc::channel(8);
+        let supervisor = Supervisor::new();
+        let mut reader = ClientActor {
+            supervisor: supervisor.clone(),
             colrev,
             client_id,
             collection,
-            cancel_token: cancel_token.clone(),
-            ws_receiver,
-            client_chan_sender: client_chan_sender.clone(),
+            websocket,
+            receiver,
         };
-        tokio::spawn(async move { reader.run().await });
+        supervisor.spawn(async move { reader.run().await }, on_exit);
 
-        Self {
-            cancel_token,
-            client_chan_sender,
-        }
+        Self { supervisor, sender }
     }
 
     // async fn send_message_raw(&self, msg: Message) {
@@ -324,40 +284,72 @@ impl ClientHandle {
     // }
 
     async fn send_message(&self, msg: ServerMessage) {
-        self.client_chan_sender.send(msg).await;
-    }
-
-    async fn disconnect(&self) {
-        self.cancel_token.cancel();
+        self.sender.send(msg).await;
     }
 }
 
+// Collection actor performs document operations over single collection,
+// then replies back with results and also broadcasts messages to all
+// active subscribers of the collection.
+
 enum CollectionMessage {
-    Subscribe(i32, ClientHandle),
-    Unsubscribe(i32),
-    Get(uuid::Uuid, oneshot::Sender<Result<Document, SinkronError>>),
-    Sync(Option<i64>, oneshot::Sender<Result<(), SinkronError>>),
-    Create(
-        uuid::Uuid,
-        Vec<i8>,
-        oneshot::Sender<Result<(), SinkronError>>,
-    ),
-    Delete(uuid::Uuid, oneshot::Sender<Result<(), SinkronError>>),
-    Update(
-        uuid::Uuid,
-        Vec<u8>,
-        oneshot::Sender<Result<(), SinkronError>>,
-    ),
+    Subscribe {
+        client_id: i32,
+        handle: ClientHandle,
+    },
+    Unsubscribe {
+        client_id: i32,
+    },
+    Get {
+        id: uuid::Uuid,
+        reply: oneshot::Sender<Result<Document, SinkronError>>,
+    },
+    Sync {
+        colrev: Option<i64>,
+        reply: oneshot::Sender<Result<(), SinkronError>>,
+    },
+    Create {
+        id: uuid::Uuid,
+        data: String,
+        reply: oneshot::Sender<Result<Document, SinkronError>>,
+    },
+    Update {
+        id: uuid::Uuid,
+        data: String,
+        reply: oneshot::Sender<Result<Document, SinkronError>>,
+    },
+    Delete {
+        id: uuid::Uuid,
+        reply: oneshot::Sender<Result<Document, SinkronError>>,
+    },
 }
 
 struct CollectionActor {
+    supervisor: Supervisor,
     id: String,
-    receiver: mpsc::Receiver<CollectionMessage>,
+    pool: db::DbConnectionPool,
+    receiver: mpsc::UnboundedReceiver<CollectionMessage>,
     subscribers: std::collections::HashMap<i32, ClientHandle>,
-    pool: DbConnectionPool,
+    timeout_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl CollectionActor {
+    fn new(
+        id: String,
+        receiver: mpsc::UnboundedReceiver<CollectionMessage>,
+        pool: db::DbConnectionPool,
+        supervisor: Supervisor,
+    ) -> Self {
+        Self {
+            id,
+            receiver,
+            pool,
+            subscribers: HashMap::new(),
+            supervisor,
+            timeout_task: None,
+        }
+    }
+
     async fn run(&mut self) {
         trace!("col-{}: actor start", self.id);
         while let Some(msg) = self.receiver.recv().await {
@@ -368,38 +360,64 @@ impl CollectionActor {
 
     async fn handle_message(&mut self, msg: CollectionMessage) {
         match msg {
-            CollectionMessage::Subscribe(id, handle) => {
-                self.subscribers.insert(id, handle);
-                trace!("col-{}: client subscribe, id: {}", self.id, id);
+            CollectionMessage::Subscribe { client_id, handle } => {
+                self.handle_subscribe(client_id, handle).await;
+                trace!("col-{}: client subscribed, id: {}", self.id, client_id);
             }
-            CollectionMessage::Unsubscribe(id) => {
-                self.subscribers.remove(&id);
-                trace!("col-{}: client unsubscribe, id: {}", self.id, id);
+            CollectionMessage::Unsubscribe { client_id } => {
+                self.handle_unsubscribe(client_id).await;
+                trace!(
+                    "col-{}: client unsubscribed, id: {}",
+                    self.id,
+                    client_id
+                );
             }
-            CollectionMessage::Sync(colrev, sender) => {
+            CollectionMessage::Sync { colrev, reply } => {
                 trace!("col-{}: sync, colrev: {:?}", self.id, colrev);
             }
-            CollectionMessage::Get(id, sender) => {
+            CollectionMessage::Get { id, reply } => {
                 trace!("col-{}: get document, id: {}", self.id, id);
                 let res = self.get_document(id).await;
             }
-            CollectionMessage::Create(id, data, sender) => {
+            CollectionMessage::Create { id, data, reply } => {
                 trace!("col-{}: create, id: {}", self.id, id);
-                // let res = self.create_document(id, data, None).await;
+                let res = self.create_document(id, data, None).await;
+                reply.send(res);
             }
-            CollectionMessage::Update(id, update, sender) => {
+            CollectionMessage::Update { id, data, reply } => {
                 trace!("col-{}: update, id: {}", self.id, id);
-                // let res = self.update_document(id, update).await;
+                let res = self.update_document(id, data).await;
+                reply.send(res);
             }
-            CollectionMessage::Delete(id, sender) => {
+            CollectionMessage::Delete { id, reply } => {
                 trace!("col-{}: delete, id: {}", self.id, id);
-                // let res = self.delete_document(id).await;
+                let res = self.delete_document(id).await;
+                reply.send(res);
             }
         }
     }
 
-    async fn connect(&self) -> Result<DbConnection, SinkronError> {
-        self.pool.get_owned().await.map_err(internal_error)
+    async fn handle_subscribe(&mut self, id: i32, handle: ClientHandle) {
+        self.subscribers.insert(id, handle);
+        self.timeout_task = None;
+    }
+
+    async fn handle_unsubscribe(&mut self, id: i32) {
+        self.subscribers.remove(&id);
+        if self.subscribers.len() == 0 {
+            let id = self.id.clone();
+            let stop = self.supervisor.stop.clone();
+            self.timeout_task = Some(tokio::spawn(async move {
+                sleep(Duration::from_secs(5)).await;
+                trace!("col-{}: disconnect by timeout", id);
+                stop.notify_waiters();
+            }));
+            trace!("col-{}: last client unsubscribed", self.id);
+        }
+    }
+
+    async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
+        self.pool.get().await.map_err(internal_error)
     }
 
     async fn increment_colrev(&self) -> Result<i64, SinkronError> {
@@ -455,6 +473,8 @@ impl CollectionActor {
             )
         })?;
 
+        println!("Data: {}", decoded.len());
+
         // increment colrev
         let next_colrev = self.increment_colrev().await?;
 
@@ -488,7 +508,9 @@ impl CollectionActor {
 
         for client in self.subscribers.values() {
             // TODO more efficient broadcast
-            client.send_message(ServerMessage::Change(msg.clone()));
+            client
+                .send_message(ServerMessage::Change(msg.clone()))
+                .await;
         }
 
         // return document
@@ -524,7 +546,7 @@ impl CollectionActor {
         let doc = Document {
             id: doc.id,
             created_at: doc.created_at,
-            updated_at: doc.created_at,
+            updated_at: doc.updated_at,
             data: doc.data.map(|data| BASE64_STANDARD.encode(data)),
             col: doc.col_id,
             colrev: doc.colrev,
@@ -558,35 +580,38 @@ impl CollectionActor {
                 "Couldn't update deleted document".to_string(),
             ));
         };
-
+        let Ok(decoded_update) = BASE64_STANDARD.decode(&update) else {
+            return Err((
+                ErrorCode::BadRequest,
+                "Couldn't decode update from base64".to_string(),
+            ));
+        };
         let loro_doc = loro::LoroDoc::new();
-        if loro_doc.import(&data).is_err() {
+        if let Err(e) = loro_doc.import(&data) {
             return Err((
                 ErrorCode::InternalServerError,
                 "Couldn't open document, data might be corrupted".to_string(),
             ));
         }
-
-        let decoded_update = BASE64_STANDARD.decode(&update).map_err(|_| {
-            (
-                ErrorCode::BadRequest,
-                "Couldn't decode update from base64".to_string(),
-            )
-        })?;
         if loro_doc.import(&decoded_update).is_err() {
             return Err((
-                ErrorCode::UnprocessableContent,
+                ErrorCode::BadRequest,
                 "Couldn't import update".to_string(),
             ));
         }
-        let snapshot = loro_doc.export_snapshot();
+        let Ok(snapshot) = loro_doc.export(loro::ExportMode::Snapshot) else {
+            return Err((
+                ErrorCode::BadRequest,
+                "Couldn't export snapshot".to_string(),
+            ));
+        };
 
-        let colrev = self.increment_colrev().await?;
+        let next_colrev = self.increment_colrev().await?;
 
         // TODO increment refs colrev
 
         let doc_update = models::DocumentUpdate {
-            colrev,
+            colrev: next_colrev,
             data: &snapshot,
         };
         let updated_at = diesel::update(schema::documents::table)
@@ -605,65 +630,135 @@ impl CollectionActor {
             updated_at,
             data: Some(BASE64_STANDARD.encode(snapshot)),
             col: doc.col_id,
-            colrev: doc.colrev,
+            colrev: next_colrev,
             permissions: doc.permissions,
         };
 
         Ok(updated)
+    }
+
+    async fn delete_document(
+        &self,
+        id: uuid::Uuid,
+    ) -> Result<Document, SinkronError> {
+        // let mut conn = self.connect().await?;
+
+        // TODO
+
+        Err((
+            ErrorCode::InternalServerError,
+            "Not implemented".to_string(),
+        ))
     }
 }
 
 #[derive(Clone)]
 struct CollectionHandle {
     id: String,
-    sender: mpsc::Sender<CollectionMessage>,
+    sender: mpsc::UnboundedSender<CollectionMessage>,
+    supervisor: Supervisor,
 }
 
 impl CollectionHandle {
-    fn new(id: String, pool: DbConnectionPool) -> Self {
-        let (sender, receiver) = mpsc::channel(100);
-
-        let mut actor = CollectionActor {
-            id: id.clone(),
-            subscribers: HashMap::new(),
+    fn new(
+        id: String,
+        pool: db::DbConnectionPool,
+        on_exit: Option<ExitCallback>,
+    ) -> Self {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let supervisor = Supervisor::new();
+        let mut actor = CollectionActor::new(
+            id.clone(),
             receiver,
             pool,
-        };
-        tokio::spawn(async move { actor.run().await });
-
-        CollectionHandle { id, sender }
+            supervisor.clone(),
+        );
+        supervisor.spawn(async move { actor.run().await }, on_exit);
+        CollectionHandle {
+            id,
+            sender,
+            supervisor,
+        }
     }
 
-    async fn send(
+    fn send(
         &self,
         msg: CollectionMessage,
     ) -> Result<(), mpsc::error::SendError<CollectionMessage>> {
-        self.sender.send(msg).await
+        self.sender.send(msg)
     }
 }
 
 enum SinkronActorMessage {
-    Connect(WebSocket, String, Option<i64>),
+    Connect {
+        websocket: WebSocket,
+        col: String,
+        colrev: Option<i64>,
+    },
+    GetCollection {
+        col: String,
+        reply: oneshot::Sender<CollectionHandle>,
+    },
 }
 
 struct SinkronActor {
     receiver: mpsc::UnboundedReceiver<SinkronActorMessage>,
     client_id: i32,
     collections: HashMap<String, CollectionHandle>,
-    pool: DbConnectionPool,
+    pool: db::DbConnectionPool,
+    exit_channel: (
+        mpsc::UnboundedSender<String>,
+        mpsc::UnboundedReceiver<String>,
+    ),
 }
 
 impl SinkronActor {
+    fn new(
+        receiver: mpsc::UnboundedReceiver<SinkronActorMessage>,
+        pool: db::DbConnectionPool,
+    ) -> Self {
+        Self {
+            receiver,
+            client_id: 0,
+            pool,
+            collections: HashMap::new(),
+            exit_channel: mpsc::unbounded_channel(),
+        }
+    }
+
     async fn run(&mut self) {
         trace!("sinkron: actor start");
-        while let Some(msg) = self.receiver.recv().await {
-            match msg {
-                SinkronActorMessage::Connect(ws, col, colrev) => {
-                    self.handle_connect(ws, col, colrev).await;
-                }
+        loop {
+            select! {
+                msg = self.receiver.recv() => {
+                    match msg {
+                        Some(msg) => self.handle_message(msg).await,
+                        None => break
+                    }
+                },
+                Some(id) = self.exit_channel.1.recv() => {
+                    trace!("sinkron: col exit, id: {}", id);
+                    self.collections.remove(&id);
+                },
             }
         }
         trace!("sinkron: actor exit");
+    }
+
+    async fn handle_message(&mut self, msg: SinkronActorMessage) {
+        match msg {
+            SinkronActorMessage::Connect {
+                websocket,
+                col,
+                colrev,
+            } => {
+                self.handle_connect(websocket, col, colrev).await;
+            }
+            SinkronActorMessage::GetCollection { col, reply } => {
+                let handle = self.get_collection_actor(&col);
+                reply.send(handle);
+            }
+        }
     }
 
     async fn handle_connect(
@@ -680,17 +775,29 @@ impl SinkronActor {
 
         // check permissions
 
-        let collection = self.get_collection_actor(&col).await;
+        let collection = self.get_collection_actor(&col);
 
-        // start client actor
+        // spawn client actor
         let client_id = self.get_client_id();
-        let client =
-            ClientHandle::new(client_id, ws, collection.clone(), colrev);
+        let collection_clone = collection.clone();
+        let on_exit: ExitCallback = Box::new(move || {
+            trace!("client-{}: exit", client_id);
+            collection_clone.send(CollectionMessage::Unsubscribe { client_id });
+        });
+
+        let client = ClientHandle::new(
+            client_id,
+            ws,
+            collection.clone(),
+            colrev,
+            Some(on_exit),
+        );
 
         // subscribe client to collection
-        let _ = collection
-            .send(CollectionMessage::Subscribe(client_id, client))
-            .await;
+        collection.send(CollectionMessage::Subscribe {
+            client_id,
+            handle: client,
+        });
     }
 
     fn get_client_id(&mut self) -> i32 {
@@ -698,19 +805,81 @@ impl SinkronActor {
         self.client_id
     }
 
-    async fn get_collection_actor(&mut self, id: &str) -> CollectionHandle {
+    fn get_collection_actor(&mut self, id: &str) -> CollectionHandle {
         match self.collections.get(id) {
             Some(col) => col.clone(),
-            None => {
-                let col =
-                    CollectionHandle::new(id.to_string(), self.pool.clone());
-                self.collections.insert(id.to_string(), col.clone());
-                col
-            }
+            None => self.spawn_collection_actor(id),
         }
     }
 
-    /*
+    fn spawn_collection_actor(&mut self, id: &str) -> CollectionHandle {
+        let exit_sender = self.exit_channel.0.clone();
+        let id_clone = id.to_string();
+        let on_exit: ExitCallback = Box::new(move || {
+            exit_sender.send(id_clone);
+        });
+
+        let col = CollectionHandle::new(
+            id.to_string(),
+            self.pool.clone(),
+            Some(on_exit),
+        );
+        self.collections.insert(id.to_string(), col.clone());
+        col
+    }
+}
+
+#[derive(Clone)]
+struct SinkronActorHandle {
+    sender: mpsc::UnboundedSender<SinkronActorMessage>,
+}
+
+impl SinkronActorHandle {
+    fn new(pool: db::DbConnectionPool) -> Self {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        let mut actor = SinkronActor::new(receiver, pool);
+        tokio::spawn(async move { actor.run().await });
+        Self { sender }
+    }
+
+    fn send(&self, msg: SinkronActorMessage) {
+        self.sender.send(msg);
+    }
+}
+
+type Collection = models::Collection;
+
+type CreateCollection = models::NewCollection;
+
+#[derive(Clone)]
+pub struct Sinkron {
+    pool: db::DbConnectionPool,
+    actor: SinkronActorHandle,
+}
+
+impl Sinkron {
+    pub async fn new(db_config: db::DbConfig) -> Self {
+        let pool = db::create_pool(db_config).await;
+        let actor = SinkronActorHandle::new(pool.clone());
+        Self { pool, actor }
+    }
+
+    async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
+        self.pool.get().await.map_err(internal_error)
+    }
+
+    async fn get_collection_actor(
+        &self,
+        col: String,
+    ) -> Result<CollectionHandle, SinkronError> {
+        let (sender, receiver) = oneshot::channel();
+        self.actor
+            .send(SinkronActorMessage::GetCollection { col, reply: sender });
+        receiver.await.map_err(internal_error)
+    }
+
+    // Collections
+
     async fn create_collection(
         &self,
         props: CreateCollection,
@@ -742,75 +911,84 @@ impl SinkronActor {
             })
     }
 
-    async fn delete_collection(&self, id: String) -> Result<(), SinkronError> {
-        let mut conn = self.connect().await?;
+    // Documents
 
-        // if ref - delete refs
-        // if doc - delete documents
+    async fn get_document(
+        &self,
+        id: uuid::Uuid,
+        col: String,
+    ) -> Result<Document, SinkronError> {
+        // TODO check if collection exists
+        let col = self.get_collection_actor(col).await?;
 
-        let num = diesel::delete(schema::collections::table.find(id))
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-
-        if num == 0 {
-            return Err((
-                ErrorCode::NotFound,
-                "Collection not found".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-    */
-}
-
-#[derive(Clone)]
-struct SinkronActorHandle {
-    sender: mpsc::UnboundedSender<SinkronActorMessage>,
-}
-
-impl SinkronActorHandle {
-    fn new(pool: DbConnectionPool) -> Self {
-        let (sender, receiver) = mpsc::unbounded_channel();
-
-        let mut actor = SinkronActor {
-            receiver,
-            client_id: 0,
-            collections: HashMap::new(),
-            pool,
-        };
-        tokio::spawn(async move { actor.run().await });
-
-        Self { sender }
+        let (sender, receiver) = oneshot::channel();
+        col.send(CollectionMessage::Get { id, reply: sender });
+        receiver.await.map_err(internal_error)?
     }
 
-    fn send(&self, msg: SinkronActorMessage) {
-        _ = self.sender.send(msg);
+    async fn create_document(
+        &self,
+        id: uuid::Uuid,
+        col: String,
+        data: String,
+    ) -> Result<Document, SinkronError> {
+        // TODO check if collection exists
+        let col = self.get_collection_actor(col).await?;
+
+        let (sender, receiver) = oneshot::channel();
+        col.send(CollectionMessage::Create {
+            id,
+            data,
+            reply: sender,
+        });
+        receiver.await.map_err(internal_error)?
     }
-}
 
-pub struct Sinkron;
+    async fn update_document(
+        &self,
+        id: uuid::Uuid,
+        col: String,
+        data: String,
+    ) -> Result<Document, SinkronError> {
+        // TODO check if collection exists
+        let col = self.get_collection_actor(col).await?;
 
-impl Sinkron {
-    pub fn new() -> Self {
-        Self {}
+        let (sender, receiver) = oneshot::channel();
+        col.send(CollectionMessage::Update {
+            id,
+            data,
+            reply: sender,
+        });
+        receiver.await.map_err(internal_error)?
     }
 
-    fn app(&self, sinkron: SinkronActorHandle) -> Router {
+    async fn delete_document(
+        &self,
+        id: uuid::Uuid,
+        col: String,
+    ) -> Result<Document, SinkronError> {
+        // TODO check if collection exists
+        let col = self.get_collection_actor(col).await?;
+
+        let (sender, receiver) = oneshot::channel();
+        col.send(CollectionMessage::Delete { id, reply: sender });
+        receiver.await.map_err(internal_error)?
+    }
+
+    fn app(&self) -> Router {
         Router::new()
             .route("/", get(root))
             // WebSockets
             .route("/sync", any(sync_handler))
-            /*
             // Documents
             .route("/get_document", post(get_document))
             .route("/create_document", post(create_document))
             .route("/update_document", post(update_document))
             .route("/delete_document", post(delete_document))
             // Collections
-            .route("/get_collection", post(get_collection))
             .route("/create_collection", post(create_collection))
+            .route("/get_collection", post(get_collection))
+            /*
             .route("/delete_collection", post(delete_collection))
             // Refs
             .route(
@@ -845,17 +1023,29 @@ impl Sinkron {
                 post(update_document_permissions),
             )
             */
-            .with_state(sinkron)
+            .with_state(self.clone())
     }
 
-    pub async fn listen(&self, db_config: DbConfig) {
-        let pool = create_pool(db_config).await;
-        let sinkron = SinkronActorHandle::new(pool);
-        let app = self.app(sinkron);
+    pub async fn listen(&self) {
+        let app = self.app();
         let listener =
             tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
         axum::serve(listener, app).await.unwrap();
     }
+}
+
+type HttpError = (StatusCode, String);
+
+fn sinkron_err_to_http(err: SinkronError) -> HttpError {
+    let code = match err.0 {
+        ErrorCode::BadRequest => StatusCode::BAD_REQUEST,
+        ErrorCode::AuthFailed => StatusCode::UNAUTHORIZED,
+        ErrorCode::NotFound => StatusCode::NOT_FOUND,
+        ErrorCode::Forbidden => StatusCode::FORBIDDEN,
+        ErrorCode::UnprocessableContent => StatusCode::UNPROCESSABLE_ENTITY,
+        ErrorCode::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    (code, err.1)
 }
 
 async fn root() -> &'static str {
@@ -868,18 +1058,117 @@ struct SyncQuery {
     colrev: Option<i64>,
 }
 
+#[derive(serde::Deserialize)]
+struct Id {
+    id: String,
+}
+
 async fn sync_handler(
     ws: WebSocketUpgrade,
     Query(query): Query<SyncQuery>,
-    State(state): State<SinkronActorHandle>,
+    State(sinkron): State<Sinkron>,
 ) -> Response {
-    ws.on_upgrade(move |ws| handle_connect(state, ws, query))
+    ws.on_upgrade(move |ws| handle_connect(sinkron, ws, query))
 }
 
 async fn handle_connect(
-    sinkron: SinkronActorHandle,
-    ws: WebSocket,
+    sinkron: Sinkron,
+    websocket: WebSocket,
     query: SyncQuery,
 ) {
-    _ = sinkron.send(SinkronActorMessage::Connect(ws, query.col, query.colrev));
+    _ = sinkron.actor.send(SinkronActorMessage::Connect {
+        websocket,
+        col: query.col,
+        colrev: query.colrev,
+    });
+}
+
+#[derive(serde::Deserialize)]
+struct GetDocument {
+    id: uuid::Uuid,
+    col: String,
+}
+
+type DeleteDocument = GetDocument;
+
+#[derive(serde::Deserialize)]
+struct CreateDocument {
+    id: uuid::Uuid,
+    col: String,
+    data: String,
+    permissions: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateDocument {
+    id: uuid::Uuid,
+    col: String,
+    data: String,
+}
+
+async fn get_document(
+    State(state): State<Sinkron>,
+    Json(payload): Json<GetDocument>,
+) -> Result<Json<Document>, HttpError> {
+    match state.get_document(payload.id, payload.col).await {
+        Ok(res) => Ok(Json(res)),
+        Err(err) => Err(sinkron_err_to_http(err)),
+    }
+}
+
+async fn create_document(
+    State(state): State<Sinkron>,
+    Json(payload): Json<CreateDocument>,
+) -> Result<Json<Document>, HttpError> {
+    let CreateDocument {
+        id,
+        col,
+        data,
+        permissions,
+    } = payload;
+    match state.create_document(id, col, data).await {
+        Ok(res) => Ok(Json(res)),
+        Err(err) => Err(sinkron_err_to_http(err)),
+    }
+}
+
+async fn update_document(
+    State(state): State<Sinkron>,
+    Json(payload): Json<UpdateDocument>,
+) -> Result<Json<Document>, HttpError> {
+    let UpdateDocument { id, col, data } = payload;
+    match state.update_document(id, col, data).await {
+        Ok(res) => Ok(Json(res)),
+        Err(err) => Err(sinkron_err_to_http(err)),
+    }
+}
+
+async fn delete_document(
+    State(state): State<Sinkron>,
+    Json(payload): Json<DeleteDocument>,
+) -> Result<Json<Document>, HttpError> {
+    match state.delete_document(payload.id, payload.col).await {
+        Ok(res) => Ok(Json(res)),
+        Err(err) => Err(sinkron_err_to_http(err)),
+    }
+}
+
+async fn create_collection(
+    State(state): State<Sinkron>,
+    Json(payload): Json<CreateCollection>,
+) -> Result<Json<Collection>, HttpError> {
+    match state.create_collection(payload).await {
+        Ok(col) => Ok(Json(col)),
+        Err(err) => Err(sinkron_err_to_http(err)),
+    }
+}
+
+async fn get_collection(
+    State(state): State<Sinkron>,
+    Json(id): Json<Id>,
+) -> Result<Json<Collection>, HttpError> {
+    match state.get_collection(id.id).await {
+        Ok(col) => Ok(Json(col)),
+        Err(err) => Err(sinkron_err_to_http(err)),
+    }
 }
