@@ -1,31 +1,33 @@
+mod db;
 mod models;
 mod protocol;
 mod schema;
-// mod sinkron;
-mod db;
-mod sinkron2;
+mod sinkron;
+
+use std::env;
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
 
-    let config = db::DbConfig {
+    /*
+    let db = db::DbConfig {
         host: "localhost".to_string(),
         port: 5432,
         database: "sinkron_rs".to_string(),
         user: "postgres".to_string(),
         password: "password".to_string(),
     };
-    /*
-    let config = {
-        port: 80,
-        host: "localhost",
-        api_token: env.SINKRON_API_TOKEN,
-        sync_auth_url: env.SINKRON_AUTH_URL
+    let config = sinkron::SinkronConfig {
+        host: env::var("SINKRON_HOST").unwrap(),
+        port: env::var("SINKRON_PORT").unwrap(),
+        api_token: env::var("SINKRON_API_TOKEN").unwrap(),
+        db
     };
     */
-    // let sinkron = sinkron::Sinkron::new(config).await;
-    // sinkron.listen().await;
-    let sinkron2 = sinkron2::Sinkron::new(config).await;
-    sinkron2.listen().await;
+    let config = serde_json::from_str::<sinkron::SinkronConfig>(
+        &env::var("SINKRON_CONFIG").unwrap(),
+    ).unwrap();
+    let sinkron = sinkron::Sinkron::new(config).await;
+    sinkron.listen().await;
 }

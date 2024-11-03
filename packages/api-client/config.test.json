@@ -1,0 +1,12 @@
+{
+    "host": "0.0.0.0",
+    "port": 3000,
+    "apiToken": "API_TOKEN",
+    "db": {
+        "host": "0.0.0.0",
+        "port": 5000,
+        "user": "postgres",
+        "password": "password",
+        "database": "sinkron"
+    }
+}

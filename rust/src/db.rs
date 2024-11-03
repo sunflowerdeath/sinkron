@@ -10,6 +10,7 @@ pub type DbConnectionPool = deadpool::managed::Pool<
     AsyncDieselConnectionManager<diesel_async::AsyncPgConnection>,
 >;
 
+#[derive(serde::Deserialize)]
 pub struct DbConfig {
     pub host: String,
     pub port: i32,

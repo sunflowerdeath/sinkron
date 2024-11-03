@@ -15,10 +15,10 @@ const Result = {
     err: <T, E>(error: E): ResultType<T, E> => ({ isOk: false, error })
 }
 
-enum ErrorCode {
+export enum ErrorCode {
     FetchError = "fetch_error",
-    RequestAborted = "request_aborted",
-    JsonParseError = "json_parse_error",
+    // RequestAborted = "request_aborted",
+    InvalidResponse = "invalid_response",
     AuthFailed = "auth_failed",
     BadRequest = "bad_request",
     NotFound = "not_found",
@@ -27,10 +27,17 @@ enum ErrorCode {
     InternalServerError = "internal_server_error"
 }
 
-type SinkronError = {
+export type SinkronError = {
     code: ErrorCode
     message: string
 }
+
+type SinkronErrorResponse = { error: SinkronError }
+
+const isSinkronErrorResponse = (data: any): data is SinkronErrorResponse =>
+    typeof data === "object" &&
+    "error" in data &&
+    typeof data.error === "object"
 
 type RawCollection = {
     id: string
@@ -39,7 +46,7 @@ type RawCollection = {
     permissions: string
 }
 
-type Collection = {
+export type Collection = {
     id: string
     is_ref: boolean
     colrev: string
@@ -56,7 +63,7 @@ type RawDocument = {
     permissions: string
 }
 
-type Document = {
+export type Document = {
     id: string
     createdAt: Date
     updatedAt: Date
@@ -85,14 +92,14 @@ const parseDocument = (raw: RawDocument): Document => {
     return parsed
 }
 
-type SinkronClientProps = {
+type SinkronApiProps = {
     url: string
     token: string
 }
 
-class SinkronClient {
+class SinkronApi {
     constructor(props: SinkronClientProps) {
-        this.url = props.url
+        this.url = props.url.replace(/\/$/, "")
         this.token = props.token
     }
 
@@ -103,25 +110,93 @@ class SinkronClient {
         method: string,
         payload: object
     ): Promise<ResultType<T, SinkronError>> {
-        let url = this.url + method
-        let res = await fetch(url, {
+        let url = `${this.url}/${method}`
+        let request = fetch(url, {
             method: "POST",
             headers: {
-                Accept: "application/json"
+                accept: "application/json",
+                "x-sinkron-api-token": this.token
             },
             body: JSON.stringify(payload)
         })
+
+        let response: Response | undefined = undefined
+        try {
+            response = await request
+        } catch (e) {
+            // if (isAbortError(e)) {
+            // return Result.err({
+            // code: ErrorCode.RequestAborted,
+            // message: "Request was aborted"
+            // })
+            // }
+            return Result.err({
+                code: ErrorCode.FetchError,
+                message: "Couldn't fetch",
+                details: { originalError: e, response }
+            })
+        }
+
+        const contentType = response.headers.get("content-type")
+        let isJson =
+            contentType && contentType.indexOf("application/json") !== -1
+
+        const parseJson = async (): Promise<
+            ResultType<object, SinkronError>
+        > => {
+            try {
+                return Result.ok(await response.json())
+            } catch (e) {
+                return Result.err({
+                    code: ErrorCode.InvalidResponse,
+                    message: "Couldn't parse response",
+                    details: { originalError: e, response }
+                })
+            }
+        }
+
+        if (response.ok) {
+            if (isJson) {
+                const res = await parseJson()
+                if (!res.isOk) return res
+                return Result.ok(res.value as T)
+            } else {
+                return Result.err({
+                    code: ErrorCode.InvalidResponse,
+                    message:
+                        "Invalid response content type, " +
+                        "required 'application/json'",
+                    details: { response }
+                })
+            }
+        } else {
+            if (isJson) {
+                const res = await parseJson()
+                if (!res.isOk) return res
+                if (isSinkronErrorResponse(res.value)) {
+                    return Result.err(res.value.error)
+                }
+            }
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Unknown error",
+                details: { response }
+            })
+        }
     }
 
     // Collections
 
-    async createCollection(
-        id: string,
+    async createCollection({
+        id,
+        permissions
+    }: {
+        id: string
         permissions: Permissions
-    ): Promise<ResultType<Collection, SinkronError>> {
+    }): Promise<ResultType<Collection, SinkronError>> {
         let res = await this.send<RawCollection>("create_collection", {
             id,
-            permissions
+            permissions: permissions.stringify()
         })
         if (!res.isOk) return res
         return Result.ok(parseCollection(res.value))
@@ -224,27 +299,64 @@ class SinkronClient {
         return this.updateDocument(id, col, update)
     }
 
-    // Groups
+    // Groups and users
 
     async createGroup(
-        user: string,
         group: string
-    ): Promise<ResultType<void, SinkronError>> {}
+    ): Promise<ResultType<undefined, SinkronError>> {
+        let res = await this.send<RawDocument>("create_group", { group })
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
+
+    async deleteGroup(
+        group: string
+    ): Promise<ResultType<undefined, SinkronError>> {
+        let res = await this.send<RawDocument>("delete_group", { group })
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
+
     async addUserToGroup(
         user: string,
         group: string
-    ): Promise<ResultType<void, SinkronError>> {}
+    ): Promise<ResultType<void, SinkronError>> {
+        let res = await this.send<RawDocument>("add_user_to_group", {
+            group,
+            user
+        })
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
+
     async removeUserFromGroup(
         group: string,
         user: string
-    ): Promise<ResultType<void, SinkronError>> {}
+    ): Promise<ResultType<void, SinkronError>> {
+        let res = await this.send<RawDocument>("remove_user_from_group", {
+            group,
+            user
+        })
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
+
     async removeUserFromAllGroups(
         user: string
-    ): Promise<ResultType<void, SinkronError>> {}
+    ): Promise<ResultType<void, SinkronError>> {
+        let res = await this.send<RawDocument>("remove_user_from_all_groups", {
+            user
+        })
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
 
     // Permissions
 
-    // async updateCollectionPermission
+    // async updateCollectionPermission(id, cb(p: Permissions) => void)
+    // async updateDocumentPermission(id, cb(p: Permissions) => void)
+    // ? async checkDocumentPermission
+    // ? async checkDocumentPermission
 }
 
-export { SinkronClient }
+export { SinkronApi }

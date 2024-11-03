@@ -5,7 +5,12 @@
     "main": "index.js",
     "scripts": {
         "lint": "oxlint -c ./oxlintrc.json src",
-        "build": "tsc && NODE_ENV=production rspack --config rspack.config.js"
+        "build": "tsc && NODE_ENV=production rspack --config rspack.config.js",
+        "test:build": "rspack --config rspack.test.config.js",
+        "test:db": "docker compose -f ./postgres-compose.yml up -d --force-recreate",
+        "test:sinkron": "SINKRON_CONFIG=$(cat config.test.json) cd ../../rust && cargo run",
+        "test:run": "mocha ./build/test.js",
+        "test": "pnpm test:builder && pnpm test:db && pnpm test:run"
     },
     "keywords": [],
     "author": "sunflowerdeath",
@@ -13,10 +18,13 @@
     "devDependencies": {
         "@rspack/cli": "^1.0.13",
         "@rspack/core": "^1.0.13",
-        "@types/uuid": "^9.0.8"
+        "@types/uuid": "^9.0.8",
+        "mocha": "^10.7.3"
     },
     "dependencies": {
+        "@types/node": "^22.8.6",
         "date-fns": "^3.6.0",
+        "dotenv": "^16.4.5",
         "js-base64": "^3.7.7",
         "loro-crdt": "^1.0.8",
         "nanoid": "^4.0.2",

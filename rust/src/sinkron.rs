@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    extract::{Query, State},
+    extract::{Query, Request, State},
     http::StatusCode,
-    response::Response,
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{any, get, post},
     Json, Router,
 };
@@ -13,16 +14,70 @@ use base64::prelude::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use log::trace;
-use tokio::select;
-use tokio::sync::{mpsc, oneshot, Notify};
-use tokio::time::{sleep, Duration};
+use tokio::{
+    select,
+    sync::{mpsc, oneshot, Notify},
+    time::{sleep, Duration},
+};
+use serde;
 
 use crate::db;
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
 
-type SinkronError = (ErrorCode, String);
+#[derive(serde::Serialize)]
+struct SinkronError {
+    code: ErrorCode,
+    message: String,
+}
+
+impl SinkronError {
+    fn bad_request(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::BadRequest,
+            message: msg.to_string(),
+        }
+    }
+    fn auth_failed(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::AuthFailed,
+            message: msg.to_string(),
+        }
+    }
+    fn not_found(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::NotFound,
+            message: msg.to_string(),
+        }
+    }
+    fn forbidden(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::Forbidden,
+            message: msg.to_string(),
+        }
+    }
+    fn unprocessable(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::UnprocessableContent,
+            message: msg.to_string(),
+        }
+    }
+    fn internal(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::InternalServerError,
+            message: msg.to_string(),
+        }
+    }
+}
+
+/// Utility function for mapping any error into an Internal Server Error
+fn internal_error<E>(err: E) -> SinkronError
+where
+    E: std::error::Error,
+{
+    SinkronError::internal(&err.to_string())
+}
 
 #[derive(serde::Serialize)]
 struct Document {
@@ -33,14 +88,6 @@ struct Document {
     col: String,
     colrev: i64,
     permissions: String,
-}
-
-/// Utility function for mapping any error into an Internal Server Error
-fn internal_error<E>(err: E) -> SinkronError
-where
-    E: std::error::Error,
-{
-    (ErrorCode::InternalServerError, err.to_string())
 }
 
 #[derive(Clone)]
@@ -165,7 +212,7 @@ impl ClientActor {
             reply: sender,
         });
         if send.is_err() {
-            // couldn't send, reply with get error ?
+            // TODO couldn't send, just exit ?
             return;
         }
         match receiver.await {
@@ -184,12 +231,13 @@ impl ClientActor {
                 // Couldn't get document
                 let err = GetErrorMessage {
                     id: msg.id,
-                    code: err.0,
+                    code: err.code,
                 };
                 self.send_message(ServerMessage::GetError(err)).await;
             }
             Err(_) => {
-                // Couldn't receive
+                // Couldn't receive reply
+                // TODO - just exit ?
                 let err = GetErrorMessage {
                     id: msg.id,
                     code: ErrorCode::InternalServerError,
@@ -226,7 +274,7 @@ impl ClientActor {
                 let err = ChangeErrorMessage {
                     id: msg.id,
                     changeid: msg.changeid,
-                    code: err.0,
+                    code: err.code,
                 };
                 self.send_message(ServerMessage::ChangeError(err)).await;
             }
@@ -246,7 +294,7 @@ impl ClientActor {
             let _ = self.websocket.send(Message::Text(encoded)).await;
             trace!("client-{}: sent message to websocket", self.client_id);
         }
-        // TODO if couldnt write, then writer actor is dead, so should exit
+        // TODO if couldnt write, then writer actor is dead, so exit
     }
 }
 
@@ -467,10 +515,7 @@ impl CollectionActor {
         */
 
         let decoded = BASE64_STANDARD.decode(&data).map_err(|_| {
-            (
-                ErrorCode::BadRequest,
-                "Couldn't decode data from base64".to_string(),
-            )
+            SinkronError::bad_request("Couldn't decode data from base64")
         })?;
 
         println!("Data: {}", decoded.len());
@@ -538,9 +583,9 @@ impl CollectionActor {
             .await
             .map_err(|err| match err {
                 diesel::NotFound => {
-                    (ErrorCode::NotFound, "Document not found".to_string())
+                    SinkronError::not_found("Document not found")
                 }
-                err => (ErrorCode::InternalServerError, err.to_string()),
+                err => SinkronError::internal(&err.to_string()),
             })?;
 
         let doc = Document {
@@ -569,41 +614,32 @@ impl CollectionActor {
             .await
             .map_err(|err| match err {
                 diesel::NotFound => {
-                    (ErrorCode::NotFound, "Document not found".to_string())
+                    SinkronError::not_found("Document not found")
                 }
-                err => (ErrorCode::InternalServerError, err.to_string()),
+                err => SinkronError::internal(&err.to_string()),
             })?;
 
         let Some(data) = doc.data else {
-            return Err((
-                ErrorCode::UnprocessableContent,
-                "Couldn't update deleted document".to_string(),
+            return Err(SinkronError::unprocessable(
+                "Couldn't update deleted document",
             ));
         };
         let Ok(decoded_update) = BASE64_STANDARD.decode(&update) else {
-            return Err((
-                ErrorCode::BadRequest,
-                "Couldn't decode update from base64".to_string(),
+            return Err(SinkronError::bad_request(
+                "Couldn't decode update from base64",
             ));
         };
         let loro_doc = loro::LoroDoc::new();
         if let Err(e) = loro_doc.import(&data) {
-            return Err((
-                ErrorCode::InternalServerError,
-                "Couldn't open document, data might be corrupted".to_string(),
+            return Err(SinkronError::internal(
+                "Couldn't open document, data might be corrupted",
             ));
         }
         if loro_doc.import(&decoded_update).is_err() {
-            return Err((
-                ErrorCode::BadRequest,
-                "Couldn't import update".to_string(),
-            ));
+            return Err(SinkronError::bad_request("Couldn't import update"));
         }
         let Ok(snapshot) = loro_doc.export(loro::ExportMode::Snapshot) else {
-            return Err((
-                ErrorCode::BadRequest,
-                "Couldn't export snapshot".to_string(),
-            ));
+            return Err(SinkronError::bad_request("Couldn't export snapshot"));
         };
 
         let next_colrev = self.increment_colrev().await?;
@@ -645,10 +681,7 @@ impl CollectionActor {
 
         // TODO
 
-        Err((
-            ErrorCode::InternalServerError,
-            "Not implemented".to_string(),
-        ))
+        Err(SinkronError::internal("Not implemented"))
     }
 }
 
@@ -775,16 +808,19 @@ impl SinkronActor {
 
         // check permissions
 
+        // check if colrev is valid
+
         let collection = self.get_collection_actor(&col);
 
         // spawn client actor
         let client_id = self.get_client_id();
-        let collection_clone = collection.clone();
-        let on_exit: ExitCallback = Box::new(move || {
-            trace!("client-{}: exit", client_id);
-            collection_clone.send(CollectionMessage::Unsubscribe { client_id });
-        });
-
+        let on_exit: ExitCallback = {
+            let collection = collection.clone();
+            Box::new(move || {
+                trace!("client-{}: exit", client_id);
+                collection.send(CollectionMessage::Unsubscribe { client_id });
+            })
+        };
         let client = ClientHandle::new(
             client_id,
             ws,
@@ -813,12 +849,13 @@ impl SinkronActor {
     }
 
     fn spawn_collection_actor(&mut self, id: &str) -> CollectionHandle {
-        let exit_sender = self.exit_channel.0.clone();
-        let id_clone = id.to_string();
-        let on_exit: ExitCallback = Box::new(move || {
-            exit_sender.send(id_clone);
-        });
-
+        let on_exit: ExitCallback = {
+            let exit_sender = self.exit_channel.0.clone();
+            let id = id.to_string();
+            Box::new(move || {
+                exit_sender.send(id);
+            })
+        };
         let col = CollectionHandle::new(
             id.to_string(),
             self.pool.clone(),
@@ -851,17 +888,40 @@ type Collection = models::Collection;
 
 type CreateCollection = models::NewCollection;
 
+fn default_host() -> String { "0.0.0.0".to_string() }
+fn default_port() -> u32 { 3000 }
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SinkronConfig {
+    #[serde(default = "default_host")]
+    pub host: String,
+    #[serde(default = "default_port")]
+    pub port: u32,
+    pub api_token: String,
+    pub db: db::DbConfig,
+}
+
 #[derive(Clone)]
 pub struct Sinkron {
     pool: db::DbConnectionPool,
     actor: SinkronActorHandle,
+    host: String,
+    port: u32,
+    api_token: String,
 }
 
 impl Sinkron {
-    pub async fn new(db_config: db::DbConfig) -> Self {
-        let pool = db::create_pool(db_config).await;
+    pub async fn new(config: SinkronConfig) -> Self {
+        let pool = db::create_pool(config.db).await;
         let actor = SinkronActorHandle::new(pool.clone());
-        Self { pool, actor }
+        Self {
+            pool,
+            actor,
+            host: config.host,
+            port: config.port,
+            api_token: config.api_token,
+        }
     }
 
     async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
@@ -905,9 +965,9 @@ impl Sinkron {
             .await
             .map_err(|err| match err {
                 diesel::NotFound => {
-                    (ErrorCode::NotFound, "Collection not found".to_string())
+                    SinkronError::not_found("Collection not found")
                 }
-                err => (ErrorCode::InternalServerError, err.to_string()),
+                err => SinkronError::internal(&err.to_string()),
             })
     }
 
@@ -976,11 +1036,7 @@ impl Sinkron {
     }
 
     fn app(&self) -> Router {
-        Router::new()
-            .route("/", get(root))
-            // WebSockets
-            .route("/sync", any(sync_handler))
-            // Documents
+        let api_router = Router::new()
             .route("/get_document", post(get_document))
             .route("/create_document", post(create_document))
             .route("/update_document", post(update_document))
@@ -1023,44 +1079,37 @@ impl Sinkron {
                 post(update_document_permissions),
             )
             */
+            .layer(middleware::from_fn_with_state(
+                self.clone(),
+                check_auth_token,
+            ))
+            .with_state(self.clone());
+
+        Router::new()
+            .route("/", get(root))
+            .route("/sync", any(sync_handler))
+            .merge(api_router)
             .with_state(self.clone())
     }
 
     pub async fn listen(&self) {
         let app = self.app();
-        let listener =
-            tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        let host = format!("{}:{}", self.host, self.port);
+        let listener = tokio::net::TcpListener::bind(host).await.unwrap();
         axum::serve(listener, app).await.unwrap();
     }
 }
 
-type HttpError = (StatusCode, String);
-
-fn sinkron_err_to_http(err: SinkronError) -> HttpError {
-    let code = match err.0 {
-        ErrorCode::BadRequest => StatusCode::BAD_REQUEST,
-        ErrorCode::AuthFailed => StatusCode::UNAUTHORIZED,
-        ErrorCode::NotFound => StatusCode::NOT_FOUND,
-        ErrorCode::Forbidden => StatusCode::FORBIDDEN,
-        ErrorCode::UnprocessableContent => StatusCode::UNPROCESSABLE_ENTITY,
-        ErrorCode::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
-    };
-    (code, err.1)
-}
-
 async fn root() -> &'static str {
-    "Hello, World!"
+    "Sinkron api"
 }
+
+// Websocket handler
 
 #[derive(serde::Deserialize)]
 struct SyncQuery {
     col: String,
     colrev: Option<i64>,
-}
-
-#[derive(serde::Deserialize)]
-struct Id {
-    id: String,
 }
 
 async fn sync_handler(
@@ -1082,6 +1131,89 @@ async fn handle_connect(
         colrev: query.colrev,
     });
 }
+
+// Api auth middleware
+
+fn get_header_value(req: &Request, header: &str) -> Option<String> {
+    let Some(header_value) = req.headers().get(header) else {
+        return None;
+    };
+    if let Ok(str) = header_value.to_str() {
+        Some(str.to_string())
+    } else {
+        None
+    }
+}
+
+async fn check_auth_token(
+    State(state): State<Sinkron>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let header = get_header_value(&req, "x-sinkron-api-token");
+    if Some(state.api_token) == header {
+        next.run(req).await
+    } else {
+        sinkron_err_response(SinkronError::auth_failed(
+            "Invalid authorization token",
+        ))
+    }
+}
+
+// Api response helpers
+
+#[derive(serde::Serialize)]
+struct SinkronErrorBody {
+    error: SinkronError,
+}
+
+fn sinkron_err_response(error: SinkronError) -> Response {
+    let status = match error.code {
+        ErrorCode::BadRequest => StatusCode::BAD_REQUEST,
+        ErrorCode::AuthFailed => StatusCode::UNAUTHORIZED,
+        ErrorCode::NotFound => StatusCode::NOT_FOUND,
+        ErrorCode::Forbidden => StatusCode::FORBIDDEN,
+        ErrorCode::UnprocessableContent => StatusCode::UNPROCESSABLE_ENTITY,
+        ErrorCode::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    let body = Json(SinkronErrorBody { error });
+    (status, body).into_response()
+}
+
+fn sinkron_response<T>(result: Result<T, SinkronError>) -> Response
+where
+    T: serde::Serialize,
+{
+    match result {
+        Ok(res) => Json(res).into_response(),
+        Err(err) => sinkron_err_response(err),
+    }
+}
+
+// Collection handlers
+
+#[derive(serde::Deserialize)]
+struct Id {
+    id: String,
+}
+
+async fn create_collection(
+    State(state): State<Sinkron>,
+    Json(payload): Json<CreateCollection>,
+) -> Response {
+    let res = state.create_collection(payload).await;
+    sinkron_response(res)
+}
+
+async fn get_collection(
+    State(state): State<Sinkron>,
+    Json(id): Json<Id>,
+) -> Response {
+    let res = state.get_collection(id.id).await;
+    sinkron_response(res)
+}
+
+// Document handlers
 
 #[derive(serde::Deserialize)]
 struct GetDocument {
@@ -1109,66 +1241,38 @@ struct UpdateDocument {
 async fn get_document(
     State(state): State<Sinkron>,
     Json(payload): Json<GetDocument>,
-) -> Result<Json<Document>, HttpError> {
-    match state.get_document(payload.id, payload.col).await {
-        Ok(res) => Ok(Json(res)),
-        Err(err) => Err(sinkron_err_to_http(err)),
-    }
+) -> Response {
+    let res = state.get_document(payload.id, payload.col).await;
+    sinkron_response(res)
 }
 
 async fn create_document(
     State(state): State<Sinkron>,
     Json(payload): Json<CreateDocument>,
-) -> Result<Json<Document>, HttpError> {
+) -> Response {
     let CreateDocument {
         id,
         col,
         data,
         permissions,
     } = payload;
-    match state.create_document(id, col, data).await {
-        Ok(res) => Ok(Json(res)),
-        Err(err) => Err(sinkron_err_to_http(err)),
-    }
+    let res = state.create_document(id, col, data).await;
+    sinkron_response(res)
 }
 
 async fn update_document(
     State(state): State<Sinkron>,
     Json(payload): Json<UpdateDocument>,
-) -> Result<Json<Document>, HttpError> {
+) -> Response {
     let UpdateDocument { id, col, data } = payload;
-    match state.update_document(id, col, data).await {
-        Ok(res) => Ok(Json(res)),
-        Err(err) => Err(sinkron_err_to_http(err)),
-    }
+    let res = state.update_document(id, col, data).await;
+    sinkron_response(res)
 }
 
 async fn delete_document(
     State(state): State<Sinkron>,
     Json(payload): Json<DeleteDocument>,
-) -> Result<Json<Document>, HttpError> {
-    match state.delete_document(payload.id, payload.col).await {
-        Ok(res) => Ok(Json(res)),
-        Err(err) => Err(sinkron_err_to_http(err)),
-    }
-}
-
-async fn create_collection(
-    State(state): State<Sinkron>,
-    Json(payload): Json<CreateCollection>,
-) -> Result<Json<Collection>, HttpError> {
-    match state.create_collection(payload).await {
-        Ok(col) => Ok(Json(col)),
-        Err(err) => Err(sinkron_err_to_http(err)),
-    }
-}
-
-async fn get_collection(
-    State(state): State<Sinkron>,
-    Json(id): Json<Id>,
-) -> Result<Json<Collection>, HttpError> {
-    match state.get_collection(id.id).await {
-        Ok(col) => Ok(Json(col)),
-        Err(err) => Err(sinkron_err_to_http(err)),
-    }
+) -> Response {
+    let res = state.delete_document(payload.id, payload.col).await;
+    sinkron_response(res)
 }
