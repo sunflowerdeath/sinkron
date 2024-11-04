@@ -23,6 +23,8 @@ CREATE TABLE "documents" (
 
 CREATE INDEX ON "documents" ("col_id", "colrev");
 
+SELECT diesel_manage_updated_at('documents');
+
 CREATE TABLE "refs" (
     "id" uuid NOT NULL DEFAULT gen_random_uuid(),
     "is_removed" boolean NOT NULL DEFAULT false,

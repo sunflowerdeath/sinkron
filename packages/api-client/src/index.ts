@@ -92,13 +92,13 @@ const parseDocument = (raw: RawDocument): Document => {
     return parsed
 }
 
-type SinkronApiProps = {
+export type SinkronApiProps = {
     url: string
     token: string
 }
 
 class SinkronApi {
-    constructor(props: SinkronClientProps) {
+    constructor(props: SinkronApiProps) {
         this.url = props.url.replace(/\/$/, "")
         this.token = props.token
     }
@@ -114,6 +114,7 @@ class SinkronApi {
         let request = fetch(url, {
             method: "POST",
             headers: {
+                "content-type": "application/json",
                 accept: "application/json",
                 "x-sinkron-api-token": this.token
             },
@@ -196,6 +197,7 @@ class SinkronApi {
     }): Promise<ResultType<Collection, SinkronError>> {
         let res = await this.send<RawCollection>("create_collection", {
             id,
+            is_ref: false,
             permissions: permissions.stringify()
         })
         if (!res.isOk) return res

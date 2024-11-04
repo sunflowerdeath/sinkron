@@ -3,14 +3,14 @@ import assert from "node:assert"
 import { SinkronApi, ErrorCode } from "../index"
 import { Permissions } from "../permissions"
 
-let url = process.env.SINKRON_API_URL
-let token = process.env.SINKRON_API_TOKEN
+let url = "http://localhost:3000"
+let token = "SINKRON_API_TOKEN"
 
 describe("SinkronApi", () => {
     it("auth", async () => {
         let permissions = new Permissions()
 
-        let invalidUrlApi = new SinkronApi({ url: "invalid", token: "invalid" })
+        let invalidUrlApi = new SinkronApi({ url: "INVALID", token: "INVALID" })
         let invalidUrlRes = await invalidUrlApi.createCollection({
             id: "test",
             permissions
@@ -18,7 +18,7 @@ describe("SinkronApi", () => {
         assert(!invalidUrlRes.isOk, "fetch error")
         assert.strictEqual(invalidUrlRes.error.code, ErrorCode.FetchError)
 
-        let invalidTokenApi = new SinkronApi({ url, token: "invalid" })
+        let invalidTokenApi = new SinkronApi({ url, token: "INVALID" })
         let invalidTokenRes = await invalidTokenApi.createCollection({
             id: "test",
             permissions
@@ -32,6 +32,7 @@ describe("SinkronApi", () => {
 
         let permissions = new Permissions()
         let createRes = await api.createCollection({ id: "test", permissions })
+        console.log(createRes)
         assert(createRes.isOk, "create")
 
         let duplicateRes = await api.createCollection({

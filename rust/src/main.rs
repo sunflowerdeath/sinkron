@@ -29,5 +29,5 @@ async fn main() {
         &env::var("SINKRON_CONFIG").unwrap(),
     ).unwrap();
     let sinkron = sinkron::Sinkron::new(config).await;
-    sinkron.listen().await;
+    sinkron.run().await;
 }

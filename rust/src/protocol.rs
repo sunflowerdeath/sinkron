@@ -1,12 +1,18 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ErrorCode {
+    #[serde(rename = "bad_request")]
     BadRequest,
+    #[serde(rename = "auth_failed")]
     AuthFailed,
+    #[serde(rename = "not_found")]
     NotFound,
+    #[serde(rename = "forbidden")]
     Forbidden,
+    #[serde(rename = "unprocessable_content")]
     UnprocessableContent,
+    #[serde(rename = "internal_server_error")]
     InternalServerError,
 }
 

@@ -14,19 +14,19 @@ use base64::prelude::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use log::trace;
+use serde;
 use tokio::{
     select,
     sync::{mpsc, oneshot, Notify},
     time::{sleep, Duration},
 };
-use serde;
 
 use crate::db;
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug)]
 struct SinkronError {
     code: ErrorCode,
     message: String,
@@ -888,8 +888,12 @@ type Collection = models::Collection;
 
 type CreateCollection = models::NewCollection;
 
-fn default_host() -> String { "0.0.0.0".to_string() }
-fn default_port() -> u32 { 3000 }
+fn default_host() -> String {
+    "0.0.0.0".to_string()
+}
+fn default_port() -> u32 {
+    3000
+}
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -945,6 +949,7 @@ impl Sinkron {
         props: CreateCollection,
     ) -> Result<Collection, SinkronError> {
         let mut conn = self.connect().await?;
+        // TODO check duplicate (for error message)
         let col = diesel::insert_into(schema::collections::table)
             .values(&props)
             .returning(models::Collection::as_returning())
@@ -1092,7 +1097,12 @@ impl Sinkron {
             .with_state(self.clone())
     }
 
-    pub async fn listen(&self) {
+    pub async fn run(&self) {
+        let conn = self.connect().await.unwrap();
+        db::run_migrations(deadpool::managed::Object::take(conn))
+            .await
+            .unwrap();
+
         let app = self.app();
         let host = format!("{}:{}", self.host, self.port);
         let listener = tokio::net::TcpListener::bind(host).await.unwrap();
