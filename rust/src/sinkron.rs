@@ -80,6 +80,7 @@ where
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Document {
     id: uuid::Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -426,6 +427,7 @@ impl CollectionActor {
             CollectionMessage::Get { id, reply } => {
                 trace!("col-{}: get document, id: {}", self.id, id);
                 let res = self.get_document(id).await;
+                reply.send(res);
             }
             CollectionMessage::Create { id, data, reply } => {
                 trace!("col-{}: create, id: {}", self.id, id);
@@ -949,7 +951,15 @@ impl Sinkron {
         props: CreateCollection,
     ) -> Result<Collection, SinkronError> {
         let mut conn = self.connect().await?;
-        // TODO check duplicate (for error message)
+        let cnt: i64 = schema::collections::table
+            .filter(schema::collections::id.eq(&props.id))
+            .count()
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if cnt != 0 {
+            return Err(SinkronError::unprocessable("Duplicate collection id"));
+        }
         let col = diesel::insert_into(schema::collections::table)
             .values(&props)
             .returning(models::Collection::as_returning())

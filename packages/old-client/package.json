@@ -1,0 +1,33 @@
+{
+    "name": "sinkron-client",
+    "version": "0.0.1",
+    "description": "",
+    "main": "build/main.js",
+    "browser": "build/main.browser.js",
+    "types": "types/index.d.ts",
+    "scripts": {
+        "lint": "oxlint -c ./oxlintrc.json src",
+        "build": "tsc && NODE_ENV=production rspack --config rspack.config.js"
+    },
+    "author": "sunflowerdeath",
+    "license": "Unlicense",
+    "devDependencies": {
+        "@rspack/cli": "^1.0.13",
+        "@rspack/core": "^1.0.13",
+        "@types/lodash-es": "^4.17.12",
+        "@types/uuid": "^9.0.8"
+    },
+    "dependencies": {
+        "@automerge/automerge": "^2.2.8",
+        "date-fns": "^3.6.0",
+        "js-base64": "^3.7.7",
+        "lodash-es": "^4.17.21",
+        "mobx": "^6.13.3",
+        "nanoevents": "^7.0.1",
+        "nanoid": "^4.0.2",
+        "pino": "^8.21.0",
+        "pino-pretty": "^10.3.1",
+        "sinkron-protocol": "workspace:*",
+        "uuid": "^9.0.1"
+    }
+}

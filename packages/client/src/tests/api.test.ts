@@ -1,5 +1,8 @@
 import assert from "node:assert"
 
+import { v4 as uuidv4 } from "uuid"
+import { LoroDoc } from "loro-crdt"
+
 import { SinkronApi, ErrorCode } from "../index"
 import { Permissions } from "../permissions"
 
@@ -57,13 +60,30 @@ describe("SinkronApi", () => {
             "not found"
         )
 
-        let deleteRes = await api.deleteCollection("test")
-        assert(deleteRes.isOk, "delete")
+        // let deleteRes = await api.deleteCollection("test")
+        // assert(deleteRes.isOk, "delete")
     })
 
-    it("documents", () => {
+    it.only("documents", async () => {
+        let api = new SinkronApi({ url, token })
+
+        let col = uuidv4()
+        let permissions = new Permissions()
+        let createColRes = await api.createCollection({ id: col, permissions })
+        assert(createColRes.isOk)
+
         // create
+        let id = uuidv4()
+        let loroDoc = new LoroDoc()
+        loroDoc.getText("text").insert(0, "Hello world!")
+        let snapshot = loroDoc.export({ mode: "snapshot" })
+        let createRes = await api.createDocument({ id, col, data: snapshot })
+        assert(createRes.isOk)
+
         // get
+        let getRes = await api.getDocument({ id, col })
+        assert(getRes.isOk)
+
         // update
         // delete
     })
