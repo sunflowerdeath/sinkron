@@ -70,22 +70,39 @@ describe("SinkronApi", () => {
         let col = uuidv4()
         let permissions = new Permissions()
         let createColRes = await api.createCollection({ id: col, permissions })
-        assert(createColRes.isOk)
+        assert(createColRes.isOk, "create col: ok")
 
         // create
         let id = uuidv4()
         let loroDoc = new LoroDoc()
-        loroDoc.getText("text").insert(0, "Hello world!")
+        loroDoc.getText("text").insert(0, "Hello")
         let snapshot = loroDoc.export({ mode: "snapshot" })
         let createRes = await api.createDocument({ id, col, data: snapshot })
-        assert(createRes.isOk)
+        assert(createRes.isOk, "create: ok")
+        
+        // TODO duplicate
 
         // get
         let getRes = await api.getDocument({ id, col })
-        assert(getRes.isOk)
+        assert(getRes.isOk, "get: ok")
+
+        // TODO not found
+        // TODO not found (invalid col)
 
         // update
+        let version = loroDoc.version()
+        loroDoc.getText("text").insert(5, ", world!")
+        let update = loroDoc.export({ mode: "update", from: version })
+        let updateRes = await api.updateDocument({ id, col, data: update })
+        assert(updateRes.isOk, "update: ok")
+
         // delete
+        let deleteRes = await api.deleteDocument({ id, col })
+        assert(deleteRes.isOk, "delete: ok")
+        assert.strictEqual(deleteRes.value.data, null, "delete: data is null")
+
+        // TODO already deleted
+        // TODO update deleted
     })
 
     it("groups", () => {

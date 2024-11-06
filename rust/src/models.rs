@@ -49,7 +49,8 @@ pub struct NewDocument {
 #[diesel(table_name = schema::documents)]
 pub struct DocumentUpdate<'a> {
     pub colrev: i64,
-    pub data: &'a[u8],
+    pub is_deleted: bool,
+    pub data: Option<&'a Vec<u8>>,
 }
 
 #[derive(serde::Serialize, Selectable, Queryable)]

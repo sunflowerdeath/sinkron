@@ -427,22 +427,22 @@ impl CollectionActor {
             CollectionMessage::Get { id, reply } => {
                 trace!("col-{}: get document, id: {}", self.id, id);
                 let res = self.get_document(id).await;
-                reply.send(res);
+                _ = reply.send(res);
             }
             CollectionMessage::Create { id, data, reply } => {
                 trace!("col-{}: create, id: {}", self.id, id);
                 let res = self.create_document(id, data, None).await;
-                reply.send(res);
+                _ = reply.send(res);
             }
             CollectionMessage::Update { id, data, reply } => {
                 trace!("col-{}: update, id: {}", self.id, id);
-                let res = self.update_document(id, data).await;
-                reply.send(res);
+                let res = self.update_document(id, Some(data)).await;
+                _ = reply.send(res);
             }
             CollectionMessage::Delete { id, reply } => {
                 trace!("col-{}: delete, id: {}", self.id, id);
-                let res = self.delete_document(id).await;
-                reply.send(res);
+                let res = self.update_document(id, None).await;
+                _ = reply.send(res);
             }
         }
     }
@@ -579,6 +579,7 @@ impl CollectionActor {
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
+        // TODO check col
         let doc: models::Document = schema::documents::table
             .find(id)
             .first(&mut conn)
@@ -606,7 +607,7 @@ impl CollectionActor {
     async fn update_document(
         &self,
         id: uuid::Uuid,
-        update: String,
+        update: Option<String>,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
@@ -621,37 +622,58 @@ impl CollectionActor {
                 err => SinkronError::internal(&err.to_string()),
             })?;
 
-        let Some(data) = doc.data else {
-            return Err(SinkronError::unprocessable(
-                "Couldn't update deleted document",
-            ));
-        };
-        let Ok(decoded_update) = BASE64_STANDARD.decode(&update) else {
-            return Err(SinkronError::bad_request(
-                "Couldn't decode update from base64",
-            ));
-        };
-        let loro_doc = loro::LoroDoc::new();
-        if let Err(e) = loro_doc.import(&data) {
-            return Err(SinkronError::internal(
-                "Couldn't open document, data might be corrupted",
-            ));
-        }
-        if loro_doc.import(&decoded_update).is_err() {
-            return Err(SinkronError::bad_request("Couldn't import update"));
-        }
-        let Ok(snapshot) = loro_doc.export(loro::ExportMode::Snapshot) else {
-            return Err(SinkronError::bad_request("Couldn't export snapshot"));
+        let new_data = match &update {
+            Some(update) => {
+                let Some(data) = doc.data else {
+                    return Err(SinkronError::unprocessable(
+                        "Couldn't update deleted document",
+                    ));
+                };
+                let Ok(decoded_update) = BASE64_STANDARD.decode(&update) else {
+                    return Err(SinkronError::bad_request(
+                        "Couldn't decode update from base64",
+                    ));
+                };
+                let loro_doc = loro::LoroDoc::new();
+                if let Err(e) = loro_doc.import(&data) {
+                    return Err(SinkronError::internal(
+                        "Couldn't open document, data might be corrupted",
+                    ));
+                }
+                if loro_doc.import(&decoded_update).is_err() {
+                    return Err(SinkronError::bad_request(
+                        "Couldn't import update",
+                    ));
+                }
+                let Ok(snapshot) = loro_doc.export(loro::ExportMode::Snapshot)
+                else {
+                    return Err(SinkronError::bad_request(
+                        "Couldn't export snapshot",
+                    ));
+                };
+
+                Some(snapshot)
+            }
+            None => {
+                if doc.data.is_none() {
+                    return Err(SinkronError::unprocessable(
+                        "Document is already deleted",
+                    ));
+                };
+                None
+            },
         };
 
         let next_colrev = self.increment_colrev().await?;
 
         // TODO increment refs colrev
-
+        
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
-            data: &snapshot,
+            is_deleted: update.is_none(),
+            data: new_data.as_ref()
         };
+
         let updated_at = diesel::update(schema::documents::table)
             .filter(schema::documents::id.eq(&id))
             .set(doc_update)
@@ -666,24 +688,13 @@ impl CollectionActor {
             id: doc.id,
             created_at: doc.created_at,
             updated_at,
-            data: Some(BASE64_STANDARD.encode(snapshot)),
+            data: new_data.map(|d| { BASE64_STANDARD.encode(d) }),
             col: doc.col_id,
             colrev: next_colrev,
             permissions: doc.permissions,
         };
 
         Ok(updated)
-    }
-
-    async fn delete_document(
-        &self,
-        id: uuid::Uuid,
-    ) -> Result<Document, SinkronError> {
-        // let mut conn = self.connect().await?;
-
-        // TODO
-
-        Err(SinkronError::internal("Not implemented"))
     }
 }
 

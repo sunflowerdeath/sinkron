@@ -78,11 +78,19 @@ export type GetDocumentProps = {
     col: string
 }
 
+export type DeleteDocumentProps = GetDocumentProps
+
 export type CreateDocumentProps = {
     id: string
     col: string
     data: Uint8Array
     // TODO permissions: Permissions
+}
+
+export type UpdateDocumentProps = {
+    id: string
+    col: string
+    data: Uint8Array
 }
 
 const parseCollection = (raw: RawCollection): Collection => {
@@ -256,27 +264,22 @@ class SinkronApi {
     }
 
     async updateDocument(
-        id: string,
-        col: string,
-        update: Uint8Array
+        props: UpdateDocumentProps
     ): Promise<ResultType<Document, SinkronError>> {
+        let { id, col, data } = props
         let res = await this.send<RawDocument>("update_document", {
             id,
             col,
-            update
+            data: Base64.fromUint8Array(data)
         })
         if (!res.isOk) return res
         return Result.ok(parseDocument(res.value))
     }
 
     async deleteDocument(
-        id: string,
-        col: string
+        props: DeleteDocumentProps
     ): Promise<ResultType<Document, SinkronError>> {
-        let res = await this.send<RawDocument>("delete_document", {
-            id,
-            col
-        })
+        let res = await this.send<RawDocument>("delete_document", props)
         if (!res.isOk) return res
         return Result.ok(parseDocument(res.value))
     }
@@ -286,7 +289,7 @@ class SinkronApi {
         col: string,
         cb: (doc: LoroDoc) => void
     ): Promise<ResultType<Document, SinkronError>> {
-        let res = await this.getDocument(id, col)
+        let res = await this.getDocument({ id, col })
         if (!res.isOk) return res
 
         let doc = res.value
@@ -307,9 +310,9 @@ class SinkronApi {
                 message: "Empty update"
             })
         }
-        let update = loro.export({ mode: "update", from: version })
+        let data = loro.export({ mode: "update", from: version })
 
-        return this.updateDocument(id, col, update)
+        return this.updateDocument({ id, col, data })
     }
 
     // Groups and users
