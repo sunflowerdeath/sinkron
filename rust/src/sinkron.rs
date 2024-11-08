@@ -479,8 +479,15 @@ impl CollectionActor {
             .returning(collections::colrev)
             .get_result(&mut conn)
             .await
-            .map_err(internal_error)?; // TODO not_found ?
+            .map_err(internal_error)?;
         Ok(colrev)
+    }
+
+    async fn broadcast(&self, msg: ServerMessage) {
+        // TODO more efficient ?
+        for client in self.subscribers.values() {
+            client.send_message(msg.clone()).await;
+        }
     }
 
     async fn create_document(
@@ -491,30 +498,17 @@ impl CollectionActor {
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
-        // TODO check for duplicate doc id ?
-
-        /*
-        NOT NEEDED ?
-        let is_ref = schema::collections::table
-            .select(schema::collections::is_ref)
-            .find(&self.id)
-            .first(&mut conn)
+        let cnt: i64 = schema::documents::table
+            .filter(schema::documents::id.eq(&id))
+            .count()
+            .get_result(&mut conn)
             .await
-            .map_err(|err| match err {
-                diesel::NotFound => {
-                    (ErrorCode::NotFound, "Collection not found".to_string())
-                }
-                err => (ErrorCode::InternalServerError, err.to_string()),
-            })?;
-
-        if is_ref {
-            return Err((
-                ErrorCode::UnprocessableContent,
-                "Creating documents is not supported in ref collections"
-                    .to_string(),
-            ));
+            .map_err(internal_error)?;
+        if cnt != 0 {
+            return Err(SinkronError::unprocessable("Duplicate document id"));
         }
-        */
+
+        // TODO check collection is_ref
 
         let decoded = BASE64_STANDARD.decode(&data).map_err(|_| {
             SinkronError::bad_request("Couldn't decode data from base64")
@@ -541,24 +535,17 @@ impl CollectionActor {
                 .await
                 .map_err(internal_error)?;
 
-        // broadcast message to subscribers
         let msg = ServerChangeMessage {
             id,
             col: self.id.clone(),
             colrev: next_colrev,
             op: Op::Create,
-            data: data.clone(),
+            data: Some(data.clone()),
             created_at: created_at.clone(),
             updated_at: created_at.clone(),
             changeid: "".to_string(), // TODO payload.changeid
         };
-
-        for client in self.subscribers.values() {
-            // TODO more efficient broadcast
-            client
-                .send_message(ServerMessage::Change(msg.clone()))
-                .await;
-        }
+        self.broadcast(ServerMessage::Change(msg)).await;
 
         // return document
         let doc = Document {
@@ -579,9 +566,9 @@ impl CollectionActor {
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
-        // TODO check col
         let doc: models::Document = schema::documents::table
             .find(id)
+            .filter(schema::documents::col_id.eq(&self.id))
             .first(&mut conn)
             .await
             .map_err(|err| match err {
@@ -613,6 +600,7 @@ impl CollectionActor {
 
         let doc: models::Document = schema::documents::table
             .find(id)
+            .filter(schema::documents::col_id.eq(&self.id))
             .first(&mut conn)
             .await
             .map_err(|err| match err {
@@ -661,40 +649,58 @@ impl CollectionActor {
                     ));
                 };
                 None
-            },
+            }
         };
 
         let next_colrev = self.increment_colrev().await?;
 
         // TODO increment refs colrev
-        
+
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
             is_deleted: update.is_none(),
-            data: new_data.as_ref()
+            data: new_data.as_ref(),
         };
 
-        let updated_at = diesel::update(schema::documents::table)
-            .filter(schema::documents::id.eq(&id))
-            .set(doc_update)
-            .returning(schema::documents::updated_at)
-            .get_result(&mut conn)
-            .await
-            .map_err(internal_error)?;
+        let updated_at: chrono::DateTime<chrono::Utc> =
+            diesel::update(schema::documents::table)
+                .filter(schema::documents::id.eq(&id))
+                .set(doc_update)
+                .returning(schema::documents::updated_at)
+                .get_result(&mut conn)
+                .await
+                .map_err(internal_error)?;
 
-        // TODO broadcast change message
+        let serialized_new_data = new_data.map(|d| BASE64_STANDARD.encode(d));
 
-        let updated = Document {
+        // broadcast message to subscribers
+        let op = if update.is_some() {
+            Op::Update
+        } else {
+            Op::Delete
+        };
+        let msg = ServerChangeMessage {
+            id,
+            col: self.id.clone(),
+            colrev: next_colrev,
+            op,
+            data: serialized_new_data.clone(),
+            created_at: doc.created_at.clone(),
+            updated_at: updated_at.clone(),
+            changeid: "".to_string(), // TODO payload.changeid
+        };
+        self.broadcast(ServerMessage::Change(msg)).await;
+
+        let updated_doc = Document {
             id: doc.id,
             created_at: doc.created_at,
             updated_at,
-            data: new_data.map(|d| { BASE64_STANDARD.encode(d) }),
+            data: serialized_new_data,
             col: doc.col_id,
             colrev: next_colrev,
             permissions: doc.permissions,
         };
-
-        Ok(updated)
+        Ok(updated_doc)
     }
 }
 
@@ -802,7 +808,7 @@ impl SinkronActor {
             }
             SinkronActorMessage::GetCollection { col, reply } => {
                 let handle = self.get_collection_actor(&col);
-                reply.send(handle);
+                _ = reply.send(handle);
             }
         }
     }

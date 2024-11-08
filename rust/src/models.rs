@@ -47,6 +47,7 @@ pub struct NewDocument {
 
 #[derive(AsChangeset)]
 #[diesel(table_name = schema::documents)]
+#[diesel(treat_none_as_null = true)]
 pub struct DocumentUpdate<'a> {
     pub colrev: i64,
     pub is_deleted: bool,

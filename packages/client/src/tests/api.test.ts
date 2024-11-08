@@ -79,30 +79,71 @@ describe("SinkronApi", () => {
         let snapshot = loroDoc.export({ mode: "snapshot" })
         let createRes = await api.createDocument({ id, col, data: snapshot })
         assert(createRes.isOk, "create: ok")
-        
-        // TODO duplicate
+
+        // duplicate
+        let duplicateRes = await api.createDocument({ id, col, data: snapshot })
+        assert(!duplicateRes.isOk, "duplicate")
+        assert.strictEqual(
+            duplicateRes.error.code,
+            ErrorCode.UnprocessableContent,
+            "duplicate"
+        )
 
         // get
         let getRes = await api.getDocument({ id, col })
-        assert(getRes.isOk, "get: ok")
+        assert(getRes.isOk, "get")
 
-        // TODO not found
-        // TODO not found (invalid col)
+        // not found
+        let notFoundRes = await api.getDocument({ id: uuidv4(), col })
+        assert(!notFoundRes.isOk, "not found")
+        assert.strictEqual(
+            notFoundRes.error.code,
+            ErrorCode.NotFound,
+            "not found"
+        )
+
+        // col not found
+        let colNotFoundRes = await api.getDocument({ id, col: uuidv4() })
+        assert(!colNotFoundRes.isOk, "col not found")
+        assert.strictEqual(
+            colNotFoundRes.error.code,
+            ErrorCode.NotFound,
+            "col not found"
+        )
 
         // update
         let version = loroDoc.version()
         loroDoc.getText("text").insert(5, ", world!")
         let update = loroDoc.export({ mode: "update", from: version })
         let updateRes = await api.updateDocument({ id, col, data: update })
-        assert(updateRes.isOk, "update: ok")
+        assert(updateRes.isOk, "update")
 
         // delete
         let deleteRes = await api.deleteDocument({ id, col })
-        assert(deleteRes.isOk, "delete: ok")
-        assert.strictEqual(deleteRes.value.data, null, "delete: data is null")
+        assert(deleteRes.isOk, "delete")
+        assert.strictEqual(deleteRes.value.data, null, "delete")
 
-        // TODO already deleted
-        // TODO update deleted
+        // already deleted
+        let alreadyDeletedRes = await api.deleteDocument({ id, col })
+        assert(!alreadyDeletedRes.isOk, "already deleted")
+        assert.strictEqual(
+            alreadyDeletedRes.error.code,
+            ErrorCode.UnprocessableContent,
+            "already deleted"
+        )
+
+        // update deleted
+        let updateDeletedRes = await api.updateDocument({
+            id,
+            col,
+            data: update
+        })
+        assert(!updateDeletedRes.isOk, "update deleted")
+        assert.strictEqual(
+            updateDeletedRes.error.code,
+            ErrorCode.UnprocessableContent,
+            "update deleted"
+        )
     })
 
     it("groups", () => {
