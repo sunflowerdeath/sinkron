@@ -22,7 +22,8 @@ const rules = [
 module.exports = {
     entry: {
         test: [
-            "./src/tests/api.test.ts"
+            "./src/tests/api.test.ts",
+            "./src/tests/ws.test.ts"
         ]
     },
     output: {

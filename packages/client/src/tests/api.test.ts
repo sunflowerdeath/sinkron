@@ -35,7 +35,6 @@ describe("SinkronApi", () => {
 
         let permissions = new Permissions()
         let createRes = await api.createCollection({ id: "test", permissions })
-        console.log(createRes)
         assert(createRes.isOk, "create")
 
         let duplicateRes = await api.createCollection({

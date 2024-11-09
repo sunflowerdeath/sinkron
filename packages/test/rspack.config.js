@@ -21,7 +21,7 @@ const rules = [
 
 module.exports = {
     entry: {
-        main: "./src/index.ts"
+        main: "./src/lorotest.ts"
     },
     output: {
         clean: true,

@@ -137,11 +137,14 @@ struct ClientActor {
     receiver: mpsc::Receiver<ServerMessage>,
     collection: CollectionHandle,
     colrev: Option<i64>,
+    timeout_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl ClientActor {
     async fn run(&mut self) {
         trace!("client-{}: start", self.client_id);
+
+        self.restart_disconnect_timer();
 
         if self.sync(self.colrev).await.is_err() {
             trace!("client-{}: sync failed", self.client_id);
@@ -165,6 +168,16 @@ impl ClientActor {
         }
     }
 
+    fn restart_disconnect_timer(&mut self) {
+        let client_id = self.client_id.clone();
+        let stop = self.supervisor.stop.clone();
+        self.timeout_task = Some(tokio::spawn(async move {
+            sleep(Duration::from_secs(5)).await;
+            trace!("client-{}: disconnect by timeout", client_id);
+            stop.notify_waiters();
+        }));
+    }
+
     async fn sync(&mut self, colrev: Option<i64>) -> Result<(), SinkronError> {
         let (sender, receiver) = oneshot::channel();
         let msg = CollectionMessage::Sync {
@@ -174,9 +187,21 @@ impl ClientActor {
         self.collection.send(msg);
         match receiver.await {
             Ok(Ok(res)) => {
+                let msg =
+                    ServerMessage::SyncComplete(SyncCompleteMessage {
+                        col: self.collection.id.clone(),
+                        colrev: "todo".to_string(),
+                    });
+                self.send_message(msg).await;
                 // send documents & sync_complete to client
             }
             _ => {
+                let msg =
+                    ServerMessage::SyncError(SyncErrorMessage {
+                        col: self.collection.id.clone(),
+                        code: ErrorCode::InternalServerError
+                    });
+                self.send_message(msg).await;
                 // send sync error to client
             }
         };
@@ -202,8 +227,8 @@ impl ClientActor {
 
     async fn handle_heartbeat(&mut self, msg: HeartbeatMessage) {
         let reply = HeartbeatMessage { i: msg.i + 1 };
+        self.restart_disconnect_timer();
         self.send_message(ServerMessage::Heartbeat(reply)).await;
-        // TODO disconnect timeout
     }
 
     async fn handle_get(&mut self, msg: GetMessage) {
@@ -250,22 +275,33 @@ impl ClientActor {
 
     async fn handle_change(&mut self, msg: ClientChangeMessage) {
         let (sender, receiver) = oneshot::channel();
-        let col_msg = match msg.op {
-            Op::Create => CollectionMessage::Create {
-                id: msg.id,
-                data: msg.data,
-                reply: sender,
-            },
-            Op::Update => CollectionMessage::Create {
-                id: msg.id,
-                data: msg.data,
-                reply: sender,
-            },
-            Op::Delete => CollectionMessage::Delete {
+
+        let col_msg = match (msg.op, msg.data) {
+            (Op::Delete, None) => CollectionMessage::Delete {
                 id: msg.id,
                 reply: sender,
             },
+            (Op::Update, Some(data)) => CollectionMessage::Update {
+                id: msg.id,
+                reply: sender,
+                data,
+            },
+            (Op::Create, Some(data)) => CollectionMessage::Create {
+                id: msg.id,
+                reply: sender,
+                data,
+            },
+            _ => {
+                let err = ChangeErrorMessage {
+                    id: msg.id,
+                    changeid: msg.changeid,
+                    code: ErrorCode::BadRequest,
+                };
+                self.send_message(ServerMessage::ChangeError(err)).await;
+                return;
+            }
         };
+
         self.collection.send(col_msg);
         match receiver.await {
             Ok(Ok(_)) => {
@@ -322,6 +358,7 @@ impl ClientHandle {
             collection,
             websocket,
             receiver,
+            timeout_task: None,
         };
         supervisor.spawn(async move { reader.run().await }, on_exit);
 
@@ -423,6 +460,8 @@ impl CollectionActor {
             }
             CollectionMessage::Sync { colrev, reply } => {
                 trace!("col-{}: sync, colrev: {:?}", self.id, colrev);
+                // TODO sync result ?
+                _ = reply.send(Ok(()));
             }
             CollectionMessage::Get { id, reply } => {
                 trace!("col-{}: get document, id: {}", self.id, id);

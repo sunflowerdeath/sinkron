@@ -58,8 +58,11 @@ pub struct DocMessage {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Op {
+    #[serde(rename = "+")]
     Create,
+    #[serde(rename = "-")]
     Delete,
+    #[serde(rename = "*")]
     Update,
 }
 
@@ -68,7 +71,7 @@ pub struct ClientChangeMessage {
     pub id: uuid::Uuid,
     pub col: String,
     pub op: Op,
-    pub data: String,
+    pub data: Option<String>,
     pub changeid: String,
 }
 
@@ -96,7 +99,7 @@ pub struct ChangeErrorMessage {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ClientMessage {
-    #[serde(rename = "heartbeat")]
+    #[serde(rename = "h")]
     Heartbeat(HeartbeatMessage),
 
     #[serde(rename = "get")]
@@ -109,7 +112,7 @@ pub enum ClientMessage {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "kind")]
 pub enum ServerMessage {
-    #[serde(rename = "heartbeat")]
+    #[serde(rename = "h")]
     Heartbeat(HeartbeatMessage),
 
     #[serde(rename = "sync_complete")]
