@@ -4,7 +4,7 @@ import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { nanoid } from "nanoid"
 import pino, { Logger } from "pino"
-import { makeObservable, makeAutoObservable, observable } from "mobx"
+import { makeObservable, makeAutoObservable, observable, action } from "mobx"
 import { debounce } from "lodash-es"
 import { parseISO } from "date-fns"
 
@@ -359,14 +359,14 @@ const disconnectTimeout = 3000
 export enum ConnectionStatus {
     Disconnected = "disconnected",
     Connected = "connected",
-    Sync = "sync",
     Ready = "ready",
     Error = "error"
 }
 
 interface CollectionProps {
+    url: string
     col: string
-    transport: Transport
+    // transport: Transport
     store?: CollectionStore
     errorHandler?: (msg: SyncErrorMessage) => void
     logger?: Logger<string>
@@ -382,9 +382,9 @@ const defaultLogger = (level = "debug"): Logger<string> => {
 
 class Collection {
     constructor(props: CollectionProps) {
-        const { col, transport, store, errorHandler, logger } = props
+        const { col, url, store, errorHandler, logger } = props
+        this.url = url
         this.col = col
-        this.transport = transport
         this.store = store
         this.errorHandler = errorHandler
         this.logger = logger === undefined ? defaultLogger() : logger
@@ -403,13 +403,14 @@ class Collection {
         this.init()
     }
 
+    url: string
     col: string
     transport!: Transport
     store?: CollectionStore = undefined
     logger: Logger<string>
     errorHandler?: (msg: SyncErrorMessage) => void
 
-    colrev: string = "-1"
+    colrev: string = "0"
     items: Map<string, Item> = new Map()
     isLoaded = false
     status = ConnectionStatus.Disconnected
@@ -437,18 +438,22 @@ class Collection {
     async init() {
         if (this.store) await this.loadFromStore()
         this.isLoaded = true
-        this.transport.emitter.on("open", () => {
+
+        this.transport = new WebSocketTransport({
+            url: `${this.url}?col=${this.col}&colrev=${this.colrev}`
+        })
+        this.transport.emitter.on("open", action(() => {
             this.logger.debug("Connected to websocket")
             this.status = ConnectionStatus.Connected
-            this.startSync()
-        })
-        this.transport.emitter.on("close", () => {
+            this.heartbeat(0)
+        }))
+        this.transport.emitter.on("close", action(() => {
             this.logger.debug("Connection closed")
             this.status = ConnectionStatus.Disconnected
             this.flushDebounced.cancel()
             clearTimeout(this.heartbeatTimeout)
             clearTimeout(this.disconnectTimeout)
-        })
+        }))
         this.transport.emitter.on("message", (msg: string) => {
             try {
                 this.onMessage(msg)
@@ -487,19 +492,6 @@ class Collection {
         this.logger.debug(
             `Loaded from local store ${items.length} items, colrev: ${colrev}`
         )
-    }
-
-    startSync() {
-        const msg = {
-            kind: "sync",
-            col: this.col,
-            colrev: this.colrev === "-1" ? undefined : this.colrev
-        }
-        this.logger.trace("Sending message: %s", msg)
-        this.transport.send(JSON.stringify(msg))
-        this.status = ConnectionStatus.Sync
-
-        this.heartbeat(0)
     }
 
     heartbeat(i: number) {

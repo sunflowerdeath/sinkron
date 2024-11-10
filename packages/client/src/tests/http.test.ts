@@ -3,7 +3,7 @@ import assert from "node:assert"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
-import { SinkronApi, ErrorCode } from "../index"
+import { SinkronApi, ErrorCode } from "../http"
 import { Permissions } from "../permissions"
 
 let url = "http://localhost:3000"
@@ -63,7 +63,7 @@ describe("SinkronApi", () => {
         // assert(deleteRes.isOk, "delete")
     })
 
-    it.only("documents", async () => {
+    it("documents", async () => {
         let api = new SinkronApi({ url, token })
 
         let col = uuidv4()

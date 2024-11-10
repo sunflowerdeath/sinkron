@@ -6,10 +6,22 @@ import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
-import { SinkronApi, ErrorCode } from "../index"
+import { SinkronApi } from "../http"
 import { Permissions } from "../permissions"
-import { WebSocketTransport } from "../ws"
 import { ServerMessage, ClientMessage, Op } from "../protocol"
+import { Collection, ConnectionStatus, ItemState } from "../ws"
+
+import { autorun } from "mobx"
+
+const awaitValue = async (fn: () => boolean): Promise<void> =>
+    new Promise((resolve) => {
+        const dispose = autorun(() => {
+            if (fn()) {
+                dispose()
+                resolve()
+            }
+        })
+    })
 
 let apiUrl = "http://localhost:3000"
 let apiToken = "SINKRON_API_TOKEN"
@@ -82,7 +94,7 @@ const testDoc = () => {
     return doc.export({ mode: "snapshot" })
 }
 
-describe.only("Sinkron", () => {
+describe("Sinkron", () => {
     it("connect", async () => {
         let col = uuidv4()
 
@@ -234,6 +246,23 @@ describe.only("Sinkron", () => {
             data: { kind: "change", id, col, op: Op.Create }
         })
 
+        // get
+        ws.send({ kind: "get", id, col })
+        const getEvent = await ws.next()
+        assertIsMatch(getEvent, {
+            kind: "message",
+            data: { kind: "doc", id, col }
+        })
+
+        // get error
+        const invalidId = uuidv4()
+        ws.send({ kind: "get", id: invalidId, col })
+        const getErrEvent = await ws.next()
+        assertIsMatch(getErrEvent, {
+            kind: "message",
+            data: { kind: "get_error", id: invalidId, code: "not_found" }
+        })
+
         // update
         const v = doc.version()
         doc.getText("test").insert(5, ", world")
@@ -270,8 +299,34 @@ describe.only("Sinkron", () => {
         })
     })
 
-    // change error
- 
-    // get
-    // get_error
+    it("client", async () => {
+        let col = uuidv4()
+
+        let api = new SinkronApi({ url: apiUrl, token: apiToken })
+        let permissions = new Permissions()
+        let createRes = await api.createCollection({ id: col, permissions })
+        assert(createRes.isOk, "create col")
+
+        const collection = new Collection({
+            url: "ws://localhost:3000/sync",
+            col
+        })
+
+        await awaitValue(() => collection.status === ConnectionStatus.Ready)
+
+        const doc = new LoroDoc()
+        doc.getText("text").insert(0, "Hello")
+        const id = collection.create(doc)
+
+        assert.strictEqual(
+            collection.items.get(id)!.state,
+            ItemState.ChangesSent,
+            "changes sent"
+        )
+        await awaitValue(
+            () => collection.items.get(id)!.state === ItemState.Synchronized
+        )
+
+        collection.destroy()
+    })
 })

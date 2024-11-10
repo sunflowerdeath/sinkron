@@ -21,17 +21,19 @@ const rules = [
 
 module.exports = {
     entry: {
-        test: [
-            "./src/tests/api.test.ts",
-            "./src/tests/ws.test.ts"
-        ]
+        test: ["./src/tests/http.test.ts", "./src/tests/ws.test.ts"]
     },
     output: {
         path: path.resolve(__dirname, "./build")
     },
     mode: isProduction ? "production" : "development",
     target: "node",
-    externals: [nodeExternals({ additionalModuleDirs: ["../node_modules"] })],
+    externals: [
+        nodeExternals({
+            additionalModuleDirs: ["../node_modules"],
+            allowlist: ["nanoevents", "nanoid", "lodash-es"]
+        })
+    ],
     resolve: {
         extensions: [".js", ".ts"]
     },
