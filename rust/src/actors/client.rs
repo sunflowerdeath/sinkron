@@ -21,7 +21,7 @@ struct ClientActor {
     websocket: WebSocket,
     receiver: mpsc::Receiver<ServerMessage>,
     collection: CollectionHandle,
-    colrev: Option<i64>,
+    colrev: i64,
     timeout_task: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -63,7 +63,7 @@ impl ClientActor {
         }));
     }
 
-    async fn sync(&mut self, colrev: Option<i64>) -> Result<(), SinkronError> {
+    async fn sync(&mut self, colrev: i64) -> Result<(), SinkronError> {
         let (sender, receiver) = oneshot::channel();
         let msg = CollectionMessage::Sync {
             colrev,
@@ -249,7 +249,7 @@ impl ClientHandle {
         client_id: i32,
         websocket: WebSocket,
         collection: CollectionHandle,
-        colrev: Option<i64>,
+        colrev: i64,
         on_exit: Option<ExitCallback>,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(8);

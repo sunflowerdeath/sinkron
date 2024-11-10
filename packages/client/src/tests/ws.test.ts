@@ -1,6 +1,7 @@
 import { inspect } from "node:util"
 import assert from "node:assert"
 import { isMatch } from "lodash"
+import { Base64 } from "js-base64"
 
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
@@ -8,7 +9,7 @@ import { LoroDoc } from "loro-crdt"
 import { SinkronApi, ErrorCode } from "../index"
 import { Permissions } from "../permissions"
 import { WebSocketTransport } from "../ws"
-import { ServerMessage } from "../protocol"
+import { ServerMessage, ClientMessage, Op } from "../protocol"
 
 let apiUrl = "http://localhost:3000"
 let apiToken = "SINKRON_API_TOKEN"
@@ -57,6 +58,10 @@ class WsTest {
         return new Promise((resolve) => {
             this.waiters.push(resolve)
         })
+    }
+
+    send(msg: ClientMessage) {
+        this.ws.send(JSON.stringify(msg))
     }
 }
 
@@ -138,21 +143,27 @@ describe.only("Sinkron", () => {
         let createRes = await api.createCollection({ id: col, permissions })
         assert(createRes.isOk, "create col")
 
-        const createDocRes1 = await api.createDocument({
+        const createDoc1Res = await api.createDocument({
             col,
             id: uuidv4(),
             data: testDoc()
         })
-        assert(createDocRes1.isOk, "create doc 1")
-        const createDocRes2 = await api.createDocument({
-            col,
-            id: uuidv4(),
-            data: testDoc()
-        })
-        assert(createDocRes2.isOk, "create doc 2")
+        assert(createDoc1Res.isOk, "create doc 1")
+        const doc1 = createDoc1Res.value
 
-        const doc1 = createDocRes1.value
-        const doc2 = createDocRes2.value
+        const createDoc2Res = await api.createDocument({
+            col,
+            id: uuidv4(),
+            data: testDoc()
+        })
+        assert(createDoc2Res.isOk, "create doc 2")
+        const doc2 = createDoc2Res.value
+        const deleteDoc2Res = await api.deleteDocument({
+            col,
+            id: doc2.id
+        })
+        assert(deleteDoc2Res.isOk, "delete doc 2")
+        const doc2deleted = deleteDoc2Res.value
 
         // sync without colrev
         {
@@ -167,25 +178,100 @@ describe.only("Sinkron", () => {
             let e3 = await ws.next()
             assertIsMatch(e3, {
                 kind: "message",
-                data: { kind: "doc", id: doc2.id }
-            })
-            let e4 = await ws.next()
-            assertIsMatch(e4, {
-                kind: "message",
-                data: { kind: "sync_complete", col, colrev: doc2.colrev }
+                data: { kind: "sync_complete", col, colrev: doc2deleted.colrev }
             })
         }
-        // sync (without colrev)
+
         // sync (with colrev)
-        // sync_error (invalid_colrev)
+        {
+            let ws = new WsTest(wsUrl(col, doc2.colrev))
+            let e1 = await ws.next()
+            assert.strictEqual(e1.kind, "open")
+            let e2 = await ws.next()
+            assertIsMatch(e2, {
+                kind: "message",
+                data: { kind: "doc", col, id: doc2.id, data: null }
+            })
+            let e3 = await ws.next()
+            assertIsMatch(e3, {
+                kind: "message",
+                data: { kind: "sync_complete", col, colrev: doc2deleted.colrev }
+            })
+        }
     })
 
-    // create
-    // update
-    // delete
+    it("crud", async () => {
+        let col = uuidv4()
+
+        let api = new SinkronApi({ url: apiUrl, token: apiToken })
+        let permissions = new Permissions()
+        let createRes = await api.createCollection({ id: col, permissions })
+        assert(createRes.isOk, "create col")
+
+        let ws = new WsTest(wsUrl(col, "0"))
+        let events = [await ws.next(), await ws.next()]
+        assertIsMatch(events, [
+            { kind: "open" },
+            { kind: "message", data: { kind: "sync_complete" } }
+        ])
+
+        // create
+        const id = uuidv4()
+        let doc = new LoroDoc()
+        doc.getText("test").insert(0, "Hello")
+        let data = Base64.fromUint8Array(doc.export({ mode: "snapshot" }))
+        ws.send({
+            kind: "change",
+            id,
+            changeid: uuidv4(),
+            col,
+            op: Op.Create,
+            data
+        })
+        const createEvent = await ws.next()
+        assertIsMatch(createEvent, {
+            kind: "message",
+            data: { kind: "change", id, col, op: Op.Create }
+        })
+
+        // update
+        const v = doc.version()
+        doc.getText("test").insert(5, ", world")
+        const updateData = Base64.fromUint8Array(
+            doc.export({ mode: "update", from: v })
+        )
+        ws.send({
+            kind: "change",
+            id,
+            changeid: uuidv4(),
+            col,
+            op: Op.Update,
+            data: updateData
+        })
+        const updateEvent = await ws.next()
+        assertIsMatch(updateEvent, {
+            kind: "message",
+            data: { kind: "change", id, col, op: Op.Update }
+        })
+
+        // delete
+        ws.send({
+            kind: "change",
+            id,
+            changeid: uuidv4(),
+            col,
+            op: Op.Delete,
+            data: null
+        })
+        const deleteEvent = await ws.next()
+        assertIsMatch(deleteEvent, {
+            kind: "message",
+            data: { kind: "change", id, col, op: Op.Delete }
+        })
+    })
 
     // change error
-
+ 
     // get
     // get_error
 })

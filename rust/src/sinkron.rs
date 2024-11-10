@@ -262,7 +262,7 @@ async fn root() -> &'static str {
 #[derive(serde::Deserialize)]
 struct SyncQuery {
     col: String,
-    colrev: Option<i64>,
+    colrev: i64,
 }
 
 async fn sync_handler(

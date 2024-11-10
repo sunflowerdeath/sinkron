@@ -22,7 +22,7 @@ pub enum SinkronActorMessage {
     Connect {
         websocket: WebSocket,
         col: String,
-        colrev: Option<i64>,
+        colrev: i64,
     },
     GetCollection {
         col: String,
@@ -98,7 +98,7 @@ impl SinkronActor {
         &mut self,
         mut ws: WebSocket,
         col: String,
-        colrev: Option<i64>,
+        colrev: i64,
     ) {
         trace!("sinkron: client connect");
 
@@ -133,18 +133,16 @@ impl SinkronActor {
 
         // TODO check permissions
 
-        if let Some(colrev) = colrev {
-            if colrev > col_model.colrev {
-                // invalid colrev
-                let msg = ServerMessage::SyncError(SyncErrorMessage {
-                    col: col.clone(),
-                    code: ErrorCode::UnprocessableContent,
-                });
-                if let Ok(encoded) = serde_json::to_string(&msg) {
-                    let _ = ws.send(Message::Text(encoded)).await;
-                }
-                return;
+        if colrev > col_model.colrev {
+            // invalid colrev
+            let msg = ServerMessage::SyncError(SyncErrorMessage {
+                col: col.clone(),
+                code: ErrorCode::UnprocessableContent,
+            });
+            if let Ok(encoded) = serde_json::to_string(&msg) {
+                let _ = ws.send(Message::Text(encoded)).await;
             }
+            return;
         }
 
         let collection = self.get_collection_actor(&col_model);

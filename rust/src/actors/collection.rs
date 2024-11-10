@@ -9,10 +9,10 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-use crate::api_types::Document;
 use crate::actors::client::ClientHandle;
+use crate::api_types::Document;
 use crate::db;
-use crate::error::{SinkronError, internal_error};
+use crate::error::{internal_error, SinkronError};
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
@@ -40,7 +40,7 @@ pub enum CollectionMessage {
         reply: oneshot::Sender<Result<Document, SinkronError>>,
     },
     Sync {
-        colrev: Option<i64>,
+        colrev: i64,
         reply: oneshot::Sender<Result<SyncResult, SinkronError>>,
     },
     Create {
@@ -196,22 +196,19 @@ impl CollectionActor {
 
     async fn sync_documents(
         &self,
-        colrev: Option<i64>,
+        colrev: i64,
     ) -> Result<SyncResult, SinkronError> {
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
             .filter(schema::documents::col_id.eq(&self.id))
             .order(schema::documents::created_at.asc())
             .into_boxed();
-        let req = match colrev {
-            Some(colrev) => {
-                // select docs since colrev, including deleted
-                req_base.filter(schema::documents::colrev.gt(colrev))
-            }
-            None => {
-                // select all doc, except deleted
-                req_base.filter(schema::documents::is_deleted.eq(false))
-            }
+        let req = if colrev == 0 {
+            // select all doc, except deleted
+            req_base.filter(schema::documents::is_deleted.eq(false))
+        } else {
+            // select docs since colrev, including deleted
+            req_base.filter(schema::documents::colrev.gt(colrev))
         };
         let documents: Vec<models::Document> =
             req.get_results(&mut conn).await.map_err(internal_error)?;
@@ -220,7 +217,7 @@ impl CollectionActor {
                 .into_iter()
                 .map(Self::doc_from_model)
                 .collect(),
-            colrev: self.colrev
+            colrev: self.colrev,
         })
     }
 
