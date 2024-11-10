@@ -161,7 +161,7 @@ impl CollectionActor {
         self.pool.get().await.map_err(internal_error)
     }
 
-    async fn increment_colrev(&self) -> Result<i64, SinkronError> {
+    async fn increment_colrev(&mut self) -> Result<i64, SinkronError> {
         let mut conn = self.connect().await?;
         use schema::collections;
         let colrev: i64 = diesel::update(collections::table)
@@ -171,6 +171,7 @@ impl CollectionActor {
             .get_result(&mut conn)
             .await
             .map_err(internal_error)?;
+        self.colrev = colrev;
         Ok(colrev)
     }
 
@@ -200,6 +201,7 @@ impl CollectionActor {
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
             .filter(schema::documents::col_id.eq(&self.id))
+            .order(schema::documents::created_at.asc())
             .into_boxed();
         let req = match colrev {
             Some(colrev) => {
@@ -218,12 +220,12 @@ impl CollectionActor {
                 .into_iter()
                 .map(Self::doc_from_model)
                 .collect(),
-            colrev: 0,
+            colrev: self.colrev
         })
     }
 
     async fn create_document(
-        &self,
+        &mut self,
         id: uuid::Uuid,
         data: String,
         permissions: Option<String>,
@@ -314,7 +316,7 @@ impl CollectionActor {
     }
 
     async fn update_document(
-        &self,
+        &mut self,
         id: uuid::Uuid,
         update: Option<String>,
     ) -> Result<Document, SinkronError> {

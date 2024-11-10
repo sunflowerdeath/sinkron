@@ -30,7 +30,7 @@ pub struct SyncErrorMessage {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SyncCompleteMessage {
     pub col: String,
-    pub colrev: String,
+    pub colrev: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

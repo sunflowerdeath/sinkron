@@ -6,10 +6,10 @@ use tokio::{
     time::{sleep, Duration},
 };
 
+use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::error::SinkronError;
 use crate::protocol::*;
-use crate::supervisor::{Supervisor, ExitCallback};
-use crate::actors::collection::{CollectionMessage, CollectionHandle};
+use crate::supervisor::{ExitCallback, Supervisor};
 
 // Client actor receives messages from the webscoket connection,
 // dispatches them to the Collection and when needed waits for the response
@@ -72,12 +72,27 @@ impl ClientActor {
         self.collection.send(msg);
         match receiver.await {
             Ok(Ok(res)) => {
-                let msg = ServerMessage::SyncComplete(SyncCompleteMessage {
-                    col: self.collection.id.clone(),
-                    colrev: "todo".to_string(),
-                });
-                self.send_message(msg).await;
-                // send documents & sync_complete to client
+                let mut messages: Vec<ServerMessage> = res
+                    .documents
+                    .into_iter()
+                    .map(|doc| {
+                        ServerMessage::Doc(DocMessage {
+                            id: doc.id,
+                            col: doc.col,
+                            colrev: doc.colrev,
+                            data: doc.data,
+                            created_at: doc.created_at,
+                            updated_at: doc.updated_at,
+                        })
+                    })
+                    .collect();
+                messages.push(
+                    ServerMessage::SyncComplete(SyncCompleteMessage {
+                        col: self.collection.id.clone(),
+                        colrev: res.colrev,
+                    })
+                );
+                self.send_messages(messages).await;
             }
             _ => {
                 let msg = ServerMessage::SyncError(SyncErrorMessage {
@@ -85,7 +100,6 @@ impl ClientActor {
                     code: ErrorCode::InternalServerError,
                 });
                 self.send_message(msg).await;
-                // send sync error to client
             }
         };
         Ok(())
@@ -215,6 +229,12 @@ impl ClientActor {
             trace!("client-{}: sent message to websocket", self.client_id);
         }
         // TODO if couldnt write, then writer actor is dead, so exit
+    }
+
+    async fn send_messages(&mut self, messages: Vec<ServerMessage>) {
+        for msg in messages {
+            self.send_message(msg).await
+        }
     }
 }
 
