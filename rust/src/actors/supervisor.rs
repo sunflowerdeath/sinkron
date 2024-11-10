@@ -34,4 +34,8 @@ impl Supervisor {
             }
         });
     }
+
+    pub fn stop(&self) {
+        self.stop.notify_waiters();
+    }
 }

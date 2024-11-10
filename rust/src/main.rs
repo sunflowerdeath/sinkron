@@ -4,7 +4,6 @@ mod protocol;
 mod schema;
 mod sinkron;
 
-mod supervisor;
 mod error;
 mod api_types;
 mod actors;

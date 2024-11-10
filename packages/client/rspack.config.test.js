@@ -21,7 +21,11 @@ const rules = [
 
 module.exports = {
     entry: {
-        test: ["./src/tests/http.test.ts", "./src/tests/ws.test.ts"]
+        test: [
+            "./src/tests/api.test.ts",
+            "./src/tests/ws.test.ts",
+            "./src/tests/collection.test.ts"
+        ]
     },
     output: {
         path: path.resolve(__dirname, "./build")

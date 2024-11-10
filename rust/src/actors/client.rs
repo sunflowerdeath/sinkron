@@ -7,9 +7,9 @@ use tokio::{
 };
 
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
+use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::error::SinkronError;
 use crate::protocol::*;
-use crate::supervisor::{ExitCallback, Supervisor};
 
 // Client actor receives messages from the webscoket connection,
 // dispatches them to the Collection and when needed waits for the response
@@ -47,7 +47,7 @@ impl ClientActor {
                     }
                 },
                 Some(msg) = self.receiver.recv() => {
-                    self.send_message(msg).await;
+                    self.send_ws_message(msg).await;
                 }
             }
         }
@@ -65,11 +65,10 @@ impl ClientActor {
 
     async fn sync(&mut self, colrev: i64) -> Result<(), SinkronError> {
         let (sender, receiver) = oneshot::channel();
-        let msg = CollectionMessage::Sync {
+        self.send_col_message(CollectionMessage::Sync {
             colrev,
             reply: sender,
-        };
-        self.collection.send(msg);
+        });
         match receiver.await {
             Ok(Ok(res)) => {
                 let mut messages: Vec<ServerMessage> = res
@@ -86,20 +85,20 @@ impl ClientActor {
                         })
                     })
                     .collect();
-                messages.push(
-                    ServerMessage::SyncComplete(SyncCompleteMessage {
+                messages.push(ServerMessage::SyncComplete(
+                    SyncCompleteMessage {
                         col: self.collection.id.clone(),
                         colrev: res.colrev,
-                    })
-                );
-                self.send_messages(messages).await;
+                    },
+                ));
+                self.send_ws_messages(messages).await;
             }
             _ => {
                 let msg = ServerMessage::SyncError(SyncErrorMessage {
                     col: self.collection.id.clone(),
                     code: ErrorCode::InternalServerError,
                 });
-                self.send_message(msg).await;
+                self.send_ws_message(msg).await;
             }
         };
         Ok(())
@@ -125,7 +124,7 @@ impl ClientActor {
     async fn handle_heartbeat(&mut self, msg: HeartbeatMessage) {
         let reply = HeartbeatMessage { i: msg.i + 1 };
         self.restart_disconnect_timer();
-        self.send_message(ServerMessage::Heartbeat(reply)).await;
+        self.send_ws_message(ServerMessage::Heartbeat(reply)).await;
     }
 
     async fn handle_get(&mut self, msg: GetMessage) {
@@ -148,7 +147,7 @@ impl ClientActor {
                     created_at: doc.created_at,
                     updated_at: doc.updated_at,
                 };
-                self.send_message(ServerMessage::Doc(msg)).await;
+                self.send_ws_message(ServerMessage::Doc(msg)).await;
             }
             Ok(Err(err)) => {
                 // Couldn't get document
@@ -156,7 +155,7 @@ impl ClientActor {
                     id: msg.id,
                     code: err.code,
                 };
-                self.send_message(ServerMessage::GetError(err)).await;
+                self.send_ws_message(ServerMessage::GetError(err)).await;
             }
             Err(_) => {
                 // Couldn't receive reply
@@ -165,7 +164,7 @@ impl ClientActor {
                     id: msg.id,
                     code: ErrorCode::InternalServerError,
                 };
-                self.send_message(ServerMessage::GetError(err)).await;
+                self.send_ws_message(ServerMessage::GetError(err)).await;
             }
         }
     }
@@ -194,12 +193,12 @@ impl ClientActor {
                     changeid: msg.changeid,
                     code: ErrorCode::BadRequest,
                 };
-                self.send_message(ServerMessage::ChangeError(err)).await;
+                self.send_ws_message(ServerMessage::ChangeError(err)).await;
                 return;
             }
         };
+        self.send_col_message(col_msg);
 
-        self.collection.send(col_msg);
         match receiver.await {
             Ok(Ok(_)) => {
                 // change success
@@ -210,7 +209,7 @@ impl ClientActor {
                     changeid: msg.changeid,
                     code: err.code,
                 };
-                self.send_message(ServerMessage::ChangeError(err)).await;
+                self.send_ws_message(ServerMessage::ChangeError(err)).await;
             }
             Err(_) => {
                 let err = ChangeErrorMessage {
@@ -218,22 +217,33 @@ impl ClientActor {
                     changeid: msg.changeid,
                     code: ErrorCode::InternalServerError,
                 };
-                self.send_message(ServerMessage::ChangeError(err)).await;
+                self.send_ws_message(ServerMessage::ChangeError(err)).await;
             }
         }
     }
 
-    async fn send_message(&mut self, msg: ServerMessage) {
-        if let Ok(encoded) = serde_json::to_string(&msg) {
-            let _ = self.websocket.send(Message::Text(encoded)).await;
-            trace!("client-{}: sent message to websocket", self.client_id);
+    fn send_col_message(&self, msg: CollectionMessage) {
+        let res = self.collection.send(msg);
+        if res.is_err() {
+            self.supervisor.stop();
+            return;
         }
-        // TODO if couldnt write, then writer actor is dead, so exit
     }
 
-    async fn send_messages(&mut self, messages: Vec<ServerMessage>) {
+    async fn send_ws_message(&mut self, msg: ServerMessage) {
+        if let Ok(encoded) = serde_json::to_string(&msg) {
+            let res = self.websocket.send(Message::Text(encoded)).await;
+            if res.is_err() {
+                self.supervisor.stop();
+                return;
+            }
+            trace!("client-{}: sent message to websocket", self.client_id);
+        }
+    }
+
+    async fn send_ws_messages(&mut self, messages: Vec<ServerMessage>) {
         for msg in messages {
-            self.send_message(msg).await
+            self.send_ws_message(msg).await
         }
     }
 }
@@ -241,7 +251,8 @@ impl ClientActor {
 #[derive(Clone)]
 pub struct ClientHandle {
     sender: mpsc::Sender<ServerMessage>,
-    supervisor: Supervisor,
+    #[allow(dead_code)]
+    pub supervisor: Supervisor,
 }
 
 impl ClientHandle {
@@ -273,6 +284,6 @@ impl ClientHandle {
     // }
 
     pub async fn send_message(&self, msg: ServerMessage) {
-        self.sender.send(msg).await;
+        _ = self.sender.send(msg).await;
     }
 }

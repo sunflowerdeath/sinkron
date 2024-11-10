@@ -11,12 +11,12 @@ use tokio::{
 
 use crate::actors::client::ClientHandle;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
+use crate::actors::supervisor::ExitCallback;
 use crate::api_types::Collection;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::protocol::*;
 use crate::schema;
-use crate::supervisor::ExitCallback;
 
 pub enum SinkronActorMessage {
     Connect {
@@ -153,7 +153,8 @@ impl SinkronActor {
             let collection = collection.clone();
             Box::new(move || {
                 trace!("client-{}: exit", client_id);
-                collection.send(CollectionMessage::Unsubscribe { client_id });
+                _ = collection
+                    .send(CollectionMessage::Unsubscribe { client_id });
             })
         };
         let client = ClientHandle::new(
@@ -165,7 +166,7 @@ impl SinkronActor {
         );
 
         // subscribe client to collection
-        collection.send(CollectionMessage::Subscribe {
+        _ = collection.send(CollectionMessage::Subscribe {
             client_id,
             handle: client,
         });
@@ -206,7 +207,7 @@ impl SinkronActor {
             let exit_sender = self.exit_channel.0.clone();
             let id = col.id.clone();
             Box::new(move || {
-                exit_sender.send(id);
+                _ = exit_sender.send(id);
             })
         };
         let col_handle = CollectionHandle::new(
@@ -234,6 +235,6 @@ impl SinkronHandle {
     }
 
     pub fn send(&self, msg: SinkronActorMessage) {
-        self.sender.send(msg);
+        _ = self.sender.send(msg);
     }
 }

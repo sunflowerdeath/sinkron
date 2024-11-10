@@ -10,13 +10,13 @@ use tokio::{
 };
 
 use crate::actors::client::ClientHandle;
+use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::api_types::Document;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
-use crate::supervisor::{ExitCallback, Supervisor};
 
 // Collection actor performs document operations over single collection,
 // then replies back with results and also broadcasts messages to all
@@ -344,7 +344,7 @@ impl CollectionActor {
                     ));
                 };
                 let loro_doc = loro::LoroDoc::new();
-                if let Err(e) = loro_doc.import(&data) {
+                if let Err(_) = loro_doc.import(&data) {
                     return Err(SinkronError::internal(
                         "Couldn't open document, data might be corrupted",
                     ));
@@ -429,6 +429,7 @@ impl CollectionActor {
 pub struct CollectionHandle {
     pub id: String,
     sender: mpsc::UnboundedSender<CollectionMessage>,
+    #[allow(dead_code)]
     pub supervisor: Supervisor,
 }
 
