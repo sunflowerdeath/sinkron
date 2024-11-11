@@ -73,6 +73,11 @@ export type Document = {
     permissions: Permissions
 }
 
+export type CreateCollectionProps = {
+    id: string
+    permissions: Permissions
+}
+
 export type GetDocumentProps = {
     id: string
     col: string
@@ -93,6 +98,39 @@ export type UpdateDocumentProps = {
     data: Uint8Array
 }
 
+export type UpdateDocumentWithCallbackProps = {
+    id: string
+    col: string
+    cb: (doc: LoroDoc) => void
+}
+
+export type AddRemoveUserToGroupProps = {
+    user: string
+    group: string
+}
+
+export type UpdateCollectionPermissionsProps = {
+    id: string
+    permissions: Permissions
+}
+
+export type UpdateCollectionPermissionsWithCallbackProps = {
+    id: string
+    cb: (p: Permissions) => void
+}
+
+export type UpdateDocumentPermissionsProps = {
+    id: string
+    col: string
+    permissions: Permissions
+}
+
+export type UpdateDocumentPermissionsWithCallbackProps = {
+    id: string
+    col: string
+    cb: (p: Permissions) => void
+}
+
 const parseCollection = (raw: RawCollection): Collection => {
     return {
         ...raw,
@@ -101,13 +139,13 @@ const parseCollection = (raw: RawCollection): Collection => {
 }
 
 const parseDocument = (raw: RawDocument): Document => {
-    let { data, createdAt, updatedAt, permissions } = raw
-    let parsed = {
+    const { data, createdAt, updatedAt, permissions } = raw
+    const parsed = {
         ...raw,
         data: data === null ? data : Base64.toUint8Array(data),
         createdAt: parseISO(createdAt),
         updatedAt: parseISO(updatedAt),
-        permissions: new Permissions() // TODO Permissions.parse(permissions)
+        permissions: Permissions.parse(permissions)
     }
     return parsed
 }
@@ -130,8 +168,8 @@ class SinkronApi {
         method: string,
         payload: object
     ): Promise<ResultType<T, SinkronError>> {
-        let url = `${this.url}/${method}`
-        let request = fetch(url, {
+        const url = `${this.url}/${method}`
+        const request = fetch(url, {
             method: "POST",
             headers: {
                 "content-type": "application/json",
@@ -159,7 +197,7 @@ class SinkronApi {
         }
 
         const contentType = response.headers.get("content-type")
-        let isJson =
+        const isJson =
             contentType && contentType.indexOf("application/json") !== -1
 
         const parseJson = async (): Promise<
@@ -208,14 +246,11 @@ class SinkronApi {
 
     // Collections
 
-    async createCollection({
-        id,
-        permissions
-    }: {
-        id: string
-        permissions: Permissions
-    }): Promise<ResultType<Collection, SinkronError>> {
-        let res = await this.send<RawCollection>("create_collection", {
+    async createCollection(
+        props: CreateCollectionProps
+    ): Promise<ResultType<Collection, SinkronError>> {
+        const { id, permissions } = props
+        const res = await this.send<RawCollection>("create_collection", {
             id,
             is_ref: false,
             permissions: permissions.stringify()
@@ -227,7 +262,7 @@ class SinkronApi {
     async getCollection(
         id: string
     ): Promise<ResultType<Collection, SinkronError>> {
-        let res = await this.send<RawCollection>("get_collection", { id })
+        const res = await this.send<RawCollection>("get_collection", { id })
         if (!res.isOk) return res
         return Result.ok(parseCollection(res.value))
     }
@@ -235,7 +270,7 @@ class SinkronApi {
     async deleteCollection(
         id: string
     ): Promise<ResultType<void, SinkronError>> {
-        let res = await this.send<void>("delete_collection", { id })
+        const res = await this.send<void>("delete_collection", { id })
         return res
     }
 
@@ -244,8 +279,8 @@ class SinkronApi {
     async createDocument(
         props: CreateDocumentProps
     ): Promise<ResultType<Document, SinkronError>> {
-        let { id, col, data } = props
-        let res = await this.send<RawDocument>("create_document", {
+        const { id, col, data } = props
+        const res = await this.send<RawDocument>("create_document", {
             id,
             col,
             data: Base64.fromUint8Array(data)
@@ -254,11 +289,10 @@ class SinkronApi {
         return Result.ok(parseDocument(res.value))
     }
 
-    async getDocument({
-        id,
-        col
-    }: GetDocumentProps): Promise<ResultType<Document, SinkronError>> {
-        let res = await this.send<RawDocument>("get_document", { id, col })
+    async getDocument(
+        props: GetDocumentProps
+    ): Promise<ResultType<Document, SinkronError>> {
+        const res = await this.send<RawDocument>("get_document", props)
         if (!res.isOk) return res
         return Result.ok(parseDocument(res.value))
     }
@@ -266,8 +300,8 @@ class SinkronApi {
     async updateDocument(
         props: UpdateDocumentProps
     ): Promise<ResultType<Document, SinkronError>> {
-        let { id, col, data } = props
-        let res = await this.send<RawDocument>("update_document", {
+        const { id, col, data } = props
+        const res = await this.send<RawDocument>("update_document", {
             id,
             col,
             data: Base64.fromUint8Array(data)
@@ -279,38 +313,38 @@ class SinkronApi {
     async deleteDocument(
         props: DeleteDocumentProps
     ): Promise<ResultType<Document, SinkronError>> {
-        let res = await this.send<RawDocument>("delete_document", props)
+        const res = await this.send<RawDocument>("delete_document", props)
         if (!res.isOk) return res
         return Result.ok(parseDocument(res.value))
     }
 
     async updateDocumentWithCallback(
-        id: string,
-        col: string,
-        cb: (doc: LoroDoc) => void
+        props: UpdateDocumentWithCallbackProps
     ): Promise<ResultType<Document, SinkronError>> {
-        let res = await this.getDocument({ id, col })
+        const { id, col, cb } = props
+
+        const res = await this.getDocument({ id, col })
         if (!res.isOk) return res
 
-        let doc = res.value
+        const doc = res.value
         if (doc.data === null) {
             return Result.err({
                 code: ErrorCode.UnprocessableContent,
                 message: "Can't update deleted document"
             })
         }
-        let loro = new LoroDoc()
+        const loro = new LoroDoc()
         loro.import(doc.data)
 
-        let version = loro.version()
+        const version = loro.version()
         cb(loro)
-        if (loro.version() === version) {
+        if (loro.version().compare(version) === 0) {
             return Result.err({
                 code: ErrorCode.UnprocessableContent,
                 message: "Empty update"
             })
         }
-        let data = loro.export({ mode: "update", from: version })
+        const data = loro.export({ mode: "update", from: version })
 
         return this.updateDocument({ id, col, data })
     }
@@ -320,7 +354,7 @@ class SinkronApi {
     async createGroup(
         group: string
     ): Promise<ResultType<undefined, SinkronError>> {
-        let res = await this.send<RawDocument>("create_group", { group })
+        const res = await this.send<RawDocument>("create_group", { group })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
@@ -328,16 +362,16 @@ class SinkronApi {
     async deleteGroup(
         group: string
     ): Promise<ResultType<undefined, SinkronError>> {
-        let res = await this.send<RawDocument>("delete_group", { group })
+        const res = await this.send<RawDocument>("delete_group", { group })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     async addUserToGroup(
-        user: string,
-        group: string
-    ): Promise<ResultType<void, SinkronError>> {
-        let res = await this.send<RawDocument>("add_user_to_group", {
+        props: AddRemoveUserToGroupProps
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const { user, group } = props
+        const res = await this.send<RawDocument>("add_user_to_group", {
             group,
             user
         })
@@ -346,33 +380,82 @@ class SinkronApi {
     }
 
     async removeUserFromGroup(
-        group: string,
-        user: string
-    ): Promise<ResultType<void, SinkronError>> {
-        let res = await this.send<RawDocument>("remove_user_from_group", {
-            group,
-            user
-        })
+        props: AddRemoveUserToGroupProps
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const res = await this.send<RawDocument>(
+            "remove_user_from_group",
+            props
+        )
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     async removeUserFromAllGroups(
         user: string
-    ): Promise<ResultType<void, SinkronError>> {
-        let res = await this.send<RawDocument>("remove_user_from_all_groups", {
-            user
-        })
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const res = await this.send<RawDocument>(
+            "remove_user_from_all_groups",
+            { user }
+        )
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     // Permissions
 
-    // async updateCollectionPermission(id, cb(p: Permissions) => void)
-    // async updateDocumentPermission(id, cb(p: Permissions) => void)
-    // ? async checkDocumentPermission
-    // ? async checkDocumentPermission
+    async updateCollectionPermissions(
+        props: UpdateCollectionPermissionsProps
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const { id, permissions } = props
+        const res = await this.send<RawDocument>(
+            "update_collection_permissions",
+            { id, permissions: permissions.stringify() }
+        )
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
+
+    async updateCollectionPermissionsWithCallback(
+        props: UpdateCollectionPermissionsWithCallbackProps
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const { id, cb } = props
+        const getRes = await this.getCollection(id)
+        if (!getRes.isOk) return getRes
+        const col = getRes.value
+        cb(col.permissions)
+        return this.updateCollectionPermissions({
+            id,
+            permissions: col.permissions
+        })
+    }
+
+    async updateDocumentPermissions(
+        props: UpdateDocumentPermissionsProps
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const { id, col, permissions } = props
+        const res = await this.send<RawDocument>(
+            "update_document_permissions",
+            { id, col, permissions: permissions.stringify() }
+        )
+        if (!res.isOk) return res
+        return Result.ok(undefined)
+    }
+
+    async updateDocumentPermissionsWithCallback(
+        props: UpdateDocumentPermissionsWithCallbackProps
+    ): Promise<ResultType<undefined, SinkronError>> {
+        const { id, col, cb } = props
+        // TODO shallow get (without data)
+        const getRes = await this.getDocument({ id, col })
+        if (!getRes.isOk) return getRes
+        const doc = getRes.value
+        cb(doc.permissions)
+        return this.updateDocumentPermissions({
+            id,
+            col,
+            permissions: doc.permissions
+        })
+    }
 }
 
 export { SinkronApi }

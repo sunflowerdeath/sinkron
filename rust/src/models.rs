@@ -70,3 +70,10 @@ pub struct NewRef {
     pub doc_id: uuid::Uuid,
     pub col_id: String,
 }
+
+#[derive(Insertable)]
+#[diesel(table_name = schema::groups)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Group {
+    pub id: String
+}
