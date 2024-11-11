@@ -23,6 +23,19 @@ use crate::schema;
 
 type CreateCollection = models::NewCollection;
 
+#[derive(serde::Deserialize)]
+struct UpdateCollectionPermissions {
+    id: String,
+    permissions: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateDocumentPermissions {
+    id: String,
+    col: String,
+    permissions: String,
+}
+
 fn default_host() -> String {
     "0.0.0.0".to_string()
 }
@@ -306,6 +319,23 @@ impl Sinkron {
         Ok(())
     }
 
+    // Permissions
+
+    async fn update_collection_permissions(
+        &self,
+        props: UpdateCollectionPermissions,
+    ) -> Result<(), SinkronError> {
+        // TODO
+        Ok(())
+    }
+
+    async fn update_document_permissions(
+        &self,
+        props: UpdateDocumentPermissions,
+    ) -> Result<(), SinkronError> {
+        // TODO
+        Ok(())
+    }
     fn app(&self) -> Router {
         let api_router = Router::new()
             .route("/get_document", post(get_document))
@@ -338,25 +368,15 @@ impl Sinkron {
                 "/remove_user_from_all_groups",
                 post(remove_user_from_all_groups),
             )
-            /*
             // Permissions
-            .route(
-                "/check_collection_permissions",
-                post(check_collection_permissions),
-            )
             .route(
                 "/update_collection_permissions",
                 post(update_collection_permissions),
             )
             .route(
-                "/check_document_permissions",
-                post(check_document_permissions),
-            )
-            .route(
                 "/update_document_permissions",
                 post(update_document_permissions),
             )
-            */
             .layer(middleware::from_fn_with_state(
                 self.clone(),
                 check_auth_token,
@@ -623,5 +643,23 @@ async fn remove_user_from_all_groups(
     Json(payload): Json<Id>,
 ) -> Response {
     let res = sinkron.remove_user_from_all_groups(payload.id).await;
+    sinkron_response(res)
+}
+
+// Permissions handlers
+
+async fn update_collection_permissions(
+    State(sinkron): State<Sinkron>,
+    Json(payload): Json<UpdateCollectionPermissions>,
+) -> Response {
+    let res = sinkron.update_collection_permissions(payload).await;
+    sinkron_response(res)
+}
+
+async fn update_document_permissions(
+    State(sinkron): State<Sinkron>,
+    Json(payload): Json<UpdateDocumentPermissions>,
+) -> Response {
+    let res = sinkron.update_document_permissions(payload).await;
     sinkron_response(res)
 }
