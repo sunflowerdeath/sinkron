@@ -352,17 +352,17 @@ class SinkronApi {
     // Groups and users
 
     async createGroup(
-        group: string
+        id: string
     ): Promise<ResultType<undefined, SinkronError>> {
-        const res = await this.send<RawDocument>("create_group", { group })
+        const res = await this.send<RawDocument>("create_group", { id })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     async deleteGroup(
-        group: string
+        id: string
     ): Promise<ResultType<undefined, SinkronError>> {
-        const res = await this.send<RawDocument>("delete_group", { group })
+        const res = await this.send<RawDocument>("delete_group", { id })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
@@ -391,11 +391,11 @@ class SinkronApi {
     }
 
     async removeUserFromAllGroups(
-        user: string
+        id: string
     ): Promise<ResultType<undefined, SinkronError>> {
         const res = await this.send<RawDocument>(
             "remove_user_from_all_groups",
-            { user }
+            { id }
         )
         if (!res.isOk) return res
         return Result.ok(undefined)

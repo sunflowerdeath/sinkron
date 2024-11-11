@@ -208,7 +208,21 @@ impl Sinkron {
 
     async fn delete_group(&self, id: String) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
-        Ok(())
+        let _ = diesel::delete(schema::members::table)
+            .filter(schema::members::group.eq(&id))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        let num = diesel::delete(schema::groups::table)
+            .filter(schema::groups::id.eq(&id))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if num == 0 {
+            Err(SinkronError::not_found("Group not found"))
+        } else {
+            Ok(())
+        }
     }
 
     async fn add_user_to_group(
@@ -217,6 +231,13 @@ impl Sinkron {
         group: String,
     ) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
+        // TODO check group exists ?
+        let new_member = models::Member { user, group };
+        let _ = diesel::insert_into(schema::members::table)
+            .values(&new_member)
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
         Ok(())
     }
 
@@ -226,7 +247,17 @@ impl Sinkron {
         group: String,
     ) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
-        Ok(())
+        let num = diesel::delete(schema::members::table)
+            .filter(schema::members::user.eq(&user))
+            .filter(schema::members::group.eq(&group))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if num == 0 {
+            Err(SinkronError::not_found("Group member not found"))
+        } else {
+            Ok(())
+        }
     }
 
     async fn remove_user_from_all_groups(
@@ -234,6 +265,11 @@ impl Sinkron {
         id: String,
     ) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
+        let _ = diesel::delete(schema::members::table)
+            .filter(schema::members::user.eq(&id))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
         Ok(())
     }
 

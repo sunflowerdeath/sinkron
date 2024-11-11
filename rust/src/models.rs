@@ -75,5 +75,13 @@ pub struct NewRef {
 #[diesel(table_name = schema::groups)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Group {
-    pub id: String
+    pub id: String,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = schema::members)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Member {
+    pub user: String,
+    pub group: String,
 }
