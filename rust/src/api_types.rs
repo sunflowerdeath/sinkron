@@ -13,3 +13,15 @@ pub struct Document {
 }
 
 pub type Collection = models::Collection;
+
+#[derive(serde::Serialize)]
+pub struct Group {
+    pub id: String,
+    pub members: Vec<String>
+}
+
+#[derive(serde::Serialize)]
+pub struct User {
+    pub id: String,
+    pub groups: Vec<String>
+}

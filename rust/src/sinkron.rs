@@ -14,7 +14,7 @@ use tokio::sync::oneshot;
 
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::{SinkronActorMessage, SinkronHandle};
-use crate::api_types::{Collection, Document};
+use crate::api_types::{Collection, Document, Group, User};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::models;
@@ -185,14 +185,44 @@ impl Sinkron {
 
     // Groups
 
-    async fn get_user(&self, id: String) -> Result<(), SinkronError> {
-        let mut conn = self.connect().await?;
-        Ok(())
+    async fn group_exists(
+        &self,
+        conn: &mut db::DbConnection,
+        id: &str,
+    ) -> Result<bool, SinkronError> {
+        let cnt: i64 = schema::groups::table
+            .filter(schema::groups::id.eq(&id))
+            .count()
+            .get_result(conn)
+            .await
+            .map_err(internal_error)?;
+        Ok(cnt != 0)
     }
 
-    async fn get_group(&self, id: String) -> Result<(), SinkronError> {
+    async fn get_user(&self, id: String) -> Result<User, SinkronError> {
         let mut conn = self.connect().await?;
-        Ok(())
+        let groups: Vec<String> = schema::members::table
+            .filter(schema::members::user.eq(&id))
+            .select(schema::members::group)
+            .get_results(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        Ok(User { id, groups })
+    }
+
+    async fn get_group(&self, id: String) -> Result<Group, SinkronError> {
+        let mut conn = self.connect().await?;
+        let exists = self.group_exists(&mut conn, &id).await?;
+        if !exists {
+            return Err(SinkronError::not_found("Group not found"));
+        }
+        let members: Vec<String> = schema::members::table
+            .filter(schema::members::group.eq(&id))
+            .select(schema::members::group)
+            .get_results(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        Ok(Group { id, members })
     }
 
     async fn create_group(&self, id: String) -> Result<(), SinkronError> {
@@ -231,7 +261,10 @@ impl Sinkron {
         group: String,
     ) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
-        // TODO check group exists ?
+        let exists = self.group_exists(&mut conn, &group).await?;
+        if !exists {
+            return Err(SinkronError::not_found("Group not found"));
+        }
         let new_member = models::Member { user, group };
         let _ = diesel::insert_into(schema::members::table)
             .values(&new_member)
@@ -296,7 +329,7 @@ impl Sinkron {
             */
             // Groups & users
             .route("/get_user", post(get_user))
-            .route("/get_group", post(create_group))
+            .route("/get_group", post(get_group))
             .route("/create_group", post(create_group))
             .route("/delete_group", post(delete_group))
             .route("/add_user_to_group", post(add_user_to_group))
@@ -528,16 +561,6 @@ async fn delete_document(
 }
 
 // Groups handlers
-
-struct Group {
-    id: String,
-    members: Vec<String>,
-}
-
-struct User {
-    id: String,
-    groups: Vec<String>,
-}
 
 #[derive(serde::Deserialize)]
 struct AddRemoveUserToGroup {
