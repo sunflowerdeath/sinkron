@@ -231,7 +231,7 @@ impl Sinkron {
         }
         let members: Vec<String> = schema::members::table
             .filter(schema::members::group.eq(&id))
-            .select(schema::members::group)
+            .select(schema::members::user)
             .get_results(&mut conn)
             .await
             .map_err(internal_error)?;
@@ -270,9 +270,9 @@ impl Sinkron {
 
     async fn add_user_to_group(
         &self,
-        user: String,
-        group: String,
+        props: AddRemoveUserToGroup,
     ) -> Result<(), SinkronError> {
+        let AddRemoveUserToGroup { user, group } = props;
         let mut conn = self.connect().await?;
         let exists = self.group_exists(&mut conn, &group).await?;
         if !exists {
@@ -289,9 +289,9 @@ impl Sinkron {
 
     async fn remove_user_from_group(
         &self,
-        user: String,
-        group: String,
+        props: AddRemoveUserToGroup,
     ) -> Result<(), SinkronError> {
+        let AddRemoveUserToGroup { user, group } = props;
         let mut conn = self.connect().await?;
         let num = diesel::delete(schema::members::table)
             .filter(schema::members::user.eq(&user))
@@ -624,7 +624,7 @@ async fn add_user_to_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<AddRemoveUserToGroup>,
 ) -> Response {
-    let res = sinkron.add_user_to_group(payload.user, payload.group).await;
+    let res = sinkron.add_user_to_group(payload).await;
     sinkron_response(res)
 }
 
@@ -632,9 +632,7 @@ async fn remove_user_from_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<AddRemoveUserToGroup>,
 ) -> Response {
-    let res = sinkron
-        .remove_user_from_group(payload.user, payload.group)
-        .await;
+    let res = sinkron.remove_user_from_group(payload).await;
     sinkron_response(res)
 }
 

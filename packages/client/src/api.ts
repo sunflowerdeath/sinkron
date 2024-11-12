@@ -104,6 +104,16 @@ export type UpdateDocumentWithCallbackProps = {
     cb: (doc: LoroDoc) => void
 }
 
+export type Group = {
+    id: string
+    members: string[]
+}
+
+export type User = {
+    id: string
+    groups: string[]
+}
+
 export type AddRemoveUserToGroupProps = {
     user: string
     group: string
@@ -134,7 +144,7 @@ export type UpdateDocumentPermissionsWithCallbackProps = {
 const parseCollection = (raw: RawCollection): Collection => {
     return {
         ...raw,
-        permissions: Permissions.parse(raw.permissions)
+        permissions: new Permissions() // TODO Permissions.parse(raw.permissions)
     }
 }
 
@@ -145,7 +155,7 @@ const parseDocument = (raw: RawDocument): Document => {
         data: data === null ? data : Base64.toUint8Array(data),
         createdAt: parseISO(createdAt),
         updatedAt: parseISO(updatedAt),
-        permissions: Permissions.parse(permissions)
+        permissions: new Permissions() // TODO Permissions.parse(permissions)
     }
     return parsed
 }
@@ -220,13 +230,28 @@ class SinkronApi {
                 if (!res.isOk) return res
                 return Result.ok(res.value as T)
             } else {
-                return Result.err({
-                    code: ErrorCode.InvalidResponse,
-                    message:
-                        "Invalid response content type, " +
-                        "required 'application/json'",
-                    details: { response }
-                })
+                try {
+                    const text = await response.text()
+                    if (text.length > 0) {
+                        return Result.err({
+                            code: ErrorCode.InternalServerError,
+                            message:
+                                "Unexpected response: " +
+                                "expected  'content type: application/json' " +
+                                "or an empty response",
+                            details: { response }
+                        })
+                    } else {
+                        // @ts-expect-error for this case T shoud be undefined
+                        return Result.ok(undefined)
+                    }
+                } catch (error) {
+                    return Result.err({
+                        code: ErrorCode.InternalServerError,
+                        message: "Couldn't parse response body as text",
+                        details: { response, error }
+                    })
+                }
             }
         } else {
             if (isJson) {
@@ -351,27 +376,31 @@ class SinkronApi {
 
     // Groups and users
 
-    async createGroup(
-        id: string
-    ): Promise<ResultType<undefined, SinkronError>> {
-        const res = await this.send<RawDocument>("create_group", { id })
+    async createGroup(id: string): Promise<ResultType<void, SinkronError>> {
+        const res = await this.send<void>("create_group", { id })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
-    async deleteGroup(
-        id: string
-    ): Promise<ResultType<undefined, SinkronError>> {
-        const res = await this.send<RawDocument>("delete_group", { id })
+    async getGroup(id: string): Promise<ResultType<Group, SinkronError>> {
+        return await this.send<Group>("get_group", { id })
+    }
+
+    async getUser(id: string): Promise<ResultType<User, SinkronError>> {
+        return await this.send<User>("get_user", { id })
+    }
+
+    async deleteGroup(id: string): Promise<ResultType<void, SinkronError>> {
+        const res = await this.send<void>("delete_group", { id })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     async addUserToGroup(
         props: AddRemoveUserToGroupProps
-    ): Promise<ResultType<undefined, SinkronError>> {
+    ): Promise<ResultType<void, SinkronError>> {
         const { user, group } = props
-        const res = await this.send<RawDocument>("add_user_to_group", {
+        const res = await this.send<void>("add_user_to_group", {
             group,
             user
         })
@@ -381,11 +410,8 @@ class SinkronApi {
 
     async removeUserFromGroup(
         props: AddRemoveUserToGroupProps
-    ): Promise<ResultType<undefined, SinkronError>> {
-        const res = await this.send<RawDocument>(
-            "remove_user_from_group",
-            props
-        )
+    ): Promise<ResultType<void, SinkronError>> {
+        const res = await this.send<void>("remove_user_from_group", props)
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
@@ -405,19 +431,19 @@ class SinkronApi {
 
     async updateCollectionPermissions(
         props: UpdateCollectionPermissionsProps
-    ): Promise<ResultType<undefined, SinkronError>> {
+    ): Promise<ResultType<void, SinkronError>> {
         const { id, permissions } = props
-        const res = await this.send<RawDocument>(
-            "update_collection_permissions",
-            { id, permissions: permissions.stringify() }
-        )
+        const res = await this.send<void>("update_collection_permissions", {
+            id,
+            permissions: permissions.stringify()
+        })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     async updateCollectionPermissionsWithCallback(
         props: UpdateCollectionPermissionsWithCallbackProps
-    ): Promise<ResultType<undefined, SinkronError>> {
+    ): Promise<ResultType<void, SinkronError>> {
         const { id, cb } = props
         const getRes = await this.getCollection(id)
         if (!getRes.isOk) return getRes
@@ -431,19 +457,20 @@ class SinkronApi {
 
     async updateDocumentPermissions(
         props: UpdateDocumentPermissionsProps
-    ): Promise<ResultType<undefined, SinkronError>> {
+    ): Promise<ResultType<void, SinkronError>> {
         const { id, col, permissions } = props
-        const res = await this.send<RawDocument>(
-            "update_document_permissions",
-            { id, col, permissions: permissions.stringify() }
-        )
+        const res = await this.send<void>("update_document_permissions", {
+            id,
+            col,
+            permissions: permissions.stringify()
+        })
         if (!res.isOk) return res
         return Result.ok(undefined)
     }
 
     async updateDocumentPermissionsWithCallback(
         props: UpdateDocumentPermissionsWithCallbackProps
-    ): Promise<ResultType<undefined, SinkronError>> {
+    ): Promise<ResultType<void, SinkronError>> {
         const { id, col, cb } = props
         // TODO shallow get (without data)
         const getRes = await this.getDocument({ id, col })

@@ -129,6 +129,7 @@ impl ClientActor {
 
     async fn handle_get(&mut self, msg: GetMessage) {
         let (sender, receiver) = oneshot::channel();
+        // TODO check permissions
         let send = self.collection.send(CollectionMessage::Get {
             id: msg.id,
             reply: sender,
@@ -170,6 +171,7 @@ impl ClientActor {
     }
 
     async fn handle_change(&mut self, msg: ClientChangeMessage) {
+        // TODO check permissions
         let (sender, receiver) = oneshot::channel();
 
         let col_msg = match (msg.op, msg.data) {

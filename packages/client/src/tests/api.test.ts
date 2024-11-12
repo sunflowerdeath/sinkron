@@ -6,23 +6,28 @@ import { LoroDoc } from "loro-crdt"
 import { SinkronApi, ErrorCode } from "../api"
 import { Permissions } from "../permissions"
 
-let url = "http://localhost:3000"
-let token = "SINKRON_API_TOKEN"
+import { assertIsMatch } from "./utils"
+
+const url = "http://localhost:3000"
+const token = "SINKRON_API_TOKEN"
 
 describe("SinkronApi", () => {
     it("auth", async () => {
-        let permissions = new Permissions()
+        const permissions = new Permissions()
 
-        let invalidUrlApi = new SinkronApi({ url: "INVALID", token: "INVALID" })
-        let invalidUrlRes = await invalidUrlApi.createCollection({
+        const invalidUrlApi = new SinkronApi({
+            url: "INVALID",
+            token: "INVALID"
+        })
+        const invalidUrlRes = await invalidUrlApi.createCollection({
             id: "test",
             permissions
         })
         assert(!invalidUrlRes.isOk, "fetch error")
         assert.strictEqual(invalidUrlRes.error.code, ErrorCode.FetchError)
 
-        let invalidTokenApi = new SinkronApi({ url, token: "INVALID" })
-        let invalidTokenRes = await invalidTokenApi.createCollection({
+        const invalidTokenApi = new SinkronApi({ url, token: "INVALID" })
+        const invalidTokenRes = await invalidTokenApi.createCollection({
             id: "test",
             permissions
         })
@@ -31,13 +36,16 @@ describe("SinkronApi", () => {
     })
 
     it("collections", async () => {
-        let api = new SinkronApi({ url, token })
+        const api = new SinkronApi({ url, token })
 
-        let permissions = new Permissions()
-        let createRes = await api.createCollection({ id: "test", permissions })
+        const permissions = new Permissions()
+        const createRes = await api.createCollection({
+            id: "test",
+            permissions
+        })
         assert(createRes.isOk, "create")
 
-        let duplicateRes = await api.createCollection({
+        const duplicateRes = await api.createCollection({
             id: "test",
             permissions
         })
@@ -48,10 +56,10 @@ describe("SinkronApi", () => {
             "duplicate"
         )
 
-        let getRes = await api.getCollection("test")
+        const getRes = await api.getCollection("test")
         assert(getRes.isOk, "get")
 
-        let notFoundRes = await api.getCollection("not_found")
+        const notFoundRes = await api.getCollection("not_found")
         assert(!notFoundRes.isOk, "not found")
         assert.strictEqual(
             notFoundRes.error.code,
@@ -59,28 +67,35 @@ describe("SinkronApi", () => {
             "not found"
         )
 
-        // let deleteRes = await api.deleteCollection("test")
+        // const deleteRes = await api.deleteCollection("test")
         // assert(deleteRes.isOk, "delete")
     })
 
     it("documents", async () => {
-        let api = new SinkronApi({ url, token })
+        const api = new SinkronApi({ url, token })
 
-        let col = uuidv4()
-        let permissions = new Permissions()
-        let createColRes = await api.createCollection({ id: col, permissions })
+        const col = uuidv4()
+        const permissions = new Permissions()
+        const createColRes = await api.createCollection({
+            id: col,
+            permissions
+        })
         assert(createColRes.isOk, "create col: ok")
 
         // create
-        let id = uuidv4()
-        let loroDoc = new LoroDoc()
+        const id = uuidv4()
+        const loroDoc = new LoroDoc()
         loroDoc.getText("text").insert(0, "Hello")
-        let snapshot = loroDoc.export({ mode: "snapshot" })
-        let createRes = await api.createDocument({ id, col, data: snapshot })
+        const snapshot = loroDoc.export({ mode: "snapshot" })
+        const createRes = await api.createDocument({ id, col, data: snapshot })
         assert(createRes.isOk, "create: ok")
 
         // duplicate
-        let duplicateRes = await api.createDocument({ id, col, data: snapshot })
+        const duplicateRes = await api.createDocument({
+            id,
+            col,
+            data: snapshot
+        })
         assert(!duplicateRes.isOk, "duplicate")
         assert.strictEqual(
             duplicateRes.error.code,
@@ -89,11 +104,11 @@ describe("SinkronApi", () => {
         )
 
         // get
-        let getRes = await api.getDocument({ id, col })
+        const getRes = await api.getDocument({ id, col })
         assert(getRes.isOk, "get")
 
         // not found
-        let notFoundRes = await api.getDocument({ id: uuidv4(), col })
+        const notFoundRes = await api.getDocument({ id: uuidv4(), col })
         assert(!notFoundRes.isOk, "not found")
         assert.strictEqual(
             notFoundRes.error.code,
@@ -102,7 +117,7 @@ describe("SinkronApi", () => {
         )
 
         // col not found
-        let colNotFoundRes = await api.getDocument({ id, col: uuidv4() })
+        const colNotFoundRes = await api.getDocument({ id, col: uuidv4() })
         assert(!colNotFoundRes.isOk, "col not found")
         assert.strictEqual(
             colNotFoundRes.error.code,
@@ -111,19 +126,19 @@ describe("SinkronApi", () => {
         )
 
         // update
-        let version = loroDoc.version()
+        const version = loroDoc.version()
         loroDoc.getText("text").insert(5, ", world!")
-        let update = loroDoc.export({ mode: "update", from: version })
-        let updateRes = await api.updateDocument({ id, col, data: update })
+        const update = loroDoc.export({ mode: "update", from: version })
+        const updateRes = await api.updateDocument({ id, col, data: update })
         assert(updateRes.isOk, "update")
 
         // delete
-        let deleteRes = await api.deleteDocument({ id, col })
+        const deleteRes = await api.deleteDocument({ id, col })
         assert(deleteRes.isOk, "delete")
         assert.strictEqual(deleteRes.value.data, null, "delete")
 
         // already deleted
-        let alreadyDeletedRes = await api.deleteDocument({ id, col })
+        const alreadyDeletedRes = await api.deleteDocument({ id, col })
         assert(!alreadyDeletedRes.isOk, "already deleted")
         assert.strictEqual(
             alreadyDeletedRes.error.code,
@@ -132,7 +147,7 @@ describe("SinkronApi", () => {
         )
 
         // update deleted
-        let updateDeletedRes = await api.updateDocument({
+        const updateDeletedRes = await api.updateDocument({
             id,
             col,
             data: update
@@ -145,10 +160,46 @@ describe("SinkronApi", () => {
         )
     })
 
-    it("groups", () => {
-        // create group
-        // add user to group
-        // remove user from group
-        // remove user from all groups
+    it("groups", async () => {
+        const api = new SinkronApi({ url, token })
+
+        const col = uuidv4()
+        const permissions = new Permissions()
+        const createColRes = await api.createCollection({
+            id: col,
+            permissions
+        })
+        assert(createColRes.isOk, "createCollection")
+
+        const createGroupRes = await api.createGroup("group")
+        assert(createGroupRes.isOk, "createGroup")
+
+        const addToGroupRes = await api.addUserToGroup({
+            user: "user",
+            group: "group"
+        })
+        assert(addToGroupRes.isOk, "addUserToGroup")
+
+        const getGroupRes = await api.getGroup("group")
+        assert(getGroupRes.isOk, "getGroup")
+        const group = getGroupRes.value
+        assertIsMatch(group, { id: "group", members: ["user"] })
+
+        const getUserRes = await api.getUser("user")
+        assert(getUserRes.isOk, "getUser")
+        const user = getUserRes.value
+        assertIsMatch(user, { id: "user", groups: ["group"] })
+
+        const removeUserRes = await api.removeUserFromGroup({
+            user: "user",
+            group: "group"
+        })
+        assert(removeUserRes.isOk, "removeUserFromGroup")
+
+        const removeUserFromAllRes = await api.removeUserFromAllGroups("user")
+        assert(removeUserFromAllRes.isOk, "removeUserFromAllGroups")
+
+        const deleteGroupRes = await api.deleteGroup("group")
+        assert(deleteGroupRes.isOk, "deleteGroup")
     })
 })

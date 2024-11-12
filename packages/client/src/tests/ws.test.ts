@@ -1,6 +1,4 @@
-import { inspect } from "node:util"
 import assert from "node:assert"
-import { isMatch } from "lodash"
 import { Base64 } from "js-base64"
 
 import { v4 as uuidv4 } from "uuid"
@@ -9,6 +7,8 @@ import { LoroDoc } from "loro-crdt"
 import { SinkronApi } from "../api"
 import { Permissions } from "../permissions"
 import { ServerMessage, ClientMessage, Op } from "../protocol"
+
+import { assertIsMatch } from "./utils"
 
 let apiUrl = "http://localhost:3000"
 let apiToken = "SINKRON_API_TOKEN"
@@ -61,17 +61,6 @@ class WsTest {
 
     send(msg: ClientMessage) {
         this.ws.send(JSON.stringify(msg))
-    }
-}
-
-const assertIsMatch = (a: object, b: object) => {
-    const match = isMatch(a, b)
-    if (!match) {
-        assert.fail(
-            "Expected objects to match: \n" +
-                `Given: ${inspect(a)}\n` +
-                `Expected: ${inspect(b)}`
-        )
     }
 }
 
