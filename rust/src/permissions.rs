@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+pub enum Action {
+    Read,
+    Create,
+    Update,
+    Delete
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]

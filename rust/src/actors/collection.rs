@@ -15,6 +15,7 @@ use crate::api_types::Document;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::models;
+use crate::permissions;
 use crate::protocol::*;
 use crate::schema;
 
@@ -27,6 +28,43 @@ pub struct SyncResult {
     pub colrev: i64,
 }
 
+pub enum Source {
+    Client { user: String },
+    Api,
+}
+
+pub struct SyncMessage {
+    pub colrev: i64,
+    pub reply: oneshot::Sender<Result<SyncResult, SinkronError>>,
+    pub source: Source,
+}
+
+pub struct GetMessage {
+    pub id: uuid::Uuid,
+    pub source: Source,
+    pub reply: oneshot::Sender<Result<Document, SinkronError>>,
+}
+
+pub struct CreateMessage {
+    pub id: uuid::Uuid,
+    pub data: String,
+    pub source: Source,
+    pub reply: oneshot::Sender<Result<Document, SinkronError>>,
+}
+
+pub struct UpdateMessage {
+    pub id: uuid::Uuid,
+    pub data: String,
+    pub source: Source,
+    pub reply: oneshot::Sender<Result<Document, SinkronError>>,
+}
+
+pub struct DeleteMessage {
+    pub id: uuid::Uuid,
+    pub source: Source,
+    pub reply: oneshot::Sender<Result<Document, SinkronError>>,
+}
+
 pub enum CollectionMessage {
     Subscribe {
         client_id: i32,
@@ -35,28 +73,11 @@ pub enum CollectionMessage {
     Unsubscribe {
         client_id: i32,
     },
-    Get {
-        id: uuid::Uuid,
-        reply: oneshot::Sender<Result<Document, SinkronError>>,
-    },
-    Sync {
-        colrev: i64,
-        reply: oneshot::Sender<Result<SyncResult, SinkronError>>,
-    },
-    Create {
-        id: uuid::Uuid,
-        data: String,
-        reply: oneshot::Sender<Result<Document, SinkronError>>,
-    },
-    Update {
-        id: uuid::Uuid,
-        data: String,
-        reply: oneshot::Sender<Result<Document, SinkronError>>,
-    },
-    Delete {
-        id: uuid::Uuid,
-        reply: oneshot::Sender<Result<Document, SinkronError>>,
-    },
+    Sync(SyncMessage),
+    Get(GetMessage),
+    Create(CreateMessage),
+    Update(UpdateMessage),
+    Delete(DeleteMessage),
 }
 
 struct CollectionActor {
@@ -96,6 +117,14 @@ impl CollectionActor {
         trace!("col-{}: actor exit", self.id);
     }
 
+    fn check_col_permission(&self, action: permissions::Action) -> bool {
+        return true;
+    }
+
+    async fn check_doc_permission(&self, action: permissions::Action) -> bool {
+        return true;
+    }
+
     async fn handle_message(&mut self, msg: CollectionMessage) {
         match msg {
             CollectionMessage::Subscribe { client_id, handle } => {
@@ -110,29 +139,48 @@ impl CollectionActor {
                     client_id
                 );
             }
-            CollectionMessage::Sync { colrev, reply } => {
+            CollectionMessage::Sync(msg) => {
+                let SyncMessage {
+                    colrev,
+                    source,
+                    reply,
+                } = msg;
                 trace!("col-{}: sync, colrev: {:?}", self.id, colrev);
-                let res = self.sync_documents(colrev).await;
+                let res = self.handle_sync(colrev, source).await;
                 _ = reply.send(res);
             }
-            CollectionMessage::Get { id, reply } => {
+            CollectionMessage::Get(msg) => {
+                let GetMessage { id, source, reply } = msg;
                 trace!("col-{}: get document, id: {}", self.id, id);
-                let res = self.get_document(id).await;
+                let res = self.handle_get(id, source).await;
                 _ = reply.send(res);
             }
-            CollectionMessage::Create { id, data, reply } => {
+            CollectionMessage::Create(msg) => {
+                let CreateMessage {
+                    id,
+                    data,
+                    source,
+                    reply,
+                } = msg;
                 trace!("col-{}: create, id: {}", self.id, id);
-                let res = self.create_document(id, data, None).await;
+                let res = self.handle_create(id, data, source).await;
                 _ = reply.send(res);
             }
-            CollectionMessage::Update { id, data, reply } => {
+            CollectionMessage::Update(msg) => {
+                let UpdateMessage {
+                    id,
+                    data,
+                    source,
+                    reply,
+                } = msg;
                 trace!("col-{}: update, id: {}", self.id, id);
-                let res = self.update_document(id, Some(data)).await;
+                let res = self.handle_update(id, data, source).await;
                 _ = reply.send(res);
             }
-            CollectionMessage::Delete { id, reply } => {
+            CollectionMessage::Delete(msg) => {
+                let DeleteMessage { id, source, reply } = msg;
                 trace!("col-{}: delete, id: {}", self.id, id);
-                let res = self.update_document(id, None).await;
+                let res = self.handle_delete(id, source).await;
                 _ = reply.send(res);
             }
         }
@@ -194,10 +242,13 @@ impl CollectionActor {
         }
     }
 
-    async fn sync_documents(
+    async fn handle_sync(
         &self,
         colrev: i64,
+        source: Source,
     ) -> Result<SyncResult, SinkronError> {
+        // TODO check permission
+
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
             .filter(schema::documents::col_id.eq(&self.id))
@@ -212,6 +263,7 @@ impl CollectionActor {
         };
         let documents: Vec<models::Document> =
             req.get_results(&mut conn).await.map_err(internal_error)?;
+
         Ok(SyncResult {
             documents: documents
                 .into_iter()
@@ -221,12 +273,38 @@ impl CollectionActor {
         })
     }
 
-    async fn create_document(
+    async fn handle_get(
+        &self,
+        id: uuid::Uuid,
+        source: Source,
+    ) -> Result<Document, SinkronError> {
+        // TODO check permission
+
+        let mut conn = self.connect().await?;
+
+        let doc: models::Document = schema::documents::table
+            .find(id)
+            .filter(schema::documents::col_id.eq(&self.id))
+            .first(&mut conn)
+            .await
+            .map_err(|err| match err {
+                diesel::NotFound => {
+                    SinkronError::not_found("Document not found")
+                }
+                err => SinkronError::internal(&err.to_string()),
+            })?;
+
+        Ok(Self::doc_from_model(doc))
+    }
+
+    async fn handle_create(
         &mut self,
         id: uuid::Uuid,
         data: String,
-        permissions: Option<String>,
+        source: Source,
     ) -> Result<Document, SinkronError> {
+        // TODO check permission
+
         let mut conn = self.connect().await?;
 
         let cnt: i64 = schema::documents::table
@@ -251,6 +329,7 @@ impl CollectionActor {
         let next_colrev = self.increment_colrev().await?;
 
         // create document
+        // TODO inherit permissions from collection if not provided
         let new_doc = models::NewDocument {
             id,
             col_id: self.id.clone(),
@@ -288,34 +367,35 @@ impl CollectionActor {
             colrev: next_colrev,
             permissions: "".to_string(),
         };
+
         Ok(doc)
     }
 
-    async fn get_document(
-        &self,
+    async fn handle_update(
+        &mut self,
         id: uuid::Uuid,
+        data: String,
+        source: Source,
     ) -> Result<Document, SinkronError> {
-        let mut conn = self.connect().await?;
+        // TODO check permission
 
-        let doc: models::Document = schema::documents::table
-            .find(id)
-            .filter(schema::documents::col_id.eq(&self.id))
-            .first(&mut conn)
-            .await
-            .map_err(|err| match err {
-                diesel::NotFound => {
-                    SinkronError::not_found("Document not found")
-                }
-                err => SinkronError::internal(&err.to_string()),
-            })?;
+        self.update_document(id, Some(data)).await
+    }
 
-        Ok(Self::doc_from_model(doc))
+    async fn handle_delete(
+        &mut self,
+        id: uuid::Uuid,
+        source: Source,
+    ) -> Result<Document, SinkronError> {
+        // TODO check permission
+
+        self.update_document(id, None).await
     }
 
     async fn update_document(
         &mut self,
         id: uuid::Uuid,
-        update: Option<String>,
+        data: Option<String>,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
@@ -331,7 +411,7 @@ impl CollectionActor {
                 err => SinkronError::internal(&err.to_string()),
             })?;
 
-        let new_data = match &update {
+        let new_data = match &data {
             Some(update) => {
                 let Some(data) = doc.data else {
                     return Err(SinkronError::unprocessable(
@@ -379,7 +459,7 @@ impl CollectionActor {
 
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
-            is_deleted: update.is_none(),
+            is_deleted: data.is_none(),
             data: new_data.as_ref(),
         };
 
@@ -395,7 +475,7 @@ impl CollectionActor {
         let serialized_new_data = new_data.map(|d| BASE64_STANDARD.encode(d));
 
         // broadcast message to subscribers
-        let op = if update.is_some() {
+        let op = if data.is_some() {
             Op::Update
         } else {
             Op::Delete

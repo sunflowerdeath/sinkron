@@ -20,7 +20,7 @@ describe("SinkronApi", () => {
             token: "INVALID"
         })
         const invalidUrlRes = await invalidUrlApi.createCollection({
-            id: "test",
+            id: uuidv4(),
             permissions
         })
         assert(!invalidUrlRes.isOk, "fetch error")
@@ -28,7 +28,7 @@ describe("SinkronApi", () => {
 
         const invalidTokenApi = new SinkronApi({ url, token: "INVALID" })
         const invalidTokenRes = await invalidTokenApi.createCollection({
-            id: "test",
+            id: uuidv4(),
             permissions
         })
         assert(!invalidTokenRes.isOk, "auth failed")
@@ -38,15 +38,16 @@ describe("SinkronApi", () => {
     it("collections", async () => {
         const api = new SinkronApi({ url, token })
 
+        const col = uuidv4()
         const permissions = new Permissions()
         const createRes = await api.createCollection({
-            id: "test",
+            id: col,
             permissions
         })
         assert(createRes.isOk, "create")
 
         const duplicateRes = await api.createCollection({
-            id: "test",
+            id: col,
             permissions
         })
         assert(!duplicateRes.isOk, "duplicate")
@@ -56,7 +57,7 @@ describe("SinkronApi", () => {
             "duplicate"
         )
 
-        const getRes = await api.getCollection("test")
+        const getRes = await api.getCollection(col)
         assert(getRes.isOk, "get")
 
         const notFoundRes = await api.getCollection("not_found")

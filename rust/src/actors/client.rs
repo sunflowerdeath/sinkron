@@ -6,6 +6,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
+use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::error::SinkronError;
@@ -63,12 +64,21 @@ impl ClientActor {
         }));
     }
 
+    fn source(&self) -> collection::Source {
+        collection::Source::Client {
+            user: "123".to_string(), // TODO actual user id
+        }
+    }
+
     async fn sync(&mut self, colrev: i64) -> Result<(), SinkronError> {
         let (sender, receiver) = oneshot::channel();
-        self.send_col_message(CollectionMessage::Sync {
-            colrev,
-            reply: sender,
-        });
+        self.send_col_message(CollectionMessage::Sync(
+            collection::SyncMessage {
+                colrev,
+                source: self.source(),
+                reply: sender,
+            },
+        ));
         match receiver.await {
             Ok(Ok(res)) => {
                 let mut messages: Vec<ServerMessage> = res
@@ -129,11 +139,13 @@ impl ClientActor {
 
     async fn handle_get(&mut self, msg: GetMessage) {
         let (sender, receiver) = oneshot::channel();
-        // TODO check permissions
-        let send = self.collection.send(CollectionMessage::Get {
-            id: msg.id,
-            reply: sender,
-        });
+        let send = self.collection.send(CollectionMessage::Get(
+            collection::GetMessage {
+                id: msg.id,
+                source: self.source(),
+                reply: sender,
+            },
+        ));
         if send.is_err() {
             // TODO couldn't send, just exit ?
             return;
@@ -171,24 +183,32 @@ impl ClientActor {
     }
 
     async fn handle_change(&mut self, msg: ClientChangeMessage) {
-        // TODO check permissions
         let (sender, receiver) = oneshot::channel();
 
         let col_msg = match (msg.op, msg.data) {
-            (Op::Delete, None) => CollectionMessage::Delete {
-                id: msg.id,
-                reply: sender,
-            },
-            (Op::Update, Some(data)) => CollectionMessage::Update {
-                id: msg.id,
-                reply: sender,
-                data,
-            },
-            (Op::Create, Some(data)) => CollectionMessage::Create {
-                id: msg.id,
-                reply: sender,
-                data,
-            },
+            (Op::Delete, None) => {
+                CollectionMessage::Delete(collection::DeleteMessage {
+                    id: msg.id,
+                    source: self.source(),
+                    reply: sender,
+                })
+            }
+            (Op::Update, Some(data)) => {
+                CollectionMessage::Update(collection::UpdateMessage {
+                    id: msg.id,
+                    data,
+                    source: self.source(),
+                    reply: sender,
+                })
+            }
+            (Op::Create, Some(data)) => {
+                CollectionMessage::Create(collection::CreateMessage {
+                    id: msg.id,
+                    data,
+                    source: self.source(),
+                    reply: sender,
+                })
+            }
             _ => {
                 let err = ChangeErrorMessage {
                     id: msg.id,

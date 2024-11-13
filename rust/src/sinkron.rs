@@ -12,6 +12,7 @@ use diesel_async::RunQueryDsl;
 use serde;
 use tokio::sync::oneshot;
 
+use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::{SinkronActorMessage, SinkronHandle};
 use crate::api_types::{Collection, Document, Group, User};
@@ -31,7 +32,7 @@ struct UpdateCollectionPermissions {
 
 #[derive(serde::Deserialize)]
 struct UpdateDocumentPermissions {
-    id: String,
+    id: uuid::Uuid,
     col: String,
     permissions: String,
 }
@@ -139,47 +140,58 @@ impl Sinkron {
         id: uuid::Uuid,
         col: String,
     ) -> Result<Document, SinkronError> {
-        // TODO check if collection exists
         let col = self.get_collection_actor(col).await?;
 
         let (sender, receiver) = oneshot::channel();
-        col.send(CollectionMessage::Get { id, reply: sender });
+        col.send(CollectionMessage::Get(collection::GetMessage {
+            id,
+            source: collection::Source::Api,
+            reply: sender,
+        }))
+        .map_err(internal_error)?;
         receiver.await.map_err(internal_error)?
     }
 
     async fn create_document(
         &self,
-        id: uuid::Uuid,
-        col: String,
-        data: String,
+        props: CreateDocument,
     ) -> Result<Document, SinkronError> {
-        // TODO check if collection exists
+        let CreateDocument {
+            id,
+            col,
+            data,
+            permissions,
+        } = props;
+
         let col = self.get_collection_actor(col).await?;
 
         let (sender, receiver) = oneshot::channel();
-        col.send(CollectionMessage::Create {
+        col.send(CollectionMessage::Create(collection::CreateMessage {
             id,
             data,
+            source: collection::Source::Api,
             reply: sender,
-        });
+        }))
+        .map_err(internal_error)?;
         receiver.await.map_err(internal_error)?
     }
 
     async fn update_document(
         &self,
-        id: uuid::Uuid,
-        col: String,
-        data: String,
+        props: UpdateDocument,
     ) -> Result<Document, SinkronError> {
-        // TODO check if collection exists
+        let UpdateDocument { id, col, data } = props;
+
         let col = self.get_collection_actor(col).await?;
 
         let (sender, receiver) = oneshot::channel();
-        col.send(CollectionMessage::Update {
+        col.send(CollectionMessage::Update(collection::UpdateMessage {
             id,
             data,
+            source: collection::Source::Api,
             reply: sender,
-        });
+        }))
+        .map_err(internal_error)?;
         receiver.await.map_err(internal_error)?
     }
 
@@ -188,11 +200,15 @@ impl Sinkron {
         id: uuid::Uuid,
         col: String,
     ) -> Result<Document, SinkronError> {
-        // TODO check if collection exists
         let col = self.get_collection_actor(col).await?;
 
         let (sender, receiver) = oneshot::channel();
-        col.send(CollectionMessage::Delete { id, reply: sender });
+        col.send(CollectionMessage::Delete(collection::DeleteMessage {
+            id,
+            source: collection::Source::Api,
+            reply: sender,
+        }))
+        .map_err(internal_error)?;
         receiver.await.map_err(internal_error)?
     }
 
@@ -325,17 +341,39 @@ impl Sinkron {
         &self,
         props: UpdateCollectionPermissions,
     ) -> Result<(), SinkronError> {
-        // TODO
-        Ok(())
+        let mut conn = self.connect().await?;
+        let num: usize = diesel::update(schema::collections::table)
+            .filter(schema::collections::id.eq(&props.id))
+            .set(schema::collections::permissions.eq(props.permissions))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if num == 0 {
+            Err(SinkronError::not_found("Collection not found"))
+        } else {
+            Ok(())
+        }
     }
 
     async fn update_document_permissions(
         &self,
         props: UpdateDocumentPermissions,
     ) -> Result<(), SinkronError> {
-        // TODO
-        Ok(())
+        let mut conn = self.connect().await?;
+        let num: usize = diesel::update(schema::documents::table)
+            .filter(schema::documents::id.eq(&props.id))
+            .filter(schema::documents::col_id.eq(&props.col))
+            .set(schema::documents::permissions.eq(props.permissions))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if num == 0 {
+            Err(SinkronError::not_found("Document not found"))
+        } else {
+            Ok(())
+        }
     }
+
     fn app(&self) -> Router {
         let api_router = Router::new()
             .route("/get_document", post(get_document))
@@ -345,8 +383,8 @@ impl Sinkron {
             // Collections
             .route("/create_collection", post(create_collection))
             .route("/get_collection", post(get_collection))
+            // .route("/delete_collection", post(delete_collection))
             /*
-            .route("/delete_collection", post(delete_collection))
             // Refs
             .route(
                 "/add_document_to_collection",
@@ -553,13 +591,7 @@ async fn create_document(
     State(state): State<Sinkron>,
     Json(payload): Json<CreateDocument>,
 ) -> Response {
-    let CreateDocument {
-        id,
-        col,
-        data,
-        permissions,
-    } = payload;
-    let res = state.create_document(id, col, data).await;
+    let res = state.create_document(payload).await;
     sinkron_response(res)
 }
 
@@ -567,8 +599,7 @@ async fn update_document(
     State(state): State<Sinkron>,
     Json(payload): Json<UpdateDocument>,
 ) -> Response {
-    let UpdateDocument { id, col, data } = payload;
-    let res = state.update_document(id, col, data).await;
+    let res = state.update_document(payload).await;
     sinkron_response(res)
 }
 
