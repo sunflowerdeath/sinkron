@@ -4,10 +4,10 @@ pub enum Action {
     Read,
     Create,
     Update,
-    Delete
+    Delete,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum Role {
@@ -33,4 +33,16 @@ impl Permissions {
             delete: Vec::new(),
         }
     }
+
+    /*
+    pub fn check(&self, action: Action, role: Role) -> bool {
+        let list = match action {
+            Action::Read => &self.read,
+            Action::Create => &self.create,
+            Action::Update => &self.update,
+            Action::Delete => &self.delete,
+        };
+        // TODO
+    }
+    */
 }

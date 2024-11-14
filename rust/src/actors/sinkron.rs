@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket};
 use diesel::prelude::*;
@@ -15,6 +16,7 @@ use crate::actors::supervisor::ExitCallback;
 use crate::api_types::Collection;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
+use crate::groups::GroupsApi;
 use crate::protocol::*;
 use crate::schema;
 
@@ -34,6 +36,7 @@ struct SinkronActor {
     receiver: mpsc::UnboundedReceiver<SinkronActorMessage>,
     client_id: i32,
     collections: HashMap<String, CollectionHandle>,
+    groups_api: Arc<GroupsApi>,
     pool: db::DbConnectionPool,
     exit_channel: (
         mpsc::UnboundedSender<String>,
@@ -44,11 +47,13 @@ struct SinkronActor {
 impl SinkronActor {
     fn new(
         receiver: mpsc::UnboundedReceiver<SinkronActorMessage>,
+        groups_api: Arc<GroupsApi>,
         pool: db::DbConnectionPool,
     ) -> Self {
         Self {
             receiver,
             client_id: 0,
+            groups_api,
             pool,
             collections: HashMap::new(),
             exit_channel: mpsc::unbounded_channel(),
@@ -145,7 +150,7 @@ impl SinkronActor {
             return;
         }
 
-        let collection = self.get_collection_actor(&col_model);
+        let collection = self.get_collection_actor(col_model);
 
         // spawn client actor
         let client_id = self.get_client_id();
@@ -177,7 +182,7 @@ impl SinkronActor {
         self.client_id
     }
 
-    fn get_collection_actor(&mut self, col: &Collection) -> CollectionHandle {
+    fn get_collection_actor(&mut self, col: Collection) -> CollectionHandle {
         match self.collections.get(&col.id) {
             Some(col) => col.clone(),
             None => self.spawn_collection_actor(col),
@@ -199,10 +204,10 @@ impl SinkronActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
-        Ok(self.get_collection_actor(&col))
+        Ok(self.get_collection_actor(col))
     }
 
-    fn spawn_collection_actor(&mut self, col: &Collection) -> CollectionHandle {
+    fn spawn_collection_actor(&mut self, col: Collection) -> CollectionHandle {
         let on_exit: ExitCallback = {
             let exit_sender = self.exit_channel.0.clone();
             let id = col.id.clone();
@@ -210,13 +215,14 @@ impl SinkronActor {
                 _ = exit_sender.send(id);
             })
         };
+        let id = col.id.clone();
         let col_handle = CollectionHandle::new(
-            col.id.clone(),
-            col.colrev,
+            col,
             self.pool.clone(),
+            self.groups_api.clone(),
             Some(on_exit),
         );
-        self.collections.insert(col.id.clone(), col_handle.clone());
+        self.collections.insert(id, col_handle.clone());
         col_handle
     }
 }
@@ -227,9 +233,9 @@ pub struct SinkronHandle {
 }
 
 impl SinkronHandle {
-    pub fn new(pool: db::DbConnectionPool) -> Self {
+    pub fn new(pool: db::DbConnectionPool, groups_api: Arc<GroupsApi>) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        let mut actor = SinkronActor::new(receiver, pool);
+        let mut actor = SinkronActor::new(receiver, groups_api, pool);
         tokio::spawn(async move { actor.run().await });
         Self { sender }
     }

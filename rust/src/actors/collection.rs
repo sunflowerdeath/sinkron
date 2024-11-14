@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use base64::prelude::*;
 use diesel::prelude::*;
@@ -11,9 +12,11 @@ use tokio::{
 
 use crate::actors::client::ClientHandle;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
+use crate::api_types::Collection;
 use crate::api_types::Document;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
+use crate::groups::GroupsApi;
 use crate::models;
 use crate::permissions;
 use crate::protocol::*;
@@ -80,11 +83,28 @@ pub enum CollectionMessage {
     Delete(DeleteMessage),
 }
 
+struct CollectionState {
+    colrev: i64,
+    permissions: permissions::Permissions,
+}
+
+impl CollectionState {
+    fn new(col: &Collection) -> Self {
+        let permissions = serde_json::from_str(&col.permissions)
+            .unwrap_or_else(|_| permissions::Permissions::empty());
+        Self {
+            colrev: col.colrev,
+            permissions,
+        }
+    }
+}
+
 struct CollectionActor {
     supervisor: Supervisor,
     id: String,
-    colrev: i64,
+    state: CollectionState,
     pool: db::DbConnectionPool,
+    groups_api: Arc<GroupsApi>,
     receiver: mpsc::UnboundedReceiver<CollectionMessage>,
     subscribers: std::collections::HashMap<i32, ClientHandle>,
     timeout_task: Option<tokio::task::JoinHandle<()>>,
@@ -93,17 +113,19 @@ struct CollectionActor {
 impl CollectionActor {
     fn new(
         id: String,
-        colrev: i64,
+        state: CollectionState,
         receiver: mpsc::UnboundedReceiver<CollectionMessage>,
         pool: db::DbConnectionPool,
+        groups_api: Arc<GroupsApi>,
         supervisor: Supervisor,
     ) -> Self {
         Self {
             supervisor,
             id,
-            colrev,
+            state,
             receiver,
             pool,
+            groups_api,
             subscribers: HashMap::new(),
             timeout_task: None,
         }
@@ -117,12 +139,35 @@ impl CollectionActor {
         trace!("col-{}: actor exit", self.id);
     }
 
-    fn check_col_permission(&self, action: permissions::Action) -> bool {
-        return true;
+    async fn check_col_permission(
+        &self,
+        source: Source,
+        action: permissions::Action,
+    ) -> Result<(), SinkronError> {
+        match source {
+            Source::Api => Ok(()),
+            Source::Client { user } => {
+                let user = self.groups_api.get_user(user).await?;
+                // TODO check
+                Ok(())
+            }
+        }
     }
 
-    async fn check_doc_permission(&self, action: permissions::Action) -> bool {
-        return true;
+    async fn check_doc_permission(
+        &self,
+        doc: &models::Document,
+        source: Source,
+        action: permissions::Action,
+    ) -> Result<(), SinkronError> {
+        match source {
+            Source::Api => Ok(()),
+            Source::Client { user } => {
+                let user = self.groups_api.get_user(user).await?;
+                // TODO check
+                Ok(())
+            }
+        }
     }
 
     async fn handle_message(&mut self, msg: CollectionMessage) {
@@ -174,13 +219,13 @@ impl CollectionActor {
                     reply,
                 } = msg;
                 trace!("col-{}: update, id: {}", self.id, id);
-                let res = self.handle_update(id, data, source).await;
+                let res = self.handle_update(id, Some(data), source).await;
                 _ = reply.send(res);
             }
             CollectionMessage::Delete(msg) => {
                 let DeleteMessage { id, source, reply } = msg;
                 trace!("col-{}: delete, id: {}", self.id, id);
-                let res = self.handle_delete(id, source).await;
+                let res = self.handle_update(id, None, source).await;
                 _ = reply.send(res);
             }
         }
@@ -219,14 +264,14 @@ impl CollectionActor {
             .get_result(&mut conn)
             .await
             .map_err(internal_error)?;
-        self.colrev = colrev;
+        self.state.colrev = colrev;
         Ok(colrev)
     }
 
     async fn broadcast(&self, msg: ServerMessage) {
         // TODO more efficient ?
         for client in self.subscribers.values() {
-            client.send_message(msg.clone()).await;
+            client.send_message(msg.clone()).await; // TODO unbounded ?
         }
     }
 
@@ -247,7 +292,9 @@ impl CollectionActor {
         colrev: i64,
         source: Source,
     ) -> Result<SyncResult, SinkronError> {
-        // TODO check permission
+        _ = self
+            .check_col_permission(source, permissions::Action::Read)
+            .await?;
 
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
@@ -269,7 +316,7 @@ impl CollectionActor {
                 .into_iter()
                 .map(Self::doc_from_model)
                 .collect(),
-            colrev: self.colrev,
+            colrev: self.state.colrev,
         })
     }
 
@@ -278,7 +325,10 @@ impl CollectionActor {
         id: uuid::Uuid,
         source: Source,
     ) -> Result<Document, SinkronError> {
-        // TODO check permission
+        // TODO
+        // _ = self
+        // .check_doc_permission(&doc, source, permissions::Action::Read)
+        // .await?;
 
         let mut conn = self.connect().await?;
 
@@ -303,7 +353,9 @@ impl CollectionActor {
         data: String,
         source: Source,
     ) -> Result<Document, SinkronError> {
-        // TODO check permission
+        _ = self
+            .check_col_permission(source, permissions::Action::Create)
+            .await?;
 
         let mut conn = self.connect().await?;
 
@@ -374,28 +426,8 @@ impl CollectionActor {
     async fn handle_update(
         &mut self,
         id: uuid::Uuid,
-        data: String,
-        source: Source,
-    ) -> Result<Document, SinkronError> {
-        // TODO check permission
-
-        self.update_document(id, Some(data)).await
-    }
-
-    async fn handle_delete(
-        &mut self,
-        id: uuid::Uuid,
-        source: Source,
-    ) -> Result<Document, SinkronError> {
-        // TODO check permission
-
-        self.update_document(id, None).await
-    }
-
-    async fn update_document(
-        &mut self,
-        id: uuid::Uuid,
         data: Option<String>,
+        source: Source,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
@@ -410,6 +442,16 @@ impl CollectionActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
+
+        let is_delete = data.is_none();
+
+        // Check permission TODO before or after get?
+        // let action = if is_delete {
+        // permissions::Action::Delete
+        // } else {
+        // permissions::Action::Update
+        // };
+        // _ = self.check_doc_permission(&doc, source, action).await?;
 
         let new_data = match &data {
             Some(update) => {
@@ -453,16 +495,17 @@ impl CollectionActor {
             }
         };
 
+        // Increment colrev
         let next_colrev = self.increment_colrev().await?;
 
         // TODO increment refs colrev
 
+        // Update document
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
-            is_deleted: data.is_none(),
+            is_deleted: is_delete,
             data: new_data.as_ref(),
         };
-
         let updated_at: chrono::DateTime<chrono::Utc> =
             diesel::update(schema::documents::table)
                 .filter(schema::documents::id.eq(&id))
@@ -474,12 +517,8 @@ impl CollectionActor {
 
         let serialized_new_data = new_data.map(|d| BASE64_STANDARD.encode(d));
 
-        // broadcast message to subscribers
-        let op = if data.is_some() {
-            Op::Update
-        } else {
-            Op::Delete
-        };
+        // Broadcast message to subscribers
+        let op = if is_delete { Op::Delete } else { Op::Update };
         let msg = ServerChangeMessage {
             id,
             col: self.id.clone(),
@@ -515,23 +554,26 @@ pub struct CollectionHandle {
 
 impl CollectionHandle {
     pub fn new(
-        id: String,
-        colrev: i64,
+        col: Collection,
         pool: db::DbConnectionPool,
+        groups_api: Arc<GroupsApi>,
         on_exit: Option<ExitCallback>,
     ) -> Self {
+        let state = CollectionState::new(&col);
+
         let (sender, receiver) = mpsc::unbounded_channel();
         let supervisor = Supervisor::new();
         let mut actor = CollectionActor::new(
-            id.clone(),
-            colrev,
+            col.id.clone(),
+            state,
             receiver,
             pool,
+            groups_api,
             supervisor.clone(),
         );
         supervisor.spawn(async move { actor.run().await }, on_exit);
         CollectionHandle {
-            id,
+            id: col.id.clone(),
             sender,
             supervisor,
         }

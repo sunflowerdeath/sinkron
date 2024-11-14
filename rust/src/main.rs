@@ -1,4 +1,5 @@
 mod actors;
+mod groups;
 mod api_types;
 mod db;
 mod error;

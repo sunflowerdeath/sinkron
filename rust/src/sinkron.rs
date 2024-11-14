@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::ws::{WebSocket, WebSocketUpgrade},
     extract::{Query, Request, State},
@@ -9,28 +11,29 @@ use axum::{
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use serde;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::{SinkronActorMessage, SinkronHandle};
-use crate::api_types::{Collection, Document, Group, User};
+use crate::api_types::{Collection, Document};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
+use crate::groups::{AddRemoveUserToGroup, GroupsApi};
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
 
 type CreateCollection = models::NewCollection;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct UpdateCollectionPermissions {
     id: String,
     permissions: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct UpdateDocumentPermissions {
     id: uuid::Uuid,
     col: String,
@@ -44,7 +47,7 @@ fn default_port() -> u32 {
     3000
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SinkronConfig {
     #[serde(default = "default_host")]
@@ -62,18 +65,21 @@ pub struct Sinkron {
     host: String,
     port: u32,
     api_token: String,
+    groups_api: Arc<GroupsApi>,
 }
 
 impl Sinkron {
     pub async fn new(config: SinkronConfig) -> Self {
         let pool = db::create_pool(config.db).await;
-        let actor = SinkronHandle::new(pool.clone());
+        let groups_api = Arc::new(GroupsApi::new(pool.clone()));
+        let actor = SinkronHandle::new(pool.clone(), groups_api.clone());
         Self {
             pool,
             actor,
             host: config.host,
             port: config.port,
             api_token: config.api_token,
+            groups_api,
         }
     }
 
@@ -212,129 +218,6 @@ impl Sinkron {
         receiver.await.map_err(internal_error)?
     }
 
-    // Groups
-
-    async fn group_exists(
-        &self,
-        conn: &mut db::DbConnection,
-        id: &str,
-    ) -> Result<bool, SinkronError> {
-        let cnt: i64 = schema::groups::table
-            .filter(schema::groups::id.eq(&id))
-            .count()
-            .get_result(conn)
-            .await
-            .map_err(internal_error)?;
-        Ok(cnt != 0)
-    }
-
-    async fn get_user(&self, id: String) -> Result<User, SinkronError> {
-        let mut conn = self.connect().await?;
-        let groups: Vec<String> = schema::members::table
-            .filter(schema::members::user.eq(&id))
-            .select(schema::members::group)
-            .get_results(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        Ok(User { id, groups })
-    }
-
-    async fn get_group(&self, id: String) -> Result<Group, SinkronError> {
-        let mut conn = self.connect().await?;
-        let exists = self.group_exists(&mut conn, &id).await?;
-        if !exists {
-            return Err(SinkronError::not_found("Group not found"));
-        }
-        let members: Vec<String> = schema::members::table
-            .filter(schema::members::group.eq(&id))
-            .select(schema::members::user)
-            .get_results(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        Ok(Group { id, members })
-    }
-
-    async fn create_group(&self, id: String) -> Result<(), SinkronError> {
-        let mut conn = self.connect().await?;
-        let new_group = models::Group { id };
-        let _ = diesel::insert_into(schema::groups::table)
-            .values(&new_group)
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        Ok(())
-    }
-
-    async fn delete_group(&self, id: String) -> Result<(), SinkronError> {
-        let mut conn = self.connect().await?;
-        let _ = diesel::delete(schema::members::table)
-            .filter(schema::members::group.eq(&id))
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        let num = diesel::delete(schema::groups::table)
-            .filter(schema::groups::id.eq(&id))
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        if num == 0 {
-            Err(SinkronError::not_found("Group not found"))
-        } else {
-            Ok(())
-        }
-    }
-
-    async fn add_user_to_group(
-        &self,
-        props: AddRemoveUserToGroup,
-    ) -> Result<(), SinkronError> {
-        let AddRemoveUserToGroup { user, group } = props;
-        let mut conn = self.connect().await?;
-        let exists = self.group_exists(&mut conn, &group).await?;
-        if !exists {
-            return Err(SinkronError::not_found("Group not found"));
-        }
-        let new_member = models::Member { user, group };
-        let _ = diesel::insert_into(schema::members::table)
-            .values(&new_member)
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        Ok(())
-    }
-
-    async fn remove_user_from_group(
-        &self,
-        props: AddRemoveUserToGroup,
-    ) -> Result<(), SinkronError> {
-        let AddRemoveUserToGroup { user, group } = props;
-        let mut conn = self.connect().await?;
-        let num = diesel::delete(schema::members::table)
-            .filter(schema::members::user.eq(&user))
-            .filter(schema::members::group.eq(&group))
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        if num == 0 {
-            Err(SinkronError::not_found("Group member not found"))
-        } else {
-            Ok(())
-        }
-    }
-
-    async fn remove_user_from_all_groups(
-        &self,
-        id: String,
-    ) -> Result<(), SinkronError> {
-        let mut conn = self.connect().await?;
-        let _ = diesel::delete(schema::members::table)
-            .filter(schema::members::user.eq(&id))
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
-        Ok(())
-    }
-
     // Permissions
 
     async fn update_collection_permissions(
@@ -447,7 +330,7 @@ async fn root() -> &'static str {
 
 // Websocket handler
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct SyncQuery {
     col: String,
     colrev: i64,
@@ -503,7 +386,7 @@ async fn check_auth_token(
 
 // Api response helpers
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 struct SinkronErrorBody {
     error: SinkronError,
 }
@@ -523,7 +406,7 @@ fn sinkron_err_response(error: SinkronError) -> Response {
 
 fn sinkron_response<T>(result: Result<T, SinkronError>) -> Response
 where
-    T: serde::Serialize,
+    T: Serialize,
 {
     match result {
         Ok(res) => Json(res).into_response(),
@@ -533,7 +416,7 @@ where
 
 // Collection handlers
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Id {
     id: String,
 }
@@ -556,7 +439,7 @@ async fn get_collection(
 
 // Document handlers
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct GetDocument {
     id: uuid::Uuid,
     col: String,
@@ -564,7 +447,7 @@ struct GetDocument {
 
 type DeleteDocument = GetDocument;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct CreateDocument {
     id: uuid::Uuid,
     col: String,
@@ -572,7 +455,7 @@ struct CreateDocument {
     permissions: Option<String>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct UpdateDocument {
     id: uuid::Uuid,
     col: String,
@@ -613,17 +496,11 @@ async fn delete_document(
 
 // Groups handlers
 
-#[derive(serde::Deserialize)]
-struct AddRemoveUserToGroup {
-    user: String,
-    group: String,
-}
-
 async fn create_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<Id>,
 ) -> Response {
-    let res = sinkron.create_group(payload.id).await;
+    let res = sinkron.groups_api.create_group(payload.id).await;
     sinkron_response(res)
 }
 
@@ -631,7 +508,7 @@ async fn get_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<Id>,
 ) -> Response {
-    let res = sinkron.get_group(payload.id).await;
+    let res = sinkron.groups_api.get_group(payload.id).await;
     sinkron_response(res)
 }
 
@@ -639,7 +516,7 @@ async fn get_user(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<Id>,
 ) -> Response {
-    let res = sinkron.get_user(payload.id).await;
+    let res = sinkron.groups_api.get_user(payload.id).await;
     sinkron_response(res)
 }
 
@@ -647,7 +524,7 @@ async fn delete_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<Id>,
 ) -> Response {
-    let res = sinkron.delete_group(payload.id).await;
+    let res = sinkron.groups_api.delete_group(payload.id).await;
     sinkron_response(res)
 }
 
@@ -655,7 +532,7 @@ async fn add_user_to_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<AddRemoveUserToGroup>,
 ) -> Response {
-    let res = sinkron.add_user_to_group(payload).await;
+    let res = sinkron.groups_api.add_user_to_group(payload).await;
     sinkron_response(res)
 }
 
@@ -663,7 +540,7 @@ async fn remove_user_from_group(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<AddRemoveUserToGroup>,
 ) -> Response {
-    let res = sinkron.remove_user_from_group(payload).await;
+    let res = sinkron.groups_api.remove_user_from_group(payload).await;
     sinkron_response(res)
 }
 
@@ -671,7 +548,10 @@ async fn remove_user_from_all_groups(
     State(sinkron): State<Sinkron>,
     Json(payload): Json<Id>,
 ) -> Response {
-    let res = sinkron.remove_user_from_all_groups(payload.id).await;
+    let res = sinkron
+        .groups_api
+        .remove_user_from_all_groups(payload.id)
+        .await;
     sinkron_response(res)
 }
 
