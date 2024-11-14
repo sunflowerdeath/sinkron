@@ -366,7 +366,6 @@ export enum ConnectionStatus {
 interface CollectionProps {
     url: string
     col: string
-    // transport: Transport
     store?: CollectionStore
     errorHandler?: (msg: SyncErrorMessage) => void
     logger?: Logger<string>

@@ -9,7 +9,9 @@
         "test:sinkron": "SINKRON_CONFIG=$(cat config.test.json) docker compose -f ./test-compose.yml up -d --build --renew-anon-volumes --force-recreate",
         "test:build": "rspack --config rspack.config.test.js",
         "test:run": "mocha ./build/test.js",
-        "test": "pnpm test:sinkron && pnpm test:build && pnpm test:run"
+        "test": "pnpm test:sinkron && pnpm test:build && pnpm test:run",
+        "benchmark:sinkron": "SINKRON_CONFIG=$(cat config.benchmark.json) ../../rust/target/debug/sinkron",
+        "benchmark:client": "rspack --config rspack.config.benchmark.js && node ./build/benchmark.js"
     },
     "keywords": [],
     "author": "sunflowerdeath",
@@ -19,7 +21,8 @@
         "@rspack/core": "^1.0.13",
         "@types/mocha": "^10.0.9",
         "@types/uuid": "^9.0.8",
-        "mocha": "^10.7.3"
+        "mocha": "^10.7.3",
+        "pino-pretty": "^10.3.1"
     },
     "dependencies": {
         "@types/lodash": "^4.17.13",
