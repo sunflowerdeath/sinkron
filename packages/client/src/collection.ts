@@ -351,10 +351,10 @@ const flushDelay = 1000
 const flushMaxWait = 2000
 
 // Interval between hearbeats. Should be less than disconnect timeout for being
-// inactive on the server
-const heartbeatInterval = 30000 // 30s
+// inactive on the server (=60s)
+const heartbeatInterval = 5000 // 30s
 // Max wait time of the server's reply to heartbeat before closing connection.
-const disconnectTimeout = 3000
+const disconnectTimeout = 5000
 
 export enum ConnectionStatus {
     Disconnected = "disconnected",

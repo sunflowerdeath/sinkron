@@ -1,9 +1,11 @@
+use std::pin::Pin;
+
 use axum::extract::ws::{Message, WebSocket};
 use log::trace;
 use tokio::{
     select,
     sync::{mpsc, oneshot},
-    time::{sleep, Duration},
+    time::{sleep, Duration, Instant},
 };
 
 use crate::actors::collection;
@@ -23,14 +25,12 @@ struct ClientActor {
     receiver: mpsc::Receiver<ServerMessage>,
     collection: CollectionHandle,
     colrev: i64,
-    timeout_task: Option<tokio::task::JoinHandle<()>>,
+    timeout: Pin<Box<tokio::time::Sleep>>,
 }
 
 impl ClientActor {
     async fn run(&mut self) {
         trace!("client-{}: start", self.client_id);
-
-        self.restart_disconnect_timer();
 
         if self.sync(self.colrev).await.is_err() {
             trace!("client-{}: sync failed", self.client_id);
@@ -49,19 +49,12 @@ impl ClientActor {
                 },
                 Some(msg) = self.receiver.recv() => {
                     self.send_ws_message(msg).await;
+                },
+                _ = &mut self.timeout => {
+                    trace!("client-{}: disconnect by timeout", self.client_id);
                 }
             }
         }
-    }
-
-    fn restart_disconnect_timer(&mut self) {
-        let client_id = self.client_id.clone();
-        let stop = self.supervisor.stop.clone();
-        self.timeout_task = Some(tokio::spawn(async move {
-            sleep(Duration::from_secs(5)).await;
-            trace!("client-{}: disconnect by timeout", client_id);
-            stop.notify_waiters();
-        }));
     }
 
     fn source(&self) -> collection::Source {
@@ -132,8 +125,12 @@ impl ClientActor {
     }
 
     async fn handle_heartbeat(&mut self, msg: HeartbeatMessage) {
+        // reset disconnect timeout
+        self.timeout
+            .as_mut()
+            .reset(Instant::now() + Duration::from_secs(10));
+
         let reply = HeartbeatMessage { i: msg.i + 1 };
-        self.restart_disconnect_timer();
         self.send_ws_message(ServerMessage::Heartbeat(reply)).await;
     }
 
@@ -294,7 +291,7 @@ impl ClientHandle {
             collection,
             websocket,
             receiver,
-            timeout_task: None,
+            timeout: Box::pin(tokio::time::sleep(Duration::from_secs(10))),
         };
         supervisor.spawn(async move { reader.run().await }, on_exit);
 

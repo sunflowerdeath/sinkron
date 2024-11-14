@@ -6,7 +6,7 @@ import { Permissions } from "./permissions"
 import { SinkronApi } from "./api"
 import { Collection } from "./collection"
 
-const numCols = 250
+const numCols = 2 // 250
 const numUsers = numCols * 2
 const actionTimeout = () => random(1000, 1500)
 

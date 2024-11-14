@@ -10,7 +10,7 @@
         "test:build": "rspack --config rspack.config.test.js",
         "test:run": "mocha ./build/test.js",
         "test": "pnpm test:sinkron && pnpm test:build && pnpm test:run",
-        "benchmark:sinkron": "SINKRON_CONFIG=$(cat config.benchmark.json) ../../rust/target/debug/sinkron",
+        "benchmark:sinkron": "RUST_LOG=sinkron=trace SINKRON_CONFIG=$(cat config.benchmark.json) ../../rust/target/debug/sinkron",
         "benchmark:client": "rspack --config rspack.config.benchmark.js && node ./build/benchmark.js"
     },
     "keywords": [],
