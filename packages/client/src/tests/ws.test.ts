@@ -4,16 +4,15 @@ import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
-import { SinkronApi } from "../api"
-import { Permissions } from "../permissions"
+import { SinkronClient, Permissions } from "../client"
 import { ServerMessage, ClientMessage, Op } from "../protocol"
 
 import { assertIsMatch } from "./utils"
 
-let apiUrl = "http://localhost:3000"
-let apiToken = "SINKRON_API_TOKEN"
-let syncToken = "token-test"
-let wsUrl = (col: string, colrev: string, token: string) =>
+const apiUrl = "http://localhost:3000"
+const apiToken = "SINKRON_API_TOKEN"
+const syncToken = "token-test"
+const wsUrl = (col: string, colrev: string, token: string) =>
     `ws://localhost:3000/sync?col=${col}&colrev=${colrev}&token=${token}`
 
 type WsEvent =
@@ -44,7 +43,7 @@ class WsTest {
     }
 
     push(e: WsEvent) {
-        let waiter = this.waiters.shift()
+        const waiter = this.waiters.shift()
         if (waiter) {
             waiter(e)
         } else {
@@ -53,7 +52,7 @@ class WsTest {
     }
 
     async next(): Promise<WsEvent> {
-        let event = this.events.shift()
+        const event = this.events.shift()
         if (event) return event
         return new Promise((resolve) => {
             this.waiters.push(resolve)
@@ -66,26 +65,29 @@ class WsTest {
 }
 
 const testDoc = () => {
-    let doc = new LoroDoc()
+    const doc = new LoroDoc()
     doc.getText("test").insert(0, "Hello")
     return doc.export({ mode: "snapshot" })
 }
 
 describe("Sinkron", () => {
     it("connect", async () => {
-        let col = uuidv4()
+        const col = uuidv4()
 
-        let api = new SinkronApi({ url: apiUrl, token: apiToken })
-        let permissions = new Permissions()
-        let createRes = await api.createCollection({ id: col, permissions })
+        const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
+        const permissions = Permissions.any()
+        const createRes = await sinkron.createCollection({
+            id: col,
+            permissions
+        })
         assert(createRes.isOk, "create col")
 
         // invalid auth token
         {
-            let ws = new WsTest(wsUrl(col, "0", "invalid"))
-            let e1 = await ws.next()
+            const ws = new WsTest(wsUrl(col, "0", "invalid"))
+            const e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
-            let e2 = await ws.next()
+            const e2 = await ws.next()
             assert.deepEqual(e2, {
                 kind: "message",
                 data: { kind: "sync_error", col, code: "auth_failed" }
@@ -95,11 +97,11 @@ describe("Sinkron", () => {
 
         // invalid col
         {
-            let invalid_col = uuidv4()
-            let ws = new WsTest(wsUrl(invalid_col, "0", syncToken))
-            let e1 = await ws.next()
+            const invalid_col = uuidv4()
+            const ws = new WsTest(wsUrl(invalid_col, "0", syncToken))
+            const e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
-            let e2 = await ws.next()
+            const e2 = await ws.next()
             assert.deepEqual(e2, {
                 kind: "message",
                 data: {
@@ -113,10 +115,10 @@ describe("Sinkron", () => {
 
         // invalid colrev
         {
-            let ws = new WsTest(wsUrl(col, "1234", syncToken))
-            let e1 = await ws.next()
+            const ws = new WsTest(wsUrl(col, "1234", syncToken))
+            const e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
-            let e2 = await ws.next()
+            const e2 = await ws.next()
             assert.deepEqual(e2, {
                 kind: "message",
                 data: {
@@ -130,10 +132,10 @@ describe("Sinkron", () => {
 
         // valid
         {
-            let ws = new WsTest(wsUrl(col, "0", syncToken))
-            let e1 = await ws.next()
+            const ws = new WsTest(wsUrl(col, "0", syncToken))
+            const e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
-            let e2 = await ws.next()
+            const e2 = await ws.next()
             assert.strictEqual(e2.kind, "message")
             assert.strictEqual(e2.data.kind, "sync_complete")
             ws.ws.close()
@@ -141,14 +143,17 @@ describe("Sinkron", () => {
     })
 
     it("sync", async () => {
-        let col = uuidv4()
+        const col = uuidv4()
 
-        let api = new SinkronApi({ url: apiUrl, token: apiToken })
-        let permissions = new Permissions()
-        let createRes = await api.createCollection({ id: col, permissions })
+        const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
+        const permissions = Permissions.any()
+        const createRes = await sinkron.createCollection({
+            id: col,
+            permissions
+        })
         assert(createRes.isOk, "create col")
 
-        const createDoc1Res = await api.createDocument({
+        const createDoc1Res = await sinkron.createDocument({
             col,
             id: uuidv4(),
             data: testDoc()
@@ -156,14 +161,14 @@ describe("Sinkron", () => {
         assert(createDoc1Res.isOk, "create doc 1")
         const doc1 = createDoc1Res.value
 
-        const createDoc2Res = await api.createDocument({
+        const createDoc2Res = await sinkron.createDocument({
             col,
             id: uuidv4(),
             data: testDoc()
         })
         assert(createDoc2Res.isOk, "create doc 2")
         const doc2 = createDoc2Res.value
-        const deleteDoc2Res = await api.deleteDocument({
+        const deleteDoc2Res = await sinkron.deleteDocument({
             col,
             id: doc2.id
         })
@@ -172,15 +177,15 @@ describe("Sinkron", () => {
 
         // sync without colrev
         {
-            let ws = new WsTest(wsUrl(col, "0", syncToken))
-            let e1 = await ws.next()
+            const ws = new WsTest(wsUrl(col, "0", syncToken))
+            const e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
-            let e2 = await ws.next()
+            const e2 = await ws.next()
             assertIsMatch(e2, {
                 kind: "message",
                 data: { kind: "doc", id: doc1.id }
             })
-            let e3 = await ws.next()
+            const e3 = await ws.next()
             assertIsMatch(e3, {
                 kind: "message",
                 data: { kind: "sync_complete", col, colrev: doc2deleted.colrev }
@@ -190,15 +195,15 @@ describe("Sinkron", () => {
 
         // sync (with colrev)
         {
-            let ws = new WsTest(wsUrl(col, doc2.colrev, syncToken))
-            let e1 = await ws.next()
+            const ws = new WsTest(wsUrl(col, doc2.colrev, syncToken))
+            const e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
-            let e2 = await ws.next()
+            const e2 = await ws.next()
             assertIsMatch(e2, {
                 kind: "message",
                 data: { kind: "doc", col, id: doc2.id, data: null }
             })
-            let e3 = await ws.next()
+            const e3 = await ws.next()
             assertIsMatch(e3, {
                 kind: "message",
                 data: { kind: "sync_complete", col, colrev: doc2deleted.colrev }
@@ -208,15 +213,18 @@ describe("Sinkron", () => {
     })
 
     it("crud", async () => {
-        let col = uuidv4()
+        const col = uuidv4()
 
-        let api = new SinkronApi({ url: apiUrl, token: apiToken })
-        let permissions = new Permissions()
-        let createRes = await api.createCollection({ id: col, permissions })
+        const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
+        const permissions = Permissions.any()
+        const createRes = await sinkron.createCollection({
+            id: col,
+            permissions
+        })
         assert(createRes.isOk, "create col")
 
-        let ws = new WsTest(wsUrl(col, "0", syncToken))
-        let events = [await ws.next(), await ws.next()]
+        const ws = new WsTest(wsUrl(col, "0", syncToken))
+        const events = [await ws.next(), await ws.next()]
         assertIsMatch(events, [
             { kind: "open" },
             { kind: "message", data: { kind: "sync_complete" } }
@@ -224,9 +232,9 @@ describe("Sinkron", () => {
 
         // create
         const id = uuidv4()
-        let doc = new LoroDoc()
+        const doc = new LoroDoc()
         doc.getText("test").insert(0, "Hello")
-        let data = Base64.fromUint8Array(doc.export({ mode: "snapshot" }))
+        const data = Base64.fromUint8Array(doc.export({ mode: "snapshot" }))
         ws.send({
             kind: "change",
             id,

@@ -4,8 +4,7 @@ import { WebSocket } from "ws"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
-import { SinkronApi } from "../api"
-import { Permissions } from "../permissions"
+import { SinkronClient, Permissions } from "../client"
 
 import { autorun } from "mobx"
 
@@ -19,21 +18,21 @@ const awaitValue = async (fn: () => boolean): Promise<void> =>
         })
     })
 
-let apiUrl = "http://localhost:3000"
-let apiToken = "SINKRON_API_TOKEN"
+const apiUrl = "http://localhost:3000"
+const apiToken = "SINKRON_API_TOKEN"
 
-import { Collection, ConnectionStatus, ItemState } from "../collection"
+import { SinkronCollection, ConnectionStatus, ItemState } from "../collection"
 
-describe("Collection", () => {
+describe("SinkronCollection", () => {
     it("create", async () => {
-        let col = uuidv4()
+        const col = uuidv4()
 
-        let api = new SinkronApi({ url: apiUrl, token: apiToken })
-        let permissions = new Permissions()
-        let createRes = await api.createCollection({ id: col, permissions })
+        const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
+        const permissions = Permissions.any()
+        const createRes = await sinkron.createCollection({ id: col, permissions })
         assert(createRes.isOk, "create col")
 
-        const collection = new Collection({
+        const collection = new SinkronCollection({
             url: "ws://localhost:3000/sync",
             // @ts-ignore
             webSocketImpl: WebSocket,

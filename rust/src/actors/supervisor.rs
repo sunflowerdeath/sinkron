@@ -1,5 +1,7 @@
 use std::sync::Arc;
-use tokio::{select, sync::Notify};
+
+use tokio::select;
+use tokio::sync::Notify;
 
 #[derive(Clone)]
 pub struct Supervisor {

@@ -1,5 +1,3 @@
-// import { createNanoEvents } from "nanoevents"
-// import { v4 as uuid } from "uuid"
 import { LoroDoc } from "loro-crdt"
 import { Base64 } from "js-base64"
 import { parseISO } from "date-fns"
@@ -144,7 +142,7 @@ export type UpdateDocumentPermissionsWithCallbackProps = {
 const parseCollection = (raw: RawCollection): Collection => {
     return {
         ...raw,
-        permissions: new Permissions() // TODO Permissions.parse(raw.permissions)
+        permissions: Permissions.parse(raw.permissions)
     }
 }
 
@@ -155,18 +153,18 @@ const parseDocument = (raw: RawDocument): Document => {
         data: data === null ? data : Base64.toUint8Array(data),
         createdAt: parseISO(createdAt),
         updatedAt: parseISO(updatedAt),
-        permissions: new Permissions() // TODO Permissions.parse(permissions)
+        permissions: Permissions.parse(permissions)
     }
     return parsed
 }
 
-export type SinkronApiProps = {
+export type SinkronClientProps = {
     url: string
     token: string
 }
 
-class SinkronApi {
-    constructor(props: SinkronApiProps) {
+class SinkronClient {
+    constructor(props: SinkronClientProps) {
         this.url = props.url.replace(/\/$/, "")
         this.token = props.token
     }
@@ -485,4 +483,4 @@ class SinkronApi {
     }
 }
 
-export { SinkronApi }
+export { SinkronClient, Permissions }

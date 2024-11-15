@@ -128,17 +128,17 @@ const hasChanges = (docA: LoroDoc, docB: LoroDoc): boolean => {
      * - 1: a > b
      * - undefined: a ∥ b: a and b are concurrent
      */
-    let res = docA.version().compare(docB.version())
+    const res = docA.version().compare(docB.version())
     return res === 1 || res === undefined
 }
 
 const loroToBase64 = (doc: LoroDoc) => {
-    let snapshot = doc.export({ mode: "snapshot" })
+    const snapshot = doc.export({ mode: "snapshot" })
     return Base64.fromUint8Array(snapshot)
 }
 
 const loroFromBase64 = (data: string) => {
-    let doc = new LoroDoc()
+    const doc = new LoroDoc()
     doc.import(Base64.toUint8Array(data))
     return doc
 }
@@ -364,7 +364,7 @@ export enum ConnectionStatus {
     Error = "error"
 }
 
-interface CollectionProps {
+interface SinkronCollectionProps {
     url: string
     token: string
     col: string
@@ -383,8 +383,8 @@ const defaultLogger = (level = "debug"): Logger<string> => {
     return logger
 }
 
-class Collection {
-    constructor(props: CollectionProps) {
+class SinkronCollection {
+    constructor(props: SinkronCollectionProps) {
         const { col, store, errorHandler, logger } = props
         this.col = col
         this.store = store
@@ -436,7 +436,7 @@ class Collection {
         clearTimeout(this.disconnectTimeout)
     }
 
-    async init(props: CollectionProps) {
+    async init(props: SinkronCollectionProps) {
         const { url, token, webSocketImpl } = props
 
         if (this.store) await this.loadFromStore()
@@ -834,7 +834,7 @@ class Collection {
             throw new Error("Can't change deleted item: " + id)
         }
 
-        let version = item.local.version()
+        const version = item.local.version()
         callback(item.local)
         if (item.local.version().compare(version) === 0) {
             // nothing changed
@@ -858,4 +858,4 @@ class Collection {
     }
 }
 
-export { Collection, WebSocketTransport, IndexedDbCollectionStore }
+export { SinkronCollection, IndexedDbCollectionStore }

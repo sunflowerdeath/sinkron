@@ -3,31 +3,30 @@ import assert from "node:assert"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
-import { SinkronApi, ErrorCode } from "../api"
-import { Permissions } from "../permissions"
+import { SinkronClient, ErrorCode, Permissions } from "../client"
 
 import { assertIsMatch } from "./utils"
 
 const url = "http://localhost:3000"
 const token = "SINKRON_API_TOKEN"
 
-describe("SinkronApi", () => {
+describe("SinkronClient", () => {
     it("auth", async () => {
-        const permissions = new Permissions()
+        const permissions = Permissions.any()
 
-        const invalidUrlApi = new SinkronApi({
+        const invalidUrlClient = new SinkronClient({
             url: "INVALID",
             token: "INVALID"
         })
-        const invalidUrlRes = await invalidUrlApi.createCollection({
+        const invalidUrlRes = await invalidUrlClient.createCollection({
             id: uuidv4(),
             permissions
         })
         assert(!invalidUrlRes.isOk, "fetch error")
         assert.strictEqual(invalidUrlRes.error.code, ErrorCode.FetchError)
 
-        const invalidTokenApi = new SinkronApi({ url, token: "INVALID" })
-        const invalidTokenRes = await invalidTokenApi.createCollection({
+        const invalidTokenClient = new SinkronClient({ url, token: "INVALID" })
+        const invalidTokenRes = await invalidTokenClient.createCollection({
             id: uuidv4(),
             permissions
         })
@@ -36,48 +35,51 @@ describe("SinkronApi", () => {
     })
 
     it("collections", async () => {
-        const api = new SinkronApi({ url, token })
+        const sinkron = new SinkronClient({ url, token })
 
         const col = uuidv4()
-        const permissions = new Permissions()
-        const createRes = await api.createCollection({
+        const permissions = Permissions.any()
+        const createRes = await sinkron.createCollection({
             id: col,
             permissions
         })
-        assert(createRes.isOk, "create")
+        assertIsMatch(createRes, {
+            isOk: true,
+            value: { id: col, colrev: 0 }
+        })
 
-        const duplicateRes = await api.createCollection({
+        const duplicateRes = await sinkron.createCollection({
             id: col,
             permissions
         })
         assert(!duplicateRes.isOk, "duplicate")
-        assert.strictEqual(
-            duplicateRes.error.code,
-            ErrorCode.UnprocessableContent,
-            "duplicate"
-        )
+        assertIsMatch(duplicateRes, {
+            isOk: false,
+            error: { code: ErrorCode.UnprocessableContent }
+        })
 
-        const getRes = await api.getCollection(col)
-        assert(getRes.isOk, "get")
+        const getRes = await sinkron.getCollection(col)
+        assertIsMatch(getRes, {
+            isOk: true,
+            value: { id: col, colrev: 0 }
+        })
 
-        const notFoundRes = await api.getCollection("not_found")
-        assert(!notFoundRes.isOk, "not found")
-        assert.strictEqual(
-            notFoundRes.error.code,
-            ErrorCode.NotFound,
-            "not found"
-        )
+        const notFoundRes = await sinkron.getCollection("not_found")
+        assertIsMatch(notFoundRes, {
+            isOk: false,
+            error: { code: ErrorCode.NotFound }
+        })
 
-        // const deleteRes = await api.deleteCollection("test")
+        // const deleteRes = await sinkron.deleteCollection("test")
         // assert(deleteRes.isOk, "delete")
     })
 
     it("documents", async () => {
-        const api = new SinkronApi({ url, token })
+        const sinkron = new SinkronClient({ url, token })
 
         const col = uuidv4()
-        const permissions = new Permissions()
-        const createColRes = await api.createCollection({
+        const permissions = Permissions.any()
+        const createColRes = await sinkron.createCollection({
             id: col,
             permissions
         })
@@ -88,28 +90,33 @@ describe("SinkronApi", () => {
         const loroDoc = new LoroDoc()
         loroDoc.getText("text").insert(0, "Hello")
         const snapshot = loroDoc.export({ mode: "snapshot" })
-        const createRes = await api.createDocument({ id, col, data: snapshot })
-        assert(createRes.isOk, "create: ok")
-
-        // duplicate
-        const duplicateRes = await api.createDocument({
+        const createRes = await sinkron.createDocument({
             id,
             col,
             data: snapshot
         })
-        assert(!duplicateRes.isOk, "duplicate")
-        assert.strictEqual(
-            duplicateRes.error.code,
-            ErrorCode.UnprocessableContent,
-            "duplicate"
-        )
+        assertIsMatch(createRes, {
+            isOk: true,
+            value: { id, col }
+        })
+
+        // duplicate
+        const duplicateRes = await sinkron.createDocument({
+            id,
+            col,
+            data: snapshot
+        })
+        assertIsMatch(duplicateRes, {
+            isOk: false,
+            error: { code: ErrorCode.UnprocessableContent }
+        })
 
         // get
-        const getRes = await api.getDocument({ id, col })
+        const getRes = await sinkron.getDocument({ id, col })
         assert(getRes.isOk, "get")
 
         // not found
-        const notFoundRes = await api.getDocument({ id: uuidv4(), col })
+        const notFoundRes = await sinkron.getDocument({ id: uuidv4(), col })
         assert(!notFoundRes.isOk, "not found")
         assert.strictEqual(
             notFoundRes.error.code,
@@ -118,7 +125,7 @@ describe("SinkronApi", () => {
         )
 
         // col not found
-        const colNotFoundRes = await api.getDocument({ id, col: uuidv4() })
+        const colNotFoundRes = await sinkron.getDocument({ id, col: uuidv4() })
         assert(!colNotFoundRes.isOk, "col not found")
         assert.strictEqual(
             colNotFoundRes.error.code,
@@ -130,16 +137,20 @@ describe("SinkronApi", () => {
         const version = loroDoc.version()
         loroDoc.getText("text").insert(5, ", world!")
         const update = loroDoc.export({ mode: "update", from: version })
-        const updateRes = await api.updateDocument({ id, col, data: update })
+        const updateRes = await sinkron.updateDocument({
+            id,
+            col,
+            data: update
+        })
         assert(updateRes.isOk, "update")
 
         // delete
-        const deleteRes = await api.deleteDocument({ id, col })
+        const deleteRes = await sinkron.deleteDocument({ id, col })
         assert(deleteRes.isOk, "delete")
         assert.strictEqual(deleteRes.value.data, null, "delete")
 
         // already deleted
-        const alreadyDeletedRes = await api.deleteDocument({ id, col })
+        const alreadyDeletedRes = await sinkron.deleteDocument({ id, col })
         assert(!alreadyDeletedRes.isOk, "already deleted")
         assert.strictEqual(
             alreadyDeletedRes.error.code,
@@ -148,7 +159,7 @@ describe("SinkronApi", () => {
         )
 
         // update deleted
-        const updateDeletedRes = await api.updateDocument({
+        const updateDeletedRes = await sinkron.updateDocument({
             id,
             col,
             data: update
@@ -162,45 +173,47 @@ describe("SinkronApi", () => {
     })
 
     it("groups", async () => {
-        const api = new SinkronApi({ url, token })
+        const sinkron = new SinkronClient({ url, token })
 
         const col = uuidv4()
-        const permissions = new Permissions()
-        const createColRes = await api.createCollection({
+        const permissions = Permissions.any()
+        const createColRes = await sinkron.createCollection({
             id: col,
             permissions
         })
         assert(createColRes.isOk, "createCollection")
 
-        const createGroupRes = await api.createGroup("group")
+        const createGroupRes = await sinkron.createGroup("group")
         assert(createGroupRes.isOk, "createGroup")
 
-        const addToGroupRes = await api.addUserToGroup({
+        const addToGroupRes = await sinkron.addUserToGroup({
             user: "user",
             group: "group"
         })
         assert(addToGroupRes.isOk, "addUserToGroup")
 
-        const getGroupRes = await api.getGroup("group")
+        const getGroupRes = await sinkron.getGroup("group")
         assert(getGroupRes.isOk, "getGroup")
         const group = getGroupRes.value
         assertIsMatch(group, { id: "group", members: ["user"] })
 
-        const getUserRes = await api.getUser("user")
+        const getUserRes = await sinkron.getUser("user")
         assert(getUserRes.isOk, "getUser")
         const user = getUserRes.value
         assertIsMatch(user, { id: "user", groups: ["group"] })
 
-        const removeUserRes = await api.removeUserFromGroup({
+        const removeUserRes = await sinkron.removeUserFromGroup({
             user: "user",
             group: "group"
         })
         assert(removeUserRes.isOk, "removeUserFromGroup")
 
-        const removeUserFromAllRes = await api.removeUserFromAllGroups("user")
+        const removeUserFromAllRes = await sinkron.removeUserFromAllGroups(
+            "user"
+        )
         assert(removeUserFromAllRes.isOk, "removeUserFromAllGroups")
 
-        const deleteGroupRes = await api.deleteGroup("group")
+        const deleteGroupRes = await sinkron.deleteGroup("group")
         assert(deleteGroupRes.isOk, "deleteGroup")
     })
 })

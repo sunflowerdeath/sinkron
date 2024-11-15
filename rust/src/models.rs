@@ -37,12 +37,12 @@ pub struct Document {
 
 #[derive(Insertable)]
 #[diesel(table_name = schema::documents)]
-pub struct NewDocument {
+pub struct NewDocument<'a> {
     pub id: uuid::Uuid,
     pub col_id: String,
     pub colrev: i64,
     pub data: Vec<u8>,
-    pub permissions: String,
+    pub permissions: &'a str
 }
 
 #[derive(AsChangeset)]

@@ -5,10 +5,8 @@ use axum::extract::ws::{Message, WebSocket};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use log::trace;
-use tokio::{
-    select,
-    sync::{mpsc, oneshot},
-};
+use tokio::select;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::actors::client::ClientHandle;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
@@ -20,17 +18,21 @@ use crate::groups::GroupsApi;
 use crate::protocol::*;
 use crate::schema;
 
+pub struct ConnectMessage {
+    pub websocket: WebSocket,
+    pub user: String,
+    pub col: String,
+    pub colrev: i64,
+}
+
+pub struct GetCollectionMessage {
+    pub col: String,
+    pub reply: oneshot::Sender<Result<CollectionHandle, SinkronError>>,
+}
+
 pub enum SinkronActorMessage {
-    Connect {
-        websocket: WebSocket,
-        user: String,
-        col: String,
-        colrev: i64,
-    },
-    GetCollection {
-        col: String,
-        reply: oneshot::Sender<Result<CollectionHandle, SinkronError>>,
-    },
+    Connect(ConnectMessage),
+    GetCollection(GetCollectionMessage),
 }
 
 struct SinkronActor {
@@ -82,16 +84,11 @@ impl SinkronActor {
 
     async fn handle_message(&mut self, msg: SinkronActorMessage) {
         match msg {
-            SinkronActorMessage::Connect {
-                websocket,
-                user,
-                col,
-                colrev,
-            } => {
-                // TODO user
-                self.handle_connect(websocket, col, colrev).await;
+            SinkronActorMessage::Connect(msg) => {
+                self.handle_connect(msg).await;
             }
-            SinkronActorMessage::GetCollection { col, reply } => {
+            SinkronActorMessage::GetCollection(msg) => {
+                let GetCollectionMessage { col, reply } = msg;
                 let res = self.get_collection_actor_by_id(&col).await;
                 _ = reply.send(res);
             }
@@ -104,14 +101,11 @@ impl SinkronActor {
 
     async fn handle_connect(
         &mut self,
-        mut ws: WebSocket,
-        col: String,
-        colrev: i64,
+        msg: ConnectMessage,
     ) {
         trace!("sinkron: client connect");
 
-        // TODO authorize
-        // let user = self.auth(token)
+        let ConnectMessage { mut websocket, user, col, colrev } = msg;
 
         let Ok(mut conn) = self.connect().await else {
             let msg = ServerMessage::SyncError(SyncErrorMessage {
@@ -119,7 +113,7 @@ impl SinkronActor {
                 code: ErrorCode::InternalServerError,
             });
             if let Ok(encoded) = serde_json::to_string(&msg) {
-                let _ = ws.send(Message::Text(encoded)).await;
+                let _ = websocket.send(Message::Text(encoded)).await;
             }
             return;
         };
@@ -134,7 +128,7 @@ impl SinkronActor {
                 code: ErrorCode::NotFound,
             });
             if let Ok(encoded) = serde_json::to_string(&msg) {
-                let _ = ws.send(Message::Text(encoded)).await;
+                let _ = websocket.send(Message::Text(encoded)).await;
             }
             return;
         };
@@ -148,7 +142,7 @@ impl SinkronActor {
                 code: ErrorCode::UnprocessableContent,
             });
             if let Ok(encoded) = serde_json::to_string(&msg) {
-                let _ = ws.send(Message::Text(encoded)).await;
+                let _ = websocket.send(Message::Text(encoded)).await;
             }
             return;
         }
@@ -167,7 +161,8 @@ impl SinkronActor {
         };
         let client = ClientHandle::new(
             client_id,
-            ws,
+            user,
+            websocket,
             collection.clone(),
             colrev,
             Some(on_exit),

@@ -9,13 +9,12 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::actors::client::ClientHandle;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
-use crate::api_types::Collection;
-use crate::api_types::Document;
+use crate::api_types::{Collection, Document};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::groups::GroupsApi;
 use crate::models;
-use crate::permissions;
+use crate::permissions::{Action, Permissions};
 use crate::protocol::*;
 use crate::schema;
 
@@ -82,16 +81,14 @@ pub enum CollectionMessage {
 
 struct CollectionState {
     colrev: i64,
-    permissions: permissions::Permissions,
+    permissions: Permissions,
 }
 
 impl CollectionState {
     fn new(col: &Collection) -> Self {
-        let permissions = serde_json::from_str(&col.permissions)
-            .unwrap_or_else(|_| permissions::Permissions::empty());
         Self {
             colrev: col.colrev,
-            permissions,
+            permissions: Permissions::parse_or_empty(&col.permissions),
         }
     }
 }
@@ -137,7 +134,7 @@ impl CollectionActor {
     async fn check_col_permission(
         &self,
         source: Source,
-        action: permissions::Action,
+        action: Action,
     ) -> Result<(), SinkronError> {
         match source {
             Source::Api => Ok(()),
@@ -156,13 +153,13 @@ impl CollectionActor {
         &self,
         doc: &models::Document,
         source: Source,
-        action: permissions::Action,
+        action: Action,
     ) -> Result<(), SinkronError> {
         match source {
             Source::Api => Ok(()),
             Source::Client { user } => {
                 let user = self.groups_api.get_user(user).await?;
-                let permissions: permissions::Permissions =
+                let permissions: Permissions =
                     serde_json::from_str(&doc.permissions).map_err(|_| {
                         SinkronError::internal(
                         "Couldn't parse permissions, data might be corrupted")
@@ -296,9 +293,7 @@ impl CollectionActor {
         colrev: i64,
         source: Source,
     ) -> Result<SyncResult, SinkronError> {
-        _ = self
-            .check_col_permission(source, permissions::Action::Read)
-            .await?;
+        _ = self.check_col_permission(source, Action::Read).await?;
 
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
@@ -344,7 +339,7 @@ impl CollectionActor {
             })?;
 
         _ = self
-            .check_doc_permission(&doc, source, permissions::Action::Read)
+            .check_doc_permission(&doc, source, Action::Read)
             .await?;
 
         Ok(Self::doc_from_model(doc))
@@ -356,9 +351,7 @@ impl CollectionActor {
         data: String,
         source: Source,
     ) -> Result<Document, SinkronError> {
-        _ = self
-            .check_col_permission(source, permissions::Action::Create)
-            .await?;
+        _ = self.check_col_permission(source, Action::Create).await?;
 
         let mut conn = self.connect().await?;
 
@@ -382,14 +375,14 @@ impl CollectionActor {
         let next_colrev = self.increment_colrev(&mut conn).await?;
 
         // create document
-        // TODO inherit permissions from collection if not provided
-        let permissions = permissions::Permissions::empty();
+        // TODO create document with different permissions that col
+        let permissions = self.state.permissions.to_string();
         let new_doc = models::NewDocument {
             id,
             col_id: self.id.clone(),
             colrev: next_colrev,
             data: decoded,
-            permissions: serde_json::to_string(&permissions).unwrap()
+            permissions: &permissions
         };
         let created_at: chrono::DateTime<chrono::Utc> =
             diesel::insert_into(schema::documents::table)
@@ -421,7 +414,7 @@ impl CollectionActor {
             data: Some(data),
             col: self.id.clone(),
             colrev: next_colrev,
-            permissions: "".to_string(),
+            permissions
         };
 
         Ok(doc)
@@ -450,9 +443,9 @@ impl CollectionActor {
         let is_delete = data.is_none();
 
         let action = if is_delete {
-            permissions::Action::Delete
+            Action::Delete
         } else {
-            permissions::Action::Update
+            Action::Update
         };
         _ = self.check_doc_permission(&doc, source, action).await?;
 

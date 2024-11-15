@@ -1,9 +1,14 @@
 import { uniq } from "lodash"
 
-const Role = {
-    any: () => "any",
-    user: (id: string) => `user:${id}`,
-    group: (id: string) => `group:${id}`
+export type Role =
+    | { kind: "any" }
+    | { kind: "user"; id: string }
+    | { kind: "group"; id: string }
+
+const role = {
+    any: (): Role => ({ kind: "any" }),
+    user: (id: string): Role => ({ kind: "user", id }),
+    group: (id: string): Role => ({ kind: "group", id })
 }
 
 export enum Action {
@@ -14,7 +19,7 @@ export enum Action {
 }
 
 export type PermissionsTable = {
-    -readonly [key in keyof typeof Action]: string[]
+    -readonly [key in keyof typeof Action]: Role[]
 }
 
 export type User = {
@@ -29,34 +34,44 @@ const emptyPermissionsTable = () => ({
     delete: []
 })
 
+const anyPermissionsTable = (): PermissionsTable => ({
+    read: [role.any()],
+    create: [role.any()],
+    update: [role.any()],
+    delete: [role.any()]
+})
+
 class Permissions {
     table: PermissionsTable
 
-    constructor(table?: PermissionsTable) {
-        this.table = table || emptyPermissionsTable()
+    constructor(table: PermissionsTable) {
+        this.table = table
     }
 
     // Adds permission to the table
-    add(action: Action, role: string) {
+    add(action: Action, role: Role) {
+        // TODO fix compare
         this.table[action] = uniq([role, ...this.table[action]])
     }
 
     // Removes permission from the table
-    remove(action: Action, role: string) {
+    remove(action: Action, role: Role) {
+        // TODO fix compare
         this.table[action] = this.table[action].filter((r) => r !== role)
     }
 
-    // Checks if user has permission (issued directly on him or on his
-    // group or group role)
+    // Checks if user has permission (issued directly on him or on his group)
     check(user: User, action: Action) {
         const roles = this.table[action]
-        for (let i in roles) {
+        for (const i in roles) {
             const role = roles[i]
-            if (role === "any") return true
-            let match = role.match(/^user:(.+)$/)
-            if (match && user.id === match[1]) return true
-            match = role.match(/^group:(.+)$/)
-            if (match && user.groups.includes(match[1])) return true
+            if (role.kind === "any") {
+                return true
+            } else if (role.kind === "user") {
+                if (user.id === role.id) return true
+            } else if (role.kind === "group") {
+                if (user.groups.includes(role.id)) return true
+            }
         }
         return false
     }
@@ -69,6 +84,14 @@ class Permissions {
         const table = JSON.parse(str)
         return new Permissions(table)
     }
+
+    static any() {
+        return new Permissions(anyPermissionsTable())
+    }
+
+    static empty() {
+        return new Permissions(emptyPermissionsTable())
+    }
 }
 
-export { emptyPermissionsTable, Permissions, Role }
+export { Permissions, role }

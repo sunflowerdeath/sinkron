@@ -36,6 +36,11 @@ impl Permissions {
         }
     }
 
+    pub fn parse_or_empty(input: &str) -> Self {
+        serde_json::from_str(&input)
+            .unwrap_or_else(|_| Permissions::empty())
+    }
+
     pub fn check(&self, user: &User, action: Action) -> bool {
         let list = match action {
             Action::Read => &self.read,
@@ -43,7 +48,27 @@ impl Permissions {
             Action::Update => &self.update,
             Action::Delete => &self.delete,
         };
-        // TODO
-        true
+        for item in list {
+            match item {
+                Role::Any => {
+                    return true;
+                }
+                Role::User { id } => {
+                    if user.id == *id {
+                        return true;
+                    }
+                }
+                Role::Group { id } => {
+                    if user.groups.contains(&id) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    pub fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 }

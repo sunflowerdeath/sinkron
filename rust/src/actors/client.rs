@@ -23,6 +23,7 @@ const DISCONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 struct ClientActor {
     supervisor: Supervisor,
     client_id: i32,
+    user_id: String,
     websocket: WebSocket,
     receiver: mpsc::Receiver<ServerMessage>,
     collection: CollectionHandle,
@@ -62,7 +63,7 @@ impl ClientActor {
 
     fn source(&self) -> collection::Source {
         collection::Source::Client {
-            user: "123".to_string(), // TODO actual user id
+            user: self.user_id.clone(),
         }
     }
 
@@ -280,6 +281,7 @@ pub struct ClientHandle {
 impl ClientHandle {
     pub fn new(
         client_id: i32,
+        user_id: String,
         websocket: WebSocket,
         collection: CollectionHandle,
         colrev: i64,
@@ -291,6 +293,7 @@ impl ClientHandle {
             supervisor: supervisor.clone(),
             colrev,
             client_id,
+            user_id,
             collection,
             websocket,
             receiver,

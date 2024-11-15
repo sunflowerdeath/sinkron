@@ -11,14 +11,15 @@ use axum::{
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use log::trace;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
-use crate::actors::sinkron::{SinkronActorMessage, SinkronHandle};
+use crate::actors::sinkron::{
+    ConnectMessage, GetCollectionMessage, SinkronActorMessage, SinkronHandle,
+};
 use crate::api_types::{Collection, Document};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
@@ -100,8 +101,9 @@ impl Sinkron {
         col: String,
     ) -> Result<CollectionHandle, SinkronError> {
         let (sender, receiver) = oneshot::channel();
-        self.actor
-            .send(SinkronActorMessage::GetCollection { col, reply: sender });
+        self.actor.send(SinkronActorMessage::GetCollection(
+            GetCollectionMessage { col, reply: sender },
+        ));
         receiver.await.map_err(internal_error)?
     }
 
@@ -360,12 +362,14 @@ impl Sinkron {
                 return;
             }
         };
-        _ = self.actor.send(SinkronActorMessage::Connect {
-            websocket,
-            user,
-            col: query.col,
-            colrev: query.colrev,
-        });
+        _ = self
+            .actor
+            .send(SinkronActorMessage::Connect(ConnectMessage {
+                websocket,
+                user,
+                col: query.col,
+                colrev: query.colrev,
+            }));
     }
 }
 
