@@ -84,7 +84,10 @@ impl Sinkron {
     }
 
     async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
-        self.pool.get().await.map_err(internal_error)
+        self.pool.get().await.map_err(|e| {
+            println!("{:?}", e);
+            internal_error(e)
+        })
     }
 
     async fn get_collection_actor(

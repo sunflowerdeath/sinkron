@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::api_types::User;
+
 pub enum Action {
     Read,
     Create,
@@ -34,8 +36,7 @@ impl Permissions {
         }
     }
 
-    /*
-    pub fn check(&self, action: Action, role: Role) -> bool {
+    pub fn check(&self, user: &User, action: Action) -> bool {
         let list = match action {
             Action::Read => &self.read,
             Action::Create => &self.create,
@@ -43,6 +44,6 @@ impl Permissions {
             Action::Delete => &self.delete,
         };
         // TODO
+        true
     }
-    */
 }

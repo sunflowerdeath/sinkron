@@ -352,7 +352,7 @@ const flushMaxWait = 2000
 
 // Interval between hearbeats. Should be less than disconnect timeout for being
 // inactive on the server (=60s)
-const heartbeatInterval = 5000 // 30s
+const heartbeatInterval = 30000 // 30s
 // Max wait time of the server's reply to heartbeat before closing connection.
 const disconnectTimeout = 5000
 
@@ -566,7 +566,7 @@ class Collection {
         if (item === undefined) return
 
         if (changeid !== undefined && item.sentChanges.has(changeid)) {
-            this.logger.warn("Rejected own change: %s", changeid)
+            this.logger.warn("Rejected change: %s %s", id, code)
             item.sentChanges.delete(changeid)
         }
 

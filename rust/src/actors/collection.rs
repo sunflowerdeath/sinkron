@@ -4,11 +4,8 @@ use std::sync::Arc;
 use base64::prelude::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use log::trace;
-use tokio::{
-    sync::{mpsc, oneshot},
-    time::{sleep, Duration},
-};
+use log::{trace, warn};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::actors::client::ClientHandle;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
@@ -107,7 +104,6 @@ struct CollectionActor {
     groups_api: Arc<GroupsApi>,
     receiver: mpsc::UnboundedReceiver<CollectionMessage>,
     subscribers: std::collections::HashMap<i32, ClientHandle>,
-    timeout_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl CollectionActor {
@@ -127,7 +123,6 @@ impl CollectionActor {
             pool,
             groups_api,
             subscribers: HashMap::new(),
-            timeout_task: None,
         }
     }
 
@@ -148,8 +143,11 @@ impl CollectionActor {
             Source::Api => Ok(()),
             Source::Client { user } => {
                 let user = self.groups_api.get_user(user).await?;
-                // TODO check
-                Ok(())
+                if self.state.permissions.check(&user, action) {
+                    Ok(())
+                } else {
+                    Err(SinkronError::forbidden("Operation is forbidden"))
+                }
             }
         }
     }
@@ -164,8 +162,16 @@ impl CollectionActor {
             Source::Api => Ok(()),
             Source::Client { user } => {
                 let user = self.groups_api.get_user(user).await?;
-                // TODO check
-                Ok(())
+                let permissions: permissions::Permissions =
+                    serde_json::from_str(&doc.permissions).map_err(|_| {
+                        SinkronError::internal(
+                        "Couldn't parse permissions, data might be corrupted")
+                    })?;
+                if permissions.check(&user, action) {
+                    Ok(())
+                } else {
+                    Err(SinkronError::forbidden("Operation is forbidden"))
+                }
             }
         }
     }
@@ -233,35 +239,33 @@ impl CollectionActor {
 
     async fn handle_subscribe(&mut self, id: i32, handle: ClientHandle) {
         self.subscribers.insert(id, handle);
-        self.timeout_task = None;
     }
 
     async fn handle_unsubscribe(&mut self, id: i32) {
         self.subscribers.remove(&id);
         if self.subscribers.len() == 0 {
-            let id = self.id.clone();
-            let stop = self.supervisor.stop.clone();
-            self.timeout_task = Some(tokio::spawn(async move {
-                sleep(Duration::from_secs(5)).await;
-                trace!("col-{}: disconnect by timeout", id);
-                stop.notify_waiters();
-            }));
             trace!("col-{}: last client unsubscribed", self.id);
+            self.supervisor.stop();
         }
     }
 
     async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
-        self.pool.get().await.map_err(internal_error)
+        self.pool.get().await.map_err(|e| {
+            warn!("Couldn't obtain db connection: {:?}", e);
+            internal_error(e)
+        })
     }
 
-    async fn increment_colrev(&mut self) -> Result<i64, SinkronError> {
-        let mut conn = self.connect().await?;
+    async fn increment_colrev(
+        &mut self,
+        conn: &mut db::DbConnection,
+    ) -> Result<i64, SinkronError> {
         use schema::collections;
         let colrev: i64 = diesel::update(collections::table)
             .filter(collections::id.eq(&self.id))
             .set(collections::colrev.eq(collections::colrev + 1))
             .returning(collections::colrev)
-            .get_result(&mut conn)
+            .get_result(conn)
             .await
             .map_err(internal_error)?;
         self.state.colrev = colrev;
@@ -325,11 +329,6 @@ impl CollectionActor {
         id: uuid::Uuid,
         source: Source,
     ) -> Result<Document, SinkronError> {
-        // TODO
-        // _ = self
-        // .check_doc_permission(&doc, source, permissions::Action::Read)
-        // .await?;
-
         let mut conn = self.connect().await?;
 
         let doc: models::Document = schema::documents::table
@@ -343,6 +342,10 @@ impl CollectionActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
+
+        _ = self
+            .check_doc_permission(&doc, source, permissions::Action::Read)
+            .await?;
 
         Ok(Self::doc_from_model(doc))
     }
@@ -375,10 +378,8 @@ impl CollectionActor {
             SinkronError::bad_request("Couldn't decode data from base64")
         })?;
 
-        println!("Data: {}", decoded.len());
-
         // increment colrev
-        let next_colrev = self.increment_colrev().await?;
+        let next_colrev = self.increment_colrev(&mut conn).await?;
 
         // create document
         // TODO inherit permissions from collection if not provided
@@ -396,6 +397,8 @@ impl CollectionActor {
                 .get_result(&mut conn)
                 .await
                 .map_err(internal_error)?;
+
+        drop(conn);
 
         let msg = ServerChangeMessage {
             id,
@@ -445,13 +448,12 @@ impl CollectionActor {
 
         let is_delete = data.is_none();
 
-        // Check permission TODO before or after get?
-        // let action = if is_delete {
-        // permissions::Action::Delete
-        // } else {
-        // permissions::Action::Update
-        // };
-        // _ = self.check_doc_permission(&doc, source, action).await?;
+        let action = if is_delete {
+            permissions::Action::Delete
+        } else {
+            permissions::Action::Update
+        };
+        _ = self.check_doc_permission(&doc, source, action).await?;
 
         let new_data = match &data {
             Some(update) => {
@@ -496,7 +498,7 @@ impl CollectionActor {
         };
 
         // Increment colrev
-        let next_colrev = self.increment_colrev().await?;
+        let next_colrev = self.increment_colrev(&mut conn).await?;
 
         // TODO increment refs colrev
 
@@ -514,6 +516,8 @@ impl CollectionActor {
                 .get_result(&mut conn)
                 .await
                 .map_err(internal_error)?;
+
+        drop(conn);
 
         let serialized_new_data = new_data.map(|d| BASE64_STANDARD.encode(d));
 

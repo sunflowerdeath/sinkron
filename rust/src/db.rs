@@ -2,6 +2,7 @@ use diesel_async::pooled_connection::deadpool::Pool;
 use diesel_async::{
     pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection,
 };
+use tokio::time::Duration;
 
 use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_migrations::{
@@ -23,7 +24,9 @@ pub async fn run_migrations(
                 Err(format!("Couldn't run migrations: {}", err.to_string()))
             }
         }
-    }).await.unwrap()
+    })
+    .await
+    .unwrap()
 }
 
 pub type DbConnection =
@@ -51,6 +54,11 @@ pub async fn create_pool(config: DbConfig) -> DbConnectionPool {
         AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
             config_string,
         );
-    let pool = Pool::builder(manager).max_size(4).build().unwrap();
+    let pool = Pool::builder(manager)
+        .max_size(50)
+        .runtime(deadpool::Runtime::Tokio1)
+        .wait_timeout(Some(Duration::from_millis(1000)))
+        .build()
+        .unwrap();
     pool
 }

@@ -14,6 +14,8 @@ use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::error::SinkronError;
 use crate::protocol::*;
 
+const DISCONNECT_TIMEOUT: Duration = Duration::from_secs(60);
+
 // Client actor receives messages from the webscoket connection,
 // dispatches them to the Collection and when needed waits for the response
 // and replies back.
@@ -52,6 +54,7 @@ impl ClientActor {
                 },
                 _ = &mut self.timeout => {
                     trace!("client-{}: disconnect by timeout", self.client_id);
+                    break
                 }
             }
         }
@@ -128,7 +131,7 @@ impl ClientActor {
         // reset disconnect timeout
         self.timeout
             .as_mut()
-            .reset(Instant::now() + Duration::from_secs(10));
+            .reset(Instant::now() + DISCONNECT_TIMEOUT);
 
         let reply = HeartbeatMessage { i: msg.i + 1 };
         self.send_ws_message(ServerMessage::Heartbeat(reply)).await;
@@ -291,7 +294,7 @@ impl ClientHandle {
             collection,
             websocket,
             receiver,
-            timeout: Box::pin(tokio::time::sleep(Duration::from_secs(10))),
+            timeout: Box::pin(sleep(DISCONNECT_TIMEOUT)),
         };
         supervisor.spawn(async move { reader.run().await }, on_exit);
 

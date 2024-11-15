@@ -11,7 +11,7 @@ mod sinkron;
 
 use std::env;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
     env_logger::init();
     let config = serde_json::from_str::<sinkron::SinkronConfig>(
