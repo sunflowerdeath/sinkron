@@ -1,5 +1,6 @@
 import assert from "node:assert"
 
+import { WebSocket } from "ws"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
@@ -34,7 +35,11 @@ describe("Collection", () => {
 
         const collection = new Collection({
             url: "ws://localhost:3000/sync",
-            col
+            // @ts-ignore
+            webSocketImpl: WebSocket,
+            col,
+            token: "token-test",
+            noAutoReconnect: true
         })
 
         await awaitValue(() => collection.status === ConnectionStatus.Ready)

@@ -383,12 +383,13 @@ impl CollectionActor {
 
         // create document
         // TODO inherit permissions from collection if not provided
+        let permissions = permissions::Permissions::empty();
         let new_doc = models::NewDocument {
             id,
             col_id: self.id.clone(),
             colrev: next_colrev,
             data: decoded,
-            permissions: "".to_string(), // TODO
+            permissions: serde_json::to_string(&permissions).unwrap()
         };
         let created_at: chrono::DateTime<chrono::Utc> =
             diesel::insert_into(schema::documents::table)

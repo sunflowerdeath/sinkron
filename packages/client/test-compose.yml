@@ -9,21 +9,20 @@ services:
             - POSTGRES_DB=sinkron
         command: ["postgres", "-c", "log_statement=all"]
         healthcheck:
-            test:
-                [
-                    "CMD-SHELL",
-                    "pg_isready -U postgres -d sinkron"
-                ]
+            test: ["CMD-SHELL", "pg_isready -U postgres -d sinkron"]
             interval: 3s
             retries: 3
             start_period: 3s
             timeout: 3s
+    auth:
+        build: ./test_auth
     sinkron:
         build: ../../rust
         ports:
             - 3000:80
         environment:
             - SINKRON_CONFIG=${SINKRON_CONFIG}
+            - RUST_LOG=sinkron=trace
         depends_on:
             postgres:
                 condition: service_healthy

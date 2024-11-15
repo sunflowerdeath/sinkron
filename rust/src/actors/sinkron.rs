@@ -23,6 +23,7 @@ use crate::schema;
 pub enum SinkronActorMessage {
     Connect {
         websocket: WebSocket,
+        user: String,
         col: String,
         colrev: i64,
     },
@@ -83,9 +84,11 @@ impl SinkronActor {
         match msg {
             SinkronActorMessage::Connect {
                 websocket,
+                user,
                 col,
                 colrev,
             } => {
+                // TODO user
                 self.handle_connect(websocket, col, colrev).await;
             }
             SinkronActorMessage::GetCollection { col, reply } => {

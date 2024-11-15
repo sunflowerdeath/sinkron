@@ -22,8 +22,10 @@
         "@rspack/core": "^1.0.13",
         "@types/mocha": "^10.0.9",
         "@types/uuid": "^9.0.8",
+        "@types/ws": "^8.5.13",
         "mocha": "^10.7.3",
-        "pino-pretty": "^10.3.1"
+        "pino-pretty": "^10.3.1",
+        "ws": "^8.18.0"
     },
     "dependencies": {
         "@types/lodash": "^4.17.13",

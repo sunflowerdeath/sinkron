@@ -30,25 +30,27 @@ export interface Transport {
 export type WebSocketTransportProps = {
     url: string
     webSocketImpl?: typeof WebSocket
+    logger: Logger<string>
 }
 
 class WebSocketTransport implements Transport {
     constructor(props: WebSocketTransportProps) {
-        const { url, webSocketImpl } = props
+        const { url, webSocketImpl, logger } = props
         this.url = url
         this.webSocketImpl = webSocketImpl || global.WebSocket
+        this.logger = logger
     }
 
     emitter = createNanoEvents()
     url: string
     webSocketImpl: typeof WebSocket
     ws?: WebSocket
+    logger: Logger<string>
 
     open() {
-        console.log("Connecting to websocket:", this.url)
+        this.logger.debug("Connecting to websocket: %s", this.url)
         this.ws = new this.webSocketImpl(this.url)
         this.ws.addEventListener("open", () => {
-            console.log("Connected to websocket!")
             this.emitter.emit("open")
         })
         this.ws.addEventListener("message", (event) => {
@@ -56,11 +58,10 @@ class WebSocketTransport implements Transport {
         })
         this.ws.addEventListener("close", () => {
             this.emitter.emit("close")
-            console.log("Websocket connection closed.")
             this.ws = undefined
         })
         this.ws.addEventListener("error", (err) => {
-            console.log("Websocket connection error:", err)
+            this.logger.debug("Websocket connection error: %o", err)
             this.ws?.close()
         })
     }
@@ -78,16 +79,16 @@ class WebSocketTransport implements Transport {
     }
 }
 
-const initialReconnectTimeout = 333
-const maxReconnectTimeout = 10000
+const INITIAL_RECONNECT_TIMEOUT = 333
+const MAX_RECONNECT_TIMEOUT = 10000
 
 const autoReconnect = (t: Transport) => {
-    let timeout = initialReconnectTimeout
+    let timeout = INITIAL_RECONNECT_TIMEOUT
     let isEnabled = true
     t.open()
     t.emitter.on("open", () => {
         // reset reconnect timeout
-        timeout = initialReconnectTimeout
+        timeout = INITIAL_RECONNECT_TIMEOUT
     })
     t.emitter.on("close", () => {
         if (!isEnabled) return
@@ -95,7 +96,7 @@ const autoReconnect = (t: Transport) => {
         setTimeout(() => {
             t.open()
         }, timeout)
-        timeout = Math.min(maxReconnectTimeout, timeout * 2)
+        timeout = Math.min(MAX_RECONNECT_TIMEOUT, timeout * 2)
     })
     return () => {
         isEnabled = false
@@ -352,9 +353,9 @@ const flushMaxWait = 2000
 
 // Interval between hearbeats. Should be less than disconnect timeout for being
 // inactive on the server (=60s)
-const heartbeatInterval = 30000 // 30s
+const HEARTBEAT_INTERVAL = 30000 // 30s
 // Max wait time of the server's reply to heartbeat before closing connection.
-const disconnectTimeout = 5000
+const DISCONNECT_TIMEOUT = 5000
 
 export enum ConnectionStatus {
     Disconnected = "disconnected",
@@ -365,10 +366,13 @@ export enum ConnectionStatus {
 
 interface CollectionProps {
     url: string
+    token: string
     col: string
     store?: CollectionStore
+    noAutoReconnect?: boolean
     errorHandler?: (msg: SyncErrorMessage) => void
     logger?: Logger<string>
+    webSocketImpl?: typeof WebSocket
 }
 
 const defaultLogger = (level = "debug"): Logger<string> => {
@@ -381,8 +385,7 @@ const defaultLogger = (level = "debug"): Logger<string> => {
 
 class Collection {
     constructor(props: CollectionProps) {
-        const { col, url, store, errorHandler, logger } = props
-        this.url = url
+        const { col, store, errorHandler, logger } = props
         this.col = col
         this.store = store
         this.errorHandler = errorHandler
@@ -399,10 +402,9 @@ class Collection {
         this.flushDebounced = debounce(this.flush.bind(this), flushDelay, {
             maxWait: flushMaxWait
         })
-        this.init()
+        this.init(props)
     }
 
-    url: string
     col: string
     transport!: Transport
     store?: CollectionStore = undefined
@@ -417,7 +419,7 @@ class Collection {
     isDestroyed = false
 
     flushDebounced: ReturnType<typeof debounce>
-    stopAutoReconnect?: () => void
+    disconnect?: () => void
     backupQueue = new Set<string>()
     flushQueue = new Set<string>()
 
@@ -428,31 +430,41 @@ class Collection {
 
     destroy() {
         this.isDestroyed = true
-        this.stopAutoReconnect?.()
+        this.disconnect?.()
         this.store?.dispose()
         clearTimeout(this.heartbeatTimeout)
         clearTimeout(this.disconnectTimeout)
     }
 
-    async init() {
+    async init(props: CollectionProps) {
+        const { url, token, webSocketImpl } = props
+
         if (this.store) await this.loadFromStore()
         this.isLoaded = true
 
         this.transport = new WebSocketTransport({
-            url: `${this.url}?col=${this.col}&colrev=${this.colrev}`
+            url: `${url}?col=${this.col}&colrev=${this.colrev}&token=${token}`,
+            webSocketImpl,
+            logger: this.logger
         })
-        this.transport.emitter.on("open", action(() => {
-            this.logger.debug("Connected to websocket")
-            this.status = ConnectionStatus.Connected
-            this.heartbeat(0)
-        }))
-        this.transport.emitter.on("close", action(() => {
-            this.logger.debug("Connection closed")
-            this.status = ConnectionStatus.Disconnected
-            this.flushDebounced.cancel()
-            clearTimeout(this.heartbeatTimeout)
-            clearTimeout(this.disconnectTimeout)
-        }))
+        this.transport.emitter.on(
+            "open",
+            action(() => {
+                this.logger.debug("Connected to websocket")
+                this.status = ConnectionStatus.Connected
+                this.heartbeat(0)
+            })
+        )
+        this.transport.emitter.on(
+            "close",
+            action(() => {
+                this.logger.debug("Connection closed")
+                this.status = ConnectionStatus.Disconnected
+                this.flushDebounced.cancel()
+                clearTimeout(this.heartbeatTimeout)
+                clearTimeout(this.disconnectTimeout)
+            })
+        )
         this.transport.emitter.on("message", (msg: string) => {
             try {
                 this.onMessage(msg)
@@ -464,8 +476,11 @@ class Collection {
             }
         })
 
-        if (!this.isDestroyed) {
-            this.stopAutoReconnect = autoReconnect(this.transport)
+        if (props.noAutoReconnect) {
+            this.transport.open()
+            this.disconnect = () => this.transport.close()
+        } else {
+            this.disconnect = autoReconnect(this.transport)
         }
     }
 
@@ -494,7 +509,7 @@ class Collection {
     }
 
     heartbeat(i: number) {
-        this.logger.trace("Sending heartbeat")
+        this.logger.trace(`Sending heartbeat: ${i}`, i)
 
         const heartbeat = { kind: "h", i }
         this.transport.send(JSON.stringify(heartbeat))
@@ -504,7 +519,7 @@ class Collection {
                 "No response from server for too long, disconnecting"
             )
             this.transport.close()
-        }, disconnectTimeout)
+        }, DISCONNECT_TIMEOUT)
     }
 
     onMessage(msg: string) {
@@ -540,7 +555,7 @@ class Collection {
         // schedule next hearbeat
         this.heartbeatTimeout = setTimeout(
             () => this.heartbeat(msg.i + 1),
-            heartbeatInterval
+            HEARTBEAT_INTERVAL
         )
     }
 
@@ -555,7 +570,7 @@ class Collection {
     handleSyncError(msg: SyncErrorMessage) {
         this.logger.error("Sync error: %o", msg)
         this.status = ConnectionStatus.Error
-        this.stopAutoReconnect?.()
+        this.disconnect?.()
         this.errorHandler?.(msg)
     }
 

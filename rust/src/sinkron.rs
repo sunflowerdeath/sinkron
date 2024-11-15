@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::ws::{WebSocket, WebSocketUpgrade},
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{Query, Request, State},
     http::StatusCode,
     middleware::{self, Next},
@@ -11,6 +11,8 @@ use axum::{
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use log::trace;
+use reqwest;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
@@ -55,6 +57,7 @@ pub struct SinkronConfig {
     #[serde(default = "default_port")]
     pub port: u32,
     pub api_token: String,
+    pub sync_auth_url: String,
     pub db: db::DbConfig,
 }
 
@@ -65,6 +68,7 @@ pub struct Sinkron {
     host: String,
     port: u32,
     api_token: String,
+    sync_auth_url: String,
     groups_api: Arc<GroupsApi>,
 }
 
@@ -79,6 +83,7 @@ impl Sinkron {
             host: config.host,
             port: config.port,
             api_token: config.api_token,
+            sync_auth_url: config.sync_auth_url,
             groups_api,
         }
     }
@@ -325,6 +330,43 @@ impl Sinkron {
         let listener = tokio::net::TcpListener::bind(host).await.unwrap();
         axum::serve(listener, app).await.unwrap();
     }
+
+    async fn auth(&self, token: &str) -> Result<String, SinkronError> {
+        let req = reqwest::Client::new()
+            .post("".to_string() + &self.sync_auth_url + &token)
+            .body("".to_string())
+            .send()
+            .await
+            .map_err(internal_error)?;
+        if req.status() != reqwest::StatusCode::OK {
+            return Err(SinkronError::auth_failed("Authentication failed"));
+        }
+        let user = req.text().await.map_err(internal_error)?;
+        return Ok(user);
+    }
+
+    async fn handle_connect(&self, mut websocket: WebSocket, query: SyncQuery) {
+        let user = match self.auth(&query.token).await {
+            Ok(user) => user,
+            Err(err) => {
+                let msg = ServerMessage::SyncError(SyncErrorMessage {
+                    col: query.col,
+                    code: err.code,
+                });
+                let Ok(str_msg) = serde_json::to_string(&msg) else {
+                    return;
+                };
+                _ = websocket.send(Message::Text(str_msg)).await;
+                return;
+            }
+        };
+        _ = self.actor.send(SinkronActorMessage::Connect {
+            websocket,
+            user,
+            col: query.col,
+            colrev: query.colrev,
+        });
+    }
 }
 
 async fn root() -> &'static str {
@@ -337,6 +379,7 @@ async fn root() -> &'static str {
 struct SyncQuery {
     col: String,
     colrev: i64,
+    token: String,
 }
 
 async fn sync_handler(
@@ -352,11 +395,7 @@ async fn handle_connect(
     websocket: WebSocket,
     query: SyncQuery,
 ) {
-    _ = sinkron.actor.send(SinkronActorMessage::Connect {
-        websocket,
-        col: query.col,
-        colrev: query.colrev,
-    });
+    sinkron.handle_connect(websocket, query).await;
 }
 
 // Api auth middleware

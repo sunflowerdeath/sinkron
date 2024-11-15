@@ -12,8 +12,9 @@ import { assertIsMatch } from "./utils"
 
 let apiUrl = "http://localhost:3000"
 let apiToken = "SINKRON_API_TOKEN"
-let wsUrl = (col: string, colrev: string) =>
-    `ws://localhost:3000/sync?col=${col}&colrev=${colrev}`
+let syncToken = "token-test"
+let wsUrl = (col: string, colrev: string, token: string) =>
+    `ws://localhost:3000/sync?col=${col}&colrev=${colrev}&token=${token}`
 
 type WsEvent =
     | { kind: "open" }
@@ -79,10 +80,23 @@ describe("Sinkron", () => {
         let createRes = await api.createCollection({ id: col, permissions })
         assert(createRes.isOk, "create col")
 
+        // invalid auth token
+        {
+            let ws = new WsTest(wsUrl(col, "0", "invalid"))
+            let e1 = await ws.next()
+            assert.strictEqual(e1.kind, "open")
+            let e2 = await ws.next()
+            assert.deepEqual(e2, {
+                kind: "message",
+                data: { kind: "sync_error", col, code: "auth_failed" }
+            })
+            ws.ws.close()
+        }
+
         // invalid col
         {
             let invalid_col = uuidv4()
-            let ws = new WsTest(wsUrl(invalid_col, "0"))
+            let ws = new WsTest(wsUrl(invalid_col, "0", syncToken))
             let e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
             let e2 = await ws.next()
@@ -99,7 +113,7 @@ describe("Sinkron", () => {
 
         // invalid colrev
         {
-            let ws = new WsTest(wsUrl(col, "1234"))
+            let ws = new WsTest(wsUrl(col, "1234", syncToken))
             let e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
             let e2 = await ws.next()
@@ -116,7 +130,7 @@ describe("Sinkron", () => {
 
         // valid
         {
-            let ws = new WsTest(wsUrl(col, "0"))
+            let ws = new WsTest(wsUrl(col, "0", syncToken))
             let e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
             let e2 = await ws.next()
@@ -158,7 +172,7 @@ describe("Sinkron", () => {
 
         // sync without colrev
         {
-            let ws = new WsTest(wsUrl(col, "0"))
+            let ws = new WsTest(wsUrl(col, "0", syncToken))
             let e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
             let e2 = await ws.next()
@@ -176,7 +190,7 @@ describe("Sinkron", () => {
 
         // sync (with colrev)
         {
-            let ws = new WsTest(wsUrl(col, doc2.colrev))
+            let ws = new WsTest(wsUrl(col, doc2.colrev, syncToken))
             let e1 = await ws.next()
             assert.strictEqual(e1.kind, "open")
             let e2 = await ws.next()
@@ -201,7 +215,7 @@ describe("Sinkron", () => {
         let createRes = await api.createCollection({ id: col, permissions })
         assert(createRes.isOk, "create col")
 
-        let ws = new WsTest(wsUrl(col, "0"))
+        let ws = new WsTest(wsUrl(col, "0", syncToken))
         let events = [await ws.next(), await ws.next()]
         assertIsMatch(events, [
             { kind: "open" },
@@ -281,5 +295,4 @@ describe("Sinkron", () => {
 
         ws.ws.close()
     })
-
 })
