@@ -4,3 +4,4 @@ node_modules/
 packages/*/node_modules
 packages/*/build
 packages/*/types
+rust/
