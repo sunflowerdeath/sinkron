@@ -4,7 +4,7 @@ import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc } from "loro-crdt"
 
-import { SinkronClient, Permissions } from "../client"
+import { SinkronClient, Permissions, Action, role } from "../client"
 import { ServerMessage, ClientMessage, Op } from "../protocol"
 
 import { assertIsMatch } from "./utils"
@@ -302,5 +302,102 @@ describe("Sinkron", () => {
         })
 
         ws.ws.close()
+    })
+
+    it("permissions", async () => {
+        const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
+
+        const PERMITTED = "permitted"
+        const READONLY = "readonly"
+        const FORBIDDEN = "forbidden"
+
+        const permissions = Permissions.empty()
+        permissions.add(Action.read, role.user(`user-${PERMITTED}`))
+        permissions.add(Action.read, role.user(`user-${READONLY}`))
+        permissions.add(Action.create, role.user(`user-${PERMITTED}`))
+        permissions.add(Action.update, role.user(`user-${PERMITTED}`))
+        permissions.add(Action.delete, role.user(`user-${PERMITTED}`))
+
+        const col = uuidv4()
+        await sinkron.createCollection({ id: col, permissions })
+
+        const docId = uuidv4()
+
+        // forbidden
+        const wsForbidden = new WsTest(wsUrl(col, "0", `token-${FORBIDDEN}`))
+        const eventsForbidden = [
+            await wsForbidden.next(),
+            await wsForbidden.next()
+        ]
+        assertIsMatch(eventsForbidden, [
+            { kind: "open" },
+            { kind: "message", data: { kind: "sync_error", code: "forbidden" } }
+        ])
+        wsForbidden.ws.close()
+
+        // readonly
+        const wsReadonly = new WsTest(wsUrl(col, "0", `token-${READONLY}`))
+        const eventsReadonly = [
+            await wsReadonly.next(),
+            await wsReadonly.next()
+        ]
+        assertIsMatch(eventsReadonly, [
+            { kind: "open" },
+            { kind: "message", data: { kind: "sync_complete" } }
+        ])
+        wsReadonly.send({
+            kind: "change",
+            id: docId,
+            changeid: uuidv4(),
+            col,
+            op: Op.Create,
+            data: Base64.fromUint8Array(testDoc())
+        })
+        assertIsMatch(await wsReadonly.next(), {
+            kind: "message",
+            data: { kind: "change_error", code: "forbidden" }
+        })
+        wsReadonly.ws.close()
+
+        // permitted
+        const wsPermitted = new WsTest(wsUrl(col, "0", `token-${PERMITTED}`))
+        const eventsPermitted = [
+            await wsPermitted.next(),
+            await wsPermitted.next()
+        ]
+        assertIsMatch(eventsPermitted, [
+            { kind: "open" },
+            { kind: "message", data: { kind: "sync_complete" } }
+        ])
+        wsPermitted.send({
+            kind: "change",
+            id: docId,
+            changeid: uuidv4(),
+            col,
+            op: Op.Create,
+            data: Base64.fromUint8Array(testDoc())
+        })
+        assertIsMatch(await wsPermitted.next(), {
+            kind: "message",
+            data: { kind: "change" }
+        })
+        wsPermitted.ws.close()
+
+        // update permissions
+        const upd1res = await sinkron.updateCollectionPermissionsWithCallback({
+            id: col,
+            cb: (p) => {
+                p.add(Action.update, role.user(`user-${READONLY}`))
+            }
+        })
+        assert(upd1res.isOk, "updateCollectionPermissions")
+        const upd2res = await sinkron.updateDocumentPermissionsWithCallback({
+            id: docId,
+            col,
+            cb: (p) => {
+                p.add(Action.update, role.user(`user-${READONLY}`))
+            }
+        })
+        assert(upd2res.isOk, "updateDocumentPermissions")
     })
 })

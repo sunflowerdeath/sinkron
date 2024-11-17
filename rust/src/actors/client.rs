@@ -100,6 +100,13 @@ impl ClientActor {
                 ));
                 self.send_ws_messages(messages).await;
             }
+            Ok(Err(err)) => {
+                let msg = ServerMessage::SyncError(SyncErrorMessage {
+                    col: self.collection.id.clone(),
+                    code: err.code,
+                });
+                self.send_ws_message(msg).await;
+            }
             _ => {
                 let msg = ServerMessage::SyncError(SyncErrorMessage {
                     col: self.collection.id.clone(),

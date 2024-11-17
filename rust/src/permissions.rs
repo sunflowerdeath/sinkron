@@ -9,7 +9,7 @@ pub enum Action {
     Delete,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "kind")]
 pub enum Role {

@@ -2,7 +2,7 @@ import { LoroDoc } from "loro-crdt"
 import { Base64 } from "js-base64"
 import { parseISO } from "date-fns"
 
-import { Permissions } from "./permissions"
+import { Permissions, Action, Role, role } from "./permissions"
 
 export type ResultType<T, E = Error> =
     | { isOk: true; value: T }
@@ -483,4 +483,4 @@ class SinkronClient {
     }
 }
 
-export { SinkronClient, Permissions }
+export { SinkronClient, Permissions, Action, Role, role }
