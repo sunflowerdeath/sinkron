@@ -1,21 +1,21 @@
-import { uniq } from "lodash"
+import uniq from "lodash-es/uniq"
 
 export type Role =
     | { kind: "any" }
     | { kind: "user"; id: string }
     | { kind: "group"; id: string }
 
-const role = {
-    any: (): Role => ({ kind: "any" }),
-    user: (id: string): Role => ({ kind: "user", id }),
-    group: (id: string): Role => ({ kind: "group", id })
-}
-
 export enum Action {
     read = "read",
     create = "create",
     update = "update",
     delete = "delete"
+}
+
+const role = {
+    any: (): Role => ({ kind: "any" }),
+    user: (id: string): Role => ({ kind: "user", id }),
+    group: (id: string): Role => ({ kind: "group", id })
 }
 
 export type PermissionsTable = {

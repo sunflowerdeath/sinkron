@@ -1,0 +1,26 @@
+{
+    "name": "@sinkron/loro-slate",
+    "version": "0.0.1",
+    "description": "",
+    "scripts": {
+        "lint": "oxlint -c ./oxlintrc.json src",
+        "build": "tsc && NODE_ENV=production rspack --config rspack.config.js",
+        "test:build": "rspack --config rspack.config.test.js",
+        "test:run": "mocha ./build/test.js",
+        "test": "pnpm test:build && pnpm test:run"
+    },
+    "keywords": [],
+    "author": "sunflowerdeath",
+    "license": "Unlicense",
+    "devDependencies": {
+        "@rspack/cli": "^1.0.13",
+        "@rspack/core": "^1.0.13",
+        "@types/mocha": "^10.0.9",
+        "mocha": "^10.7.3"
+    },
+    "dependencies": {
+        "@types/node": "^22.9.0",
+        "loro-crdt": "^1.1.2",
+        "slate": "^0.110.2"
+    }
+}

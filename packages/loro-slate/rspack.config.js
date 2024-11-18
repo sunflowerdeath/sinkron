@@ -1,5 +1,4 @@
 const path = require("path")
-const nodeExternals = require("webpack-node-externals")
 
 const isProduction = process.env.NODE_ENV === "production"
 const src = path.resolve(__dirname, "src")
@@ -20,25 +19,22 @@ const rules = [
 ]
 
 module.exports = {
+    mode: isProduction ? "production" : "development",
     entry: {
-        main: "./src/index.ts"
+        main: "./src/index.ts",
     },
     output: {
         path: path.resolve(__dirname, "./build"),
         filename: "[name].js",
-        library: {
-            type: "commonjs"
-        }
+        library: { type: "module" }
     },
-    mode: isProduction ? "production" : "development",
-    target: "node",
-    externals: [nodeExternals({ additionalModuleDirs: ["../node_modules"] })],
+    // target: "web",
     resolve: {
         extensions: [".js", ".ts"]
     },
-    module: { rules },
+    externals: ["loro-crdt", "slate"],
+    experiments: { asyncWebAssembly: true, outputModule: true },
     devtool: "cheap-module-source-map",
-    optimization: {
-        minimize: false
-    }
+    optimization: { minimize: false },
+    module: { rules }
 }

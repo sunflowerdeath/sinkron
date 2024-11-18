@@ -1,7 +1,7 @@
 import { In } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
-import * as Automerge from "@automerge/automerge"
-import { Permissions, Action, Role } from "sinkron"
+import { LoroDoc, LoroMap } from "loro-crdt"
+import { Permissions, Action, role } from "@sinkron/client/lib/client"
 
 import { App, AppModels } from "../app"
 import { User, SpaceRole } from "../entities"
@@ -40,6 +40,7 @@ export type SpaceMemberView = {
 export type LockDocumentProps = {
     spaceId: string
     docId: string
+    colId: string
     lock: boolean
 }
 
@@ -48,6 +49,14 @@ const spaceNameSchema = ajv.compile({
     minLength: 1,
     maxLength: 100
 })
+
+const createMetaDoc = () => {
+    const doc = new LoroDoc()
+    const root = doc.getMap("root")
+    root.set("isMeta", true)
+    root.setContainer("categories", new LoroMap())
+    return doc
+}
 
 class SpaceService {
     app: App
@@ -91,33 +100,33 @@ class SpaceService {
         await this.app.sinkron.createGroup(`${col}/readonly`)
         await this.app.sinkron.createGroup(`${col}/members`)
 
-        const p = new Permissions()
-        const members = Role.group(`${col}/members`)
+        const p = Permissions.empty()
+        const members = role.group(`${col}/members`)
         p.add(Action.read, members)
         p.add(Action.create, members)
         p.add(Action.update, members)
         p.add(Action.delete, members)
-        const readonly = Role.group(`${col}/readonly`)
+        const readonly = role.group(`${col}/readonly`)
         p.add(Action.read, readonly)
         await this.app.sinkron.createCollection({
             id: col,
-            permissions: p.table
+            permissions: p
         })
 
-        const meta = Automerge.from({ meta: true, categories: {} })
-        await this.app.sinkron.createDocument(
-            uuidv4(),
+        const meta = createMetaDoc()
+        await this.app.sinkron.createDocument({
+            id: uuidv4(),
             col,
-            Automerge.save(meta)
-        )
-
-        // TODO create in transaction, throw if sinkron failed
+            data: meta.export({ mode: "snapshot" })
+        })
 
         await this.addMember(models, {
             userId: ownerId,
             spaceId: space.id,
             role: "owner"
         })
+
+        // TODO create in transaction, throw if failed
 
         return Result.ok(space)
     }
@@ -180,7 +189,10 @@ class SpaceService {
         const group =
             `spaces/${spaceId}/` +
             (role === "readonly" ? "readonly" : "members")
-        await this.app.sinkron.addMemberToGroup(userId, group)
+        await this.app.sinkron.addUserToGroup({
+            user: userId,
+            group
+        })
     }
 
     async getMemberRole(
@@ -244,16 +256,29 @@ class SpaceService {
         const membersGroup = `spaces/${spaceId}/members`
         if (member.role !== "readonly" && role === "readonly") {
             // become readonly
-            await this.app.sinkron.addMemberToGroup(userId, readonlyGroup)
-            await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
+            await this.app.sinkron.addUserToGroup({
+                user: userId,
+                group: readonlyGroup
+            })
+            await this.app.sinkron.removeUserFromGroup({
+                user: userId,
+                group: membersGroup
+            })
         } else if (member.role === "readonly" && role !== "readonly") {
             // become not readony
-            await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
-            await this.app.sinkron.addMemberToGroup(userId, membersGroup)
+            await this.app.sinkron.removeUserFromGroup({
+                user: userId,
+                group: readonlyGroup
+            })
+            await this.app.sinkron.addUserToGroup({
+                user: userId,
+                group: membersGroup
+            })
         }
         await this.app.models.members.update({ spaceId, userId }, { role })
 
-        this.app.channels.send(`users/${userId}`, "profile")
+        // TODO
+        // this.app.channels.send(`users/${userId}`, "profile")
 
         return Result.ok({ ...member, role })
     }
@@ -277,10 +302,17 @@ class SpaceService {
 
         const readonlyGroup = `spaces/${spaceId}/readonly`
         const membersGroup = `spaces/${spaceId}/members`
-        await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
-        await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
+        await this.app.sinkron.removeUserFromGroup({
+            user: userId,
+            group: membersGroup
+        })
+        await this.app.sinkron.removeUserFromGroup({
+            user: userId,
+            group: readonlyGroup
+        })
 
-        this.app.channels.send(`users/${userId}`, "profile")
+        // TODO
+        // this.app.channels.send(`users/${userId}`, "profile")
 
         return Result.ok(true)
     }
@@ -366,39 +398,41 @@ class SpaceService {
     async lockDocument({
         spaceId,
         docId,
+        colId,
         lock
     }: LockDocumentProps): Promise<ResultType<true, RequestError>> {
-        const res = await this.app.sinkron.updateDocumentPermissions(
-            docId,
-            (p) => {
-                const group = Role.group(`spaces/${spaceId}/members`)
-                if (lock) {
-                    p.remove(Action.update, group)
-                    p.remove(Action.delete, group)
-                } else {
-                    p.add(Action.update, group)
-                    p.add(Action.delete, group)
+        const res =
+            await this.app.sinkron.updateDocumentPermissionsWithCallback({
+                id: docId,
+                col: colId,
+                cb: (p) => {
+                    const group = role.group(`spaces/${spaceId}/members`)
+                    if (lock) {
+                        p.remove(Action.update, group)
+                        p.remove(Action.delete, group)
+                    } else {
+                        p.add(Action.update, group)
+                        p.add(Action.delete, group)
+                    }
                 }
-            }
-        )
+            })
         if (!res.isOk) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "Couldn't set permissions"
+                code: ErrorCode.InternalServerError,
+                message: "Couldn't update permissions"
             })
         }
 
-        const updateRes =
-            await this.app.sinkronServer.updateDocumentWithCallback(
-                docId,
-                (doc) => {
-                    // @ts-expect-error doc untyped
-                    doc.isLocked = lock
-                }
-            )
+        const updateRes = await this.app.sinkron.updateDocumentWithCallback({
+            id: docId,
+            col: colId,
+            cb: (doc) => {
+                doc.getMap("root").set("isLocked", lock)
+            }
+        })
         if (!updateRes.isOk) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: ErrorCode.InternalServerError,
                 message: "Couldn't update document"
             })
         }

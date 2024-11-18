@@ -187,6 +187,8 @@ class FileService {
 
         if (uploadedFileIds.length === 0) return
 
+        /*
+        TODO
         const col = `spaces/${spaceId}`
         const res = await this.app.sinkron.syncCollection(col)
         if (!res.isOk) return
@@ -204,6 +206,7 @@ class FileService {
         if (orphanIds.length > 0) {
             await this.batchDeleteFiles(models, { spaceId, fileIds: orphanIds })
         }
+        */
     }
 }
 

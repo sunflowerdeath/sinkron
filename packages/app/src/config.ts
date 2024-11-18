@@ -17,10 +17,15 @@ export type SmtpConfig = {
 export type MailConfig = { type: "console" } | SmtpConfig
 
 export type SinkronConfig = {
+    url: string
+    token: string
+}
+
+export type SinkronAppConfig = {
     db: DbConfig
     storage: StorageConfig
     mail: MailConfig
-    sinkron: { db: DbConfig }
+    sinkron: SinkronConfig
 }
 
 const configStr = process.env.SINKRON_CONFIG
@@ -28,7 +33,7 @@ if (configStr === undefined || configStr.length === 0) {
     console.error('Config not found. Set env variable "SINKRON_CONFIG"')
     process.exit(1)
 }
-let config: SinkronConfig
+let config: SinkronAppConfig
 try {
     config = JSON.parse(configStr)
 } catch {

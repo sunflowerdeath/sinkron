@@ -2,5 +2,6 @@
 temp
 node_modules/
 packages/*/node_modules
-packages/*/build
 packages/*/types
+packages/*/build
+packages/*/lib

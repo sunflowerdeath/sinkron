@@ -6,7 +6,7 @@ describe("Users", () => {
     let app: App
 
     beforeEach(async () => {
-        app = new App({})
+        app = new App()
         await app.init()
     })
 

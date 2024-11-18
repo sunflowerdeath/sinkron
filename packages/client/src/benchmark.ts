@@ -2,9 +2,8 @@ import { LoroDoc } from "loro-crdt"
 import { random, sample } from "lodash"
 import pino, { Logger } from "pino"
 
-import { Permissions } from "./permissions"
-import { SinkronApi } from "./api"
-import { Collection } from "./collection"
+import { SinkronClient, Permissions } from "./client"
+import { SinkronCollection } from "./collection"
 
 const numCols = 20 // 250
 const numUsers = numCols * 2
@@ -21,10 +20,11 @@ const client = (userid: string, colid: string) => {
         transport: { target: "pino-pretty" }
     })
     logger.level = "warn"
-    const col = new Collection({
+    const col = new SinkronCollection({
         col: colid,
         url: `ws://localhost:3337/sync`,
-        logger
+        logger,
+        token: `token-${userid}`
     })
     const doSomething = () => {
         const n = random(20)
@@ -55,14 +55,14 @@ const client = (userid: string, colid: string) => {
 const timeout = (t: number) => new Promise((resolve) => setTimeout(resolve, t))
 
 const spawnClients = async () => {
-    const api = new SinkronApi({
+    const api = new SinkronClient({
         url: "http://localhost:3337",
         token: "SINKRON_API_TOKEN"
     })
 
     for (let i = 0; i < numCols; i++) {
         const col = `cols/${i}`
-        const permissions = new Permissions()
+        const permissions = Permissions.any()
         await api.createCollection({ id: col, permissions })
     }
 

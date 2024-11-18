@@ -45,8 +45,7 @@ const appConfig = {
 const dbConfig = {
     ...baseConfig,
     entry: {
-        "app-db": "./src/db/app.ts",
-        "sinkron-db": "./src/db/sinkron.ts"
+        db: "./src/db/app.ts"
     },
     output: {
         path: path.resolve(__dirname, "./build"),

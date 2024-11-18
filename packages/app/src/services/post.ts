@@ -1,9 +1,10 @@
+import { LoroDoc } from "loro-crdt"
+
 import { App, AppModels } from "../app"
 import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
-import * as Automerge from "@automerge/automerge"
 
-type PublishProps = {
+type PostProps = {
     docId: string
     spaceId: string
 }
@@ -41,31 +42,41 @@ class PostService {
     }
 
     async #getDocContent(
-        docId: string
+        props: PostProps
     ): Promise<ResultType<string, RequestError>> {
-        const doc = await this.app.sinkron.getDocument(docId)
-        if (doc === null || doc.data === null) {
+        const { docId, spaceId } = props
+        const res = await this.app.sinkron.getDocument({
+            id: docId,
+            col: `spaces/${spaceId}`
+        })
+        if (!res.isOk) {
+            return Result.err({
+                code: ErrorCode.InternalServerError, // TODO
+                message: "Couldn't get document",
+                details: props
+            })
+        }
+        const doc = res.value
+        if (doc.data === null) {
             return Result.err({
                 code: ErrorCode.InvalidRequest,
                 message: "Document doesn't exist",
-                details: { docId }
+                details: props
             })
         }
-        const automerge = Automerge.load(doc.data)
-        return Result.ok(JSON.stringify(automerge.content))
+        const content = LoroDoc.fromSnapshot(doc.data).toJSON()
+        return Result.ok(JSON.stringify(content))
     }
 
     async publish(
         models: AppModels,
-        props: PublishProps
+        props: PostProps
     ): Promise<ResultType<PostPublishResult, RequestError>> {
         const { docId, spaceId } = props
 
-        // TODO check post already exists
+        // TODO check if post already exists
 
-        // TODO check that document is part of space
-
-        const getContentRes = await this.#getDocContent(docId)
+        const getContentRes = await this.#getDocContent(props)
         if (!getContentRes.isOk) return getContentRes
 
         const insertRes = await models.posts.insert({
@@ -75,17 +86,17 @@ class PostService {
         })
         const { publishedAt } = insertRes.generatedMaps[0]
 
-        const updateRes =
-            await this.app.sinkronServer.updateDocumentWithCallback(
-                docId,
-                (doc) => {
-                    doc.isPublished = true
-                }
-            )
+        const updateRes = await this.app.sinkron.updateDocumentWithCallback({
+            id: docId,
+            col: `spaces/${spaceId}`,
+            cb: (doc) => {
+                doc.getMap("root").set("isPublished", true)
+            }
+        })
         if (!updateRes.isOk) {
             return Result.err({
                 code: ErrorCode.InternalServerError,
-                message: "Unknown error"
+                message: "Couldn't update document"
             })
         }
 
@@ -94,14 +105,17 @@ class PostService {
 
     async update(
         models: AppModels,
-        id: string
+        props: PostProps
     ): Promise<ResultType<PostPublishResult, RequestError>> {
-        const getContentRes = await this.#getDocContent(id)
+        const getContentRes = await this.#getDocContent(props)
         if (!getContentRes.isOk) return getContentRes
 
-        await models.posts.update({ id }, { content: getContentRes.value })
+        await models.posts.update(
+            { id: props.docId },
+            { content: getContentRes.value }
+        )
 
-        const updated = await this.get(models, id)
+        const updated = await this.get(models, props.docId)
         if (updated === null) {
             return Result.err({
                 code: ErrorCode.InternalServerError,
@@ -113,29 +127,31 @@ class PostService {
 
     async unpublish(
         models: AppModels,
-        id: string
+        props: PostProps
     ): Promise<ResultType<true, RequestError>> {
-        const res = await models.posts.delete({ id })
+        const { docId, spaceId } = props
+
+        const res = await models.posts.delete({ id: docId })
 
         if (res.affected === 0) {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "Post not found",
-                details: { id }
+                details: props
             })
         }
 
-        const updateRes =
-            await this.app.sinkronServer.updateDocumentWithCallback(
-                id,
-                (doc) => {
-                    doc.isPublished = false
-                }
-            )
+        const updateRes = await this.app.sinkron.updateDocumentWithCallback({
+            id: docId,
+            col: `spaces/${spaceId}`,
+            cb: (doc) => {
+                doc.getMap("root").set("isPublished", false)
+            }
+        })
         if (!updateRes.isOk) {
             return Result.err({
                 code: ErrorCode.InternalServerError,
-                message: "Unknown error"
+                message: "Couldn't update document"
             })
         }
 

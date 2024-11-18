@@ -7,13 +7,9 @@
         "database": "sinkron_app"
     },
     "sinkron": {
-        "db": {
-            "host": "0.0.0.0",
-            "port": 5432,
-            "username": "postgres",
-            "password": "password",
-            "database": "sinkron"
-        }
+        "host": "0.0.0.0",
+        "port": 5432,
+        "apiToken": "SINKRON_API_TOKEN"
     },
     "mail": {
         "type": "console"

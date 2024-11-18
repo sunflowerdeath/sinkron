@@ -1,16 +1,16 @@
 import { createServer } from "http"
-import type { IncomingMessage } from "http"
-import { Duplex } from "stream"
+// import type { IncomingMessage } from "http"
+// import { Duplex } from "stream"
 import path from "path"
 
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
 import { DataSource, Repository } from "typeorm"
 import Bowser from "bowser"
 import cors from "@fastify/cors"
-import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
+import { SinkronClient } from "@sinkron/client/lib/client"
 
 import dataSource from "./db/app"
-import { config, SinkronConfig } from "./config"
+import { config, SinkronAppConfig } from "./config"
 import {
     User,
     Otp,
@@ -243,12 +243,11 @@ type Services = {
 }
 
 class App {
-    config: SinkronConfig
-    sinkron: Sinkron
-    sinkronServer: SinkronServer
+    config: SinkronAppConfig
+    sinkron: SinkronClient
     storage: ObjectStorage
     emailSender: EmailSender
-    channels: ChannelServer
+    // channels: ChannelServer
     fastify: FastifyInstance
     db: DataSource
     models: AppModels
@@ -285,9 +284,8 @@ class App {
             files: this.db.getRepository<File>("file"),
             posts: this.db.getRepository<Post>("post")
         }
-        this.sinkron = new Sinkron({ db: config.sinkron.db })
-        this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
-        this.channels = new ChannelServer({})
+        this.sinkron = new SinkronClient(config.sinkron)
+        // this.channels = new ChannelServer({})
         this.fastify = this.createFastify()
     }
 
@@ -308,39 +306,20 @@ class App {
     }
 
     async init() {
-        await this.sinkron.init()
         await this.db.initialize()
     }
 
     async destroy() {
         await this.db.destroy()
-        this.channels.dispose()
-        this.sinkronServer.dispose()
+        // this.channels.dispose()
     }
 
+    /*
     async handleUpgrade(
         request: IncomingMessage,
         socket: Duplex,
         head: Buffer
     ) {
-        const matchSinkron = request.url!.match(/^\/sinkron\/(.+)$/)
-        if (matchSinkron) {
-            const token = matchSinkron[1]
-            const res = await this.services.auth.verifyAuthToken(
-                this.models,
-                token
-            )
-            if (res.isOk && res.value !== null) {
-                this.sinkronServer.upgrade(request, socket, head, {
-                    id: res.value.userId
-                })
-            } else {
-                socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
-                socket.destroy()
-            }
-            return
-        }
-
         const matchChannels = request.url!.match(/^\/channels\/(.+)$/)
         if (matchChannels) {
             const token = matchChannels[1]
@@ -362,12 +341,13 @@ class App {
         socket.write("HTTP/1.1 404 Not Found\r\n\r\n")
         socket.destroy()
     }
+    */
 
     createFastify() {
         const fastify = Fastify({
             serverFactory: (handler) => {
                 const server = createServer(handler)
-                server.on("upgrade", this.handleUpgrade.bind(this))
+                // server.on("upgrade", this.handleUpgrade.bind(this))
                 return server
             }
         })
@@ -451,7 +431,7 @@ class App {
         return fastify
     }
 
-    start(props: AppProps) {
+    start(props: AppProps = {}) {
         const { host, port } = { ...defaultAppProps, ...props }
         this.fastify.listen({ host, port }, (err) => {
             if (err) {

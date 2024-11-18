@@ -1,9 +1,8 @@
 {
-    "include": ["src/**/*"],
     "compilerOptions": {
         "strict": true,
 
-        "target": "es2015",
+        "lib": ["es2022"],
         "module": "esnext",
         "moduleResolution": "bundler",
         "esModuleInterop": true,
@@ -14,6 +13,8 @@
         "declaration": true,
         "declarationDir": "./types",
         "emitDeclarationOnly": true,
+        "target": "es2015",
+        "outDir": "build",
 
         "noImplicitAny": true,
         "noImplicitReturns": true,
