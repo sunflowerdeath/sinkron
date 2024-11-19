@@ -65,7 +65,7 @@ class PostService {
             })
         }
         const content = LoroDoc.fromSnapshot(doc.data).toJSON()
-        return Result.ok(JSON.stringify(content))
+        return Result.ok(JSON.stringify(content.root.content))
     }
 
     async publish(

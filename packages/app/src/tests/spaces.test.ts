@@ -3,45 +3,41 @@ import assert from "node:assert"
 import { LoroDoc } from "loro-crdt"
 import { v4 as uuidv4 } from "uuid"
 
-// import { Sinkron } from "sinkron"
 import { App } from "../app"
 import { User } from "../entities"
 
+import { fakeMail } from "./utils"
+
+const createDoc = () => {
+    const doc = new LoroDoc()
+    const root = doc.getMap("root")
+    root.set("isLocked", false)
+    return doc
+}
+
 describe("Spaces", () => {
-    let app: App
+    let app = new App()
     let user: User | undefined
-    // let user2
     let headers: { [key: string]: string }
 
-    beforeEach(async () => {
-        app = new App()
+    before(async () => {
         await app.init()
+    })
 
-        const res = await app.services.users.create(
-            app.models,
-            "test@sinkron.xyz"
-        )
+    after(async () => {
+        await app.destroy()
+    })
+
+    beforeEach(async () => {
+        // create random user & login
+        const res = await app.services.users.create(app.models, fakeMail())
         assert(res.isOk, "user")
         user = res.value
-
-        /*
-        const res2 = await app.services.users.create(app.models, {
-            name: "user2",
-            password: "password"
-        })
-        assert(res2.isOk)
-        user2 = res2.value
-        */
-
         const tokenRes = await app.services.auth.issueAuthToken(app.models, {
             userId: user.id
         })
         assert(tokenRes.isOk, "token")
         headers = { "x-sinkron-auth-token": tokenRes.value.token }
-    })
-
-    afterEach(async () => {
-        await app.destroy()
     })
 
     it("create, delete", async () => {
@@ -96,9 +92,7 @@ describe("Spaces", () => {
         // create doc
         const docId = uuidv4()
         const col = `spaces/${space.id}`
-        const doc = new LoroDoc()
-        // TODO
-        // doc.isLocked = false
+        const doc = createDoc()
         const res2 = await app.sinkron.createDocument({
             id: docId,
             col,
@@ -112,23 +106,23 @@ describe("Spaces", () => {
             url: `/spaces/${space.id}/lock/${docId}`,
             headers
         })
-        assert.strictEqual(res3.statusCode, 200, "locked")
+        assert.strictEqual(res3.statusCode, 200, "lock")
 
         // check is locked
         // TODO
         // const res4 = await app.sinkron.checkDocumentPermission({
-            // id: docId,
-            // user: user!.id,
-            // action: Action.update
+        // id: docId,
+        // user: user!.id,
+        // action: Action.update
         // })
         // assert(res4.isOk, "check permissions")
         // assert(!res4.value, "update not permitted")
 
         // TODO
         // const res5 = await app.sinkron.checkDocumentPermission({
-            // id: docId,
-            // user: user!.id,
-            // action: Action.delete
+        // id: docId,
+        // user: user!.id,
+        // action: Action.delete
         // })
         // assert(res5.isOk, "check permissions")
         // assert(!res5.value, "delete not permitted")
@@ -136,9 +130,8 @@ describe("Spaces", () => {
         const res6 = await app.sinkron.getDocument({ id: docId, col })
         assert(res6.isOk)
         assert(res6.value !== null, "doc")
-        // const lockedDoc = LoroDoc.fromSnapshot(res6.value.data!)
-        // TODO
-        // assert("isLocked" in lockedDoc && lockedDoc.isLocked, "is locked")
+        const lockedDoc = LoroDoc.fromSnapshot(res6.value.data!)
+        assert(lockedDoc.getMap("root").get("isLocked"), "isLocked=true")
 
         // unlock
         const res7 = await app.fastify.inject({
@@ -146,14 +139,14 @@ describe("Spaces", () => {
             url: `/spaces/${space.id}/unlock/${docId}`,
             headers
         })
-        assert.strictEqual(res7.statusCode, 200, "unlocked")
+        assert.strictEqual(res7.statusCode, 200, "unlock")
 
         // check is unlocked
         // TODO
         // const res8 = await app.sinkron.checkDocumentPermission({
-            // id: docId,
-            // user: user!.id,
-            // action: Action.update
+        // id: docId,
+        // user: user!.id,
+        // action: Action.update
         // })
         // assert(res8.isOk, "check permissions")
         // assert(res8.value, "permitted")
@@ -161,12 +154,8 @@ describe("Spaces", () => {
         const res9 = await app.sinkron.getDocument({ id: docId, col })
         assert(res9.isOk)
         assert(res9.value !== null, "doc")
-        // const unlockedDoc = LoroDoc.fromSnapshot(res6.value.data!)
-        // TODO
-        // assert(
-            // "isLocked" in unlockedDoc && !unlockedDoc.isLocked,
-            // "is unlocked"
-        // )
+        const unlockedDoc = LoroDoc.fromSnapshot(res9.value.data!)
+        assert(!unlockedDoc.getMap("root").get("isLocked"), "isLocked=false")
     })
 
     it("members update / remove", async () => {
@@ -182,7 +171,7 @@ describe("Spaces", () => {
 
         const createUserRes = await app.services.users.create(
             app.models,
-            "user@sinkron.xyz"
+            fakeMail()
         )
         assert(createUserRes.isOk, "create user")
         const memberUser = createUserRes.value

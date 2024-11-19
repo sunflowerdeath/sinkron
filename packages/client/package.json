@@ -5,13 +5,9 @@
     "scripts": {
         "lint": "oxlint -c ./oxlintrc.json src",
         "build": "tsc && NODE_ENV=production rspack --config rspack.config.js",
-        "test:sinkron": "SINKRON_CONFIG=$(cat config.test.json) docker compose -f ./test-compose.yml up -d --build --renew-anon-volumes --force-recreate",
-        "test:build": "rspack --config rspack.config.test.js",
-        "test:run": "mocha ./build/test.js",
-        "test": "pnpm test:sinkron && pnpm test:build && pnpm test:run",
-        "benchmark:sinkron:perf": "RUST_LOG=sinkron=warn SINKRON_CONFIG=$(cat config.benchmark.json) sudo -E flamegraph -- ../../rust/target/benchmark/sinkron",
-        "benchmark:sinkron": "SINKRON_CONFIG=$(cat config.benchmark.json) ../../rust/target/release/sinkron",
-        "benchmark:client": "rspack --config rspack.config.benchmark.js && node ./build/benchmark.js"
+        "test": "sh ./scripts/test.sh",
+        "benchmark:client": "sh ./scripts/benchmark_client.sh",
+        "benchmark:server": "sh ./scripts/benchmark_server.sh"
     },
     "keywords": [],
     "author": "sunflowerdeath",
@@ -35,12 +31,11 @@
         "js-base64": "^3.7.7",
         "lodash": "^4.17.21",
         "lodash-es": "^4.17.21",
-        "loro-crdt": "^1.0.8",
+        "loro-crdt": "^1.1.3",
         "mobx": "^6.13.3",
         "nanoevents": "^7.0.1",
         "nanoid": "^4.0.2",
         "pino": "^9.5.0",
-        "sinkron-protocol": "workspace:*",
         "uuid": "^9.0.1"
     }
 }

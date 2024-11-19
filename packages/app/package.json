@@ -6,15 +6,10 @@
     "scripts": {
         "lint": "oxlint src",
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
-        "migrate:app": "typeorm migration:run -d ./build/app-db.js",
-        "migrate:sinkron": "typeorm migration:run -d ./build/sinkron-db.js",
-        "migrate": "pnpm migrate:app && pnpm migrate:sinkron",
+        "migrate": "typeorm migration:run -d ./build/db.js",
         "start": "pnpm migrate && node ./build/main.js",
         "dev": "SINKRON_CONFIG=$(cat ./config.dev.json) pnpm start",
-        "test:db": "docker compose -f ./postgres-compose.yml up -d --force-recreate",
-        "test:build": "rspack --config=rspack.config.test.js",
-        "test:run": "SINKRON_CONFIG=$(cat config.test.json) mocha ./build/test.js",
-        "test": "pnpm test:db && pnpm test:build && pnpm test:run"
+        "test": "sh ./scripts/test.sh"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
@@ -30,7 +25,6 @@
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
-        "@automerge/automerge": "^2.2.8",
         "@aws-sdk/client-s3": "^3.668.0",
         "@fastify/cors": "^10.0.1",
         "@sinkron/client": "workspace:*",

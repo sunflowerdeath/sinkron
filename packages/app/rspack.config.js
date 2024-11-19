@@ -18,6 +18,10 @@ const rules = [
 ]
 
 const baseConfig = {
+    output: {
+        path: path.resolve(__dirname, "./build"),
+        filename: "[name].js"
+    },
     mode: isProduction ? "production" : "development",
     target: "node",
     externals: [nodeExternals({ additionalModuleDirs: ["../node_modules"] })],
@@ -35,17 +39,13 @@ const appConfig = {
     ...baseConfig,
     entry: {
         main: "./src/index.ts"
-    },
-    output: {
-        path: path.resolve(__dirname, "./build"),
-        filename: "[name].js"
     }
 }
 
 const dbConfig = {
     ...baseConfig,
     entry: {
-        db: "./src/db/app.ts"
+        db: "./src/db.ts"
     },
     output: {
         path: path.resolve(__dirname, "./build"),
@@ -54,4 +54,16 @@ const dbConfig = {
     }
 }
 
-module.exports = [appConfig, dbConfig]
+const testConfig = {
+    ...baseConfig,
+    entry: {
+        test: [
+            "./src/tests/users.test.ts",
+            "./src/tests/spaces.test.ts",
+            "./src/tests/invites.test.ts",
+            "./src/tests/posts.test.ts"
+        ]
+    }
+}
+
+module.exports = [appConfig, dbConfig, testConfig]

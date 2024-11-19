@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+    postgres_sinkron:
+        image: postgres:17-alpine
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_DB=sinkron
+        command: ["postgres", "-c", "log_statement=all"]
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d sinkron"]
+            interval: 3s
+            retries: 3
+            start_period: 3s
+            timeout: 3s
+
+    sinkron:
+        build: ../../rust
+        environment:
+            - SINKRON_CONFIG=${SINKRON_CONFIG}
+            - RUST_LOG=sinkron=trace
+        depends_on:
+            postgres:
+                condition: service_healthy
+                restart: true
+        ports:
+            - 3001:80
+
+    postgres:
+        image: postgres:17-alpine
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_DB=sinkron
+        command: ["postgres", "-c", "log_statement=all"]
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d sinkron"]
+            interval: 3s
+            retries: 3
+            start_period: 3s
+            timeout: 3s
+        ports:
+            - 5001:5432

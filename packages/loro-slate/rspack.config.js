@@ -26,7 +26,7 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, "./build"),
         filename: "[name].js",
-        library: { type: "module" }
+        library: { type: "commonjs" }
     },
     // target: "web",
     resolve: {

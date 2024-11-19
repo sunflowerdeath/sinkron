@@ -18,251 +18,8 @@ importers:
         specifier: ^5.6.3
         version: 5.6.3
 
-  packages/-app:
-    dependencies:
-      '@automerge/automerge':
-        specifier: ^2.2.8
-        version: 2.2.8
-      '@aws-sdk/client-s3':
-        specifier: ^3.668.0
-        version: 3.674.0
-      '@fastify/cors':
-        specifier: ^10.0.1
-        version: 10.0.1
-      ajv:
-        specifier: ^8.17.1
-        version: 8.17.1
-      bowser:
-        specifier: ^2.11.0
-        version: 2.11.0
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.1.0
-      fastify:
-        specifier: ^5.0.0
-        version: 5.0.0
-      lodash:
-        specifier: ^4.17.21
-        version: 4.17.21
-      mkdirp:
-        specifier: ^3.0.1
-        version: 3.0.1
-      nodemailer:
-        specifier: ^6.9.15
-        version: 6.9.15
-      pg:
-        specifier: ^8.13.0
-        version: 8.13.0
-      pino:
-        specifier: ^8.21.0
-        version: 8.21.0
-      sharp:
-        specifier: ^0.33.5
-        version: 0.33.5
-      sinkron:
-        specifier: workspace:*
-        version: link:../-sinkron
-      typeorm:
-        specifier: ^0.3.20
-        version: 0.3.20(pg@8.13.0)
-      uuid:
-        specifier: ^9.0.1
-        version: 9.0.1
-    devDependencies:
-      '@rspack/cli':
-        specifier: ^1.0.13
-        version: 1.0.13(@rspack/core@1.0.13)(@types/express@4.17.21)
-      '@rspack/core':
-        specifier: ^1.0.13
-        version: 1.0.13
-      '@types/lodash':
-        specifier: ^4.17.10
-        version: 4.17.13
-      '@types/mocha':
-        specifier: ^10.0.9
-        version: 10.0.9
-      '@types/node':
-        specifier: ^18.19.55
-        version: 18.19.56
-      '@types/nodemailer':
-        specifier: ^6.4.16
-        version: 6.4.16
-      '@types/uuid':
-        specifier: ^9.0.8
-        version: 9.0.8
-      mocha:
-        specifier: ^10.7.3
-        version: 10.7.3
-      webpack-node-externals:
-        specifier: ^3.0.0
-        version: 3.0.0
-
-  packages/-benchmark:
-    dependencies:
-      '@automerge/automerge':
-        specifier: ^2.2.8
-        version: 2.2.8
-      lodash:
-        specifier: ^4.17.21
-        version: 4.17.21
-      pino:
-        specifier: ^8.11.0
-        version: 8.21.0
-      pino-pretty:
-        specifier: ^10.3.1
-        version: 10.3.1
-      sinkron:
-        specifier: workspace:*
-        version: link:../-sinkron
-      sinkron-client:
-        specifier: workspace:*
-        version: link:../-client
-      uuid:
-        specifier: ^9.0.0
-        version: 9.0.1
-      ws:
-        specifier: ^8.11.0
-        version: 8.18.0
-    devDependencies:
-      '@rspack/cli':
-        specifier: ^1.0.13
-        version: 1.0.13(@rspack/core@1.0.13)(@types/express@4.17.21)
-      '@rspack/core':
-        specifier: ^1.0.13
-        version: 1.0.13
-      '@types/lodash':
-        specifier: ^4.14.202
-        version: 4.17.13
-      '@types/node':
-        specifier: ^18.11.9
-        version: 18.19.56
-      '@types/ws':
-        specifier: ^8.5.7
-        version: 8.5.12
-      webpack-node-externals:
-        specifier: ^3.0.0
-        version: 3.0.0
-
-  packages/-client:
-    dependencies:
-      '@automerge/automerge':
-        specifier: ^2.2.8
-        version: 2.2.8
-      date-fns:
-        specifier: ^3.6.0
-        version: 3.6.0
-      js-base64:
-        specifier: ^3.7.7
-        version: 3.7.7
-      lodash-es:
-        specifier: ^4.17.21
-        version: 4.17.21
-      mobx:
-        specifier: ^6.13.3
-        version: 6.13.5
-      nanoevents:
-        specifier: ^7.0.1
-        version: 7.0.1
-      nanoid:
-        specifier: ^4.0.2
-        version: 4.0.2
-      pino:
-        specifier: ^8.21.0
-        version: 8.21.0
-      pino-pretty:
-        specifier: ^10.3.1
-        version: 10.3.1
-      sinkron-protocol:
-        specifier: workspace:*
-        version: link:../-protocol
-      uuid:
-        specifier: ^9.0.1
-        version: 9.0.1
-    devDependencies:
-      '@rspack/cli':
-        specifier: ^1.0.13
-        version: 1.0.13(@rspack/core@1.0.13)(@types/express@4.17.21)
-      '@rspack/core':
-        specifier: ^1.0.13
-        version: 1.0.13
-      '@types/lodash-es':
-        specifier: ^4.17.12
-        version: 4.17.12
-      '@types/uuid':
-        specifier: ^9.0.8
-        version: 9.0.8
-
-  packages/-protocol: {}
-
-  packages/-sinkron:
-    dependencies:
-      '@automerge/automerge':
-        specifier: ^2.2.8
-        version: 2.2.8
-      ajv:
-        specifier: ^8.17.1
-        version: 8.17.1
-      date-fns:
-        specifier: ^2.30.0
-        version: 2.30.0
-      lodash:
-        specifier: ^4.17.21
-        version: 4.17.21
-      lru-cache:
-        specifier: ^11.0.1
-        version: 11.0.1
-      pino:
-        specifier: ^8.21.0
-        version: 8.21.0
-      pino-pretty:
-        specifier: ^10.3.1
-        version: 10.3.1
-      typeorm:
-        specifier: ^0.3.20
-        version: 0.3.20(pg@8.13.0)
-      uuid:
-        specifier: ^9.0.1
-        version: 9.0.1
-      ws:
-        specifier: ^8.18.0
-        version: 8.18.0
-    devDependencies:
-      '@rspack/cli':
-        specifier: ^1.0.13
-        version: 1.0.13(@rspack/core@1.0.13)(@types/express@4.17.21)
-      '@rspack/core':
-        specifier: ^1.0.13
-        version: 1.0.13
-      '@types/lodash':
-        specifier: ^4.17.10
-        version: 4.17.13
-      '@types/mocha':
-        specifier: ^10.0.9
-        version: 10.0.9
-      '@types/node':
-        specifier: ^18.19.55
-        version: 18.19.56
-      '@types/uuid':
-        specifier: ^9.0.8
-        version: 9.0.8
-      '@types/ws':
-        specifier: ^8.5.12
-        version: 8.5.12
-      mocha:
-        specifier: ^10.7.3
-        version: 10.7.3
-      sinkron-protocol:
-        specifier: workspace:*
-        version: link:../-protocol
-      webpack-node-externals:
-        specifier: ^3.0.0
-        version: 3.0.0
-
   packages/app:
     dependencies:
-      '@automerge/automerge':
-        specifier: ^2.2.8
-        version: 2.2.8
       '@aws-sdk/client-s3':
         specifier: ^3.668.0
         version: 3.674.0
@@ -370,8 +127,8 @@ importers:
         specifier: ^4.17.21
         version: 4.17.21
       loro-crdt:
-        specifier: ^1.0.8
-        version: 1.0.8
+        specifier: ^1.1.3
+        version: 1.1.3
       mobx:
         specifier: ^6.13.3
         version: 6.13.5
@@ -384,9 +141,6 @@ importers:
       pino:
         specifier: ^9.5.0
         version: 9.5.0
-      sinkron-protocol:
-        specifier: workspace:*
-        version: link:../-protocol
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
@@ -418,9 +172,6 @@ importers:
 
   packages/front:
     dependencies:
-      '@automerge/automerge':
-        specifier: ^2.2.8
-        version: 2.2.8
       '@maskito/core':
         specifier: ^2.5.0
         version: 2.5.0
@@ -430,6 +181,12 @@ importers:
       '@material-design-icons/svg':
         specifier: ^0.14.13
         version: 0.14.13
+      '@sinkron/client':
+        specifier: workspace:*
+        version: link:../client
+      '@sinkron/loro-slate':
+        specifier: workspace:*
+        version: link:../loro-slate
       ajv:
         specifier: ^8.17.1
         version: 8.17.1
@@ -443,8 +200,8 @@ importers:
         specifier: ^4.17.21
         version: 4.17.21
       loro-crdt:
-        specifier: ^1.0.8
-        version: 1.0.8
+        specifier: ^1.1.3
+        version: 1.1.3
       mobx:
         specifier: ^6.13.3
         version: 6.13.5
@@ -478,9 +235,6 @@ importers:
       react-use:
         specifier: ^17.5.1
         version: 17.5.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      sinkron-client:
-        specifier: workspace:*
-        version: link:../-client
       slate:
         specifier: ^0.110.2
         version: 0.110.2
@@ -531,8 +285,8 @@ importers:
         specifier: ^22.9.0
         version: 22.9.0
       loro-crdt:
-        specifier: ^1.1.2
-        version: 1.1.2
+        specifier: ^1.1.3
+        version: 1.1.3
       slate:
         specifier: ^0.110.2
         version: 0.110.2
@@ -561,9 +315,6 @@ importers:
         version: 2.0.3
 
 packages:
-
-  '@automerge/automerge@2.2.8':
-    resolution: {integrity: sha512-kP6Z9lIkNeIGe/jhF8SUQAgUMwVjtXCBL0eZEgQGCoWvPNTPcg8fnQco28XkYBrfkkuqiEUAbdHhJmSp0y79ug==}
 
   '@aws-crypto/crc32@5.2.0':
     resolution: {integrity: sha512-nLbCWqQNgUiwwtFsen1AdzAtvuLRsQS8rYgMuxCrdKf9kOssamGLuPwyTY9wyYblNr9+1XM8v6zoDTPPSIeANg==}
@@ -1486,9 +1237,6 @@ packages:
   '@types/uuid@9.0.8':
     resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
 
-  '@types/ws@8.5.12':
-    resolution: {integrity: sha512-3tPRkv1EtkDpzlgyKyI8pGsGZAGPEaXeu0DOj5DI25Ja91bdAYddYHbADRYVrZMRbfW+1l5YwXVDKohDJNQxkQ==}
-
   '@types/ws@8.5.13':
     resolution: {integrity: sha512-osM/gWBTPKgHV8XkTunnegTRIsvF6owmf5w+JtAfOw472dptdm0dlGv4xCt6GwQRcC2XVOvvRE/0bAoQcL2QkA==}
 
@@ -2389,12 +2137,6 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
-  loro-crdt@1.0.8:
-    resolution: {integrity: sha512-8Qbt7klEs4CslDZ4/GsEhq6kVpHQcaz1kNUXdx/i4MP9y1M9/Qnzfamu5fHWmSe4qHOk3dzOhLYY1/Wt8UsaMA==}
-
-  loro-crdt@1.1.2:
-    resolution: {integrity: sha512-+waTg97ttmMN3LvqmM3X5dg5JGFP18y/nB4a8N9Zh1c06Sii/NSkmuk1IHNok3b8pwBiDSqz9ZcoUI5LfxcsRw==}
-
   loro-crdt@1.1.3:
     resolution: {integrity: sha512-B/tsQysTHSFMoiHqn5DTXuDAnOvSq2AGGbnjD+AmJBP9HRObOXa9lXlGsLyaArkpwa6LDehzz0euiJU9/KH4Sw==}
 
@@ -2403,10 +2145,6 @@ packages:
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
-
-  lru-cache@11.0.1:
-    resolution: {integrity: sha512-CgeuL5uom6j/ZVrg7G/+1IXqRY8JXX4Hghfy5YE0EhoYQWvndP1kufu58cmZLNIDKnRhZrXfdS9urVWx98AipQ==}
-    engines: {node: 20 || >=22}
 
   mdn-data@2.0.14:
     resolution: {integrity: sha512-dn6wd0uw5GsdswPFfsgMp5NSB0/aDe6fK94YJV/AJDYXL6HVLWBsxeq7js7Ad+mU2K9LAlwpk6kN2D5mwCPVow==}
@@ -3563,10 +3301,6 @@ packages:
     engines: {node: '>=10'}
 
 snapshots:
-
-  '@automerge/automerge@2.2.8':
-    dependencies:
-      uuid: 9.0.1
 
   '@aws-crypto/crc32@5.2.0':
     dependencies:
@@ -4944,10 +4678,6 @@ snapshots:
 
   '@types/uuid@9.0.8': {}
 
-  '@types/ws@8.5.12':
-    dependencies:
-      '@types/node': 18.19.56
-
   '@types/ws@8.5.13':
     dependencies:
       '@types/node': 18.19.56
@@ -5829,10 +5559,6 @@ snapshots:
     dependencies:
       js-tokens: 4.0.0
 
-  loro-crdt@1.0.8: {}
-
-  loro-crdt@1.1.2: {}
-
   loro-crdt@1.1.3: {}
 
   lower-case@2.0.2:
@@ -5840,8 +5566,6 @@ snapshots:
       tslib: 2.8.0
 
   lru-cache@10.4.3: {}
-
-  lru-cache@11.0.1: {}
 
   mdn-data@2.0.14: {}
 

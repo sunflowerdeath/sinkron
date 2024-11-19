@@ -1,5 +1,12 @@
-import type { DbConfig } from "./db/dataSource"
 import type { S3Config } from "./files/s3"
+
+export type DbConfig = {
+    host: string
+    port: number
+    username: string
+    password: string
+    database: string
+}
 
 export type StorageConfig =
     | { type: "local"; path: string }

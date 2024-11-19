@@ -9,6 +9,8 @@
         "test:run": "mocha ./build/test.js",
         "test": "pnpm test:build && pnpm test:run"
     },
+    "main": "build/main.js",
+    "types": "types/index.d.ts",
     "keywords": [],
     "author": "sunflowerdeath",
     "license": "Unlicense",
@@ -20,7 +22,7 @@
     },
     "dependencies": {
         "@types/node": "^22.9.0",
-        "loro-crdt": "^1.1.2",
+        "loro-crdt": "^1.1.3",
         "slate": "^0.110.2"
     }
 }

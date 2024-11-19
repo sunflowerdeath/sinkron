@@ -1,23 +1,14 @@
 {
     "db": {
         "host": "localhost",
-        "port": 5002,
-        "username": "user",
+        "port": 5001,
+        "username": "postgres",
         "password": "password",
-        "database": "sinkron_app",
-        "synchronize": true,
-        "dropSchema": true
+        "database": "sinkron"
     },
     "sinkron": {
-        "db": {
-            "host": "localhost",
-            "port": 5001,
-            "username": "user",
-            "password": "password",
-            "database": "sinkron",
-            "synchronize": true,
-            "dropSchema": true
-        }
+        "url": "http://localhost:3001",
+        "token": "SINKRON_API_TOKEN"
     },
     "mail": {
         "type": "console"

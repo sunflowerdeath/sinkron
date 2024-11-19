@@ -40,7 +40,6 @@ export type SpaceMemberView = {
 export type LockDocumentProps = {
     spaceId: string
     docId: string
-    colId: string
     lock: boolean
 }
 
@@ -398,13 +397,13 @@ class SpaceService {
     async lockDocument({
         spaceId,
         docId,
-        colId,
         lock
     }: LockDocumentProps): Promise<ResultType<true, RequestError>> {
+        const col = `spaces/${spaceId}`
         const res =
             await this.app.sinkron.updateDocumentPermissionsWithCallback({
                 id: docId,
-                col: colId,
+                col,
                 cb: (p) => {
                     const group = role.group(`spaces/${spaceId}/members`)
                     if (lock) {
@@ -425,7 +424,7 @@ class SpaceService {
 
         const updateRes = await this.app.sinkron.updateDocumentWithCallback({
             id: docId,
-            col: colId,
+            col,
             cb: (doc) => {
                 doc.getMap("root").set("isLocked", lock)
             }

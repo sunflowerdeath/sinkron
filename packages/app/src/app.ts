@@ -9,7 +9,7 @@ import Bowser from "bowser"
 import cors from "@fastify/cors"
 import { SinkronClient } from "@sinkron/client/lib/client"
 
-import dataSource from "./db/app"
+import dataSource from "./db"
 import { config, SinkronAppConfig } from "./config"
 import {
     User,

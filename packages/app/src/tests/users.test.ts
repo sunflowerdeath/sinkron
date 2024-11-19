@@ -2,15 +2,16 @@ import assert from "node:assert"
 
 import { App } from "../app"
 
-describe("Users", () => {
-    let app: App
+import { fakeMail } from "./utils"
 
-    beforeEach(async () => {
-        app = new App()
+describe("Users", () => {
+    let app = new App()
+
+    before(async () => {
         await app.init()
     })
 
-    afterEach(async () => {
+    after(async () => {
         await app.destroy()
     })
 
@@ -18,9 +19,9 @@ describe("Users", () => {
         const res = await app.fastify.inject({
             url: "/login",
             method: "POST",
-            payload: { email: "test@sinkron.xyz" }
+            payload: { email: fakeMail() }
         })
-        assert.strictEqual(res.statusCode, 200, "login is 200")
+        assert.strictEqual(res.statusCode, 200, "login ok")
         const { id } = JSON.parse(res.payload)
 
         const code = app.services.auth.lastCode
@@ -39,7 +40,7 @@ describe("Users", () => {
         assert.strictEqual(res3.statusCode, 200, "correct code")
         const { token, user } = JSON.parse(res3.payload)
         assert(token !== undefined, "set auth token")
-        const headers = { 'x-sinkron-auth-token': token }
+        const headers = { "x-sinkron-auth-token": token }
 
         const res4 = await app.fastify.inject({
             method: "GET",
@@ -61,11 +62,11 @@ describe("Users", () => {
         assert.strictEqual(res6.statusCode, 401, "profile is 401")
     })
 
-    const login = async () => {
+    const login = async (email: string) => {
         const res = await app.fastify.inject({
             method: "POST",
             url: "/login",
-            payload: { email: "test@sinkron.xyz" }
+            payload: { email }
         })
         const { id } = JSON.parse(res.payload)
         const res2 = await app.fastify.inject({
@@ -74,12 +75,12 @@ describe("Users", () => {
             payload: { id, code: app.services.auth.lastCode }
         })
         const { token } = JSON.parse(res2.payload)
-        const headers = { 'x-sinkron-auth-token': token }
+        const headers = { "x-sinkron-auth-token": token }
         return { headers }
     }
 
     it("logout", async () => {
-        const session = await login()
+        const session = await login(fakeMail())
 
         const res = await app.fastify.inject({
             method: "POST",
@@ -93,12 +94,13 @@ describe("Users", () => {
             url: "/profile",
             headers: session.headers
         })
-        assert.strictEqual(res2.statusCode, 401, "profile not ok")
+        assert.strictEqual(res2.statusCode, 401, "401")
     })
 
     it("sessions", async () => {
-        await login()
-        const session2 = await login()
+        const email = fakeMail()
+        await login(email)
+        const session2 = await login(email)
 
         const res = await app.fastify.inject({
             method: "GET",
