@@ -53,11 +53,6 @@ const rules = [
 ]
 
 const plugins = [
-    new DefinePlugin({
-        // bug in rspack@1.0.0 mode=production not working
-        // set mode to "none" and define manually
-        "process.env.NODE_ENV": isProduction ? '"production"' : '"development"'
-    }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
         favicon: "src/favicon.ico",
@@ -86,9 +81,8 @@ module.exports = {
         publicPath: isTauri ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[fullhash].js"
     },
-    mode: "none", //isProduction ? "production" : "development", // "none",
     optimization: {
-        minimize: false // isProduction
+        minimize: isProduction
     },
     target: "web",
     resolve: {

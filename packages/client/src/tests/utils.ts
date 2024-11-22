@@ -1,7 +1,7 @@
 import assert from "node:assert"
 import { inspect } from "node:util"
 
-import { isMatch } from "lodash"
+import { isMatch } from "lodash-es"
 
 const assertIsMatch = (a: object, b: object) => {
     const match = isMatch(a, b)

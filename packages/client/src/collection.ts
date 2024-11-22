@@ -9,9 +9,11 @@ import {
     makeAutoObservable,
     observable,
     action,
-    computed
+    computed,
+    createAtom,
+    IAtom
 } from "mobx"
-import { debounce } from "lodash-es"
+import debounce from "lodash-es/debounce"
 import { parseISO } from "date-fns"
 
 import { Op } from "./protocol"
@@ -110,8 +112,58 @@ const autoReconnect = (t: Transport) => {
     }
 }
 
+const L = LoroDoc.prototype
+
+class ObservableLoroDoc {
+    #doc: LoroDoc
+    #atom: IAtom
+
+    constructor(doc: LoroDoc | undefined) {
+        this.#doc = doc === undefined ? new LoroDoc() : doc
+        this.#atom = createAtom("ObservableLoroDoc")
+    }
+
+    get doc() {
+        this.#atom.reportObserved()
+        return this.#doc
+    }
+
+    change(cb: (doc: LoroDoc) => void) {
+        cb(this.#doc)
+        this.#atom.reportChanged()
+    }
+
+    export(...args: Parameters<typeof L.export>): ReturnType<typeof L.export> {
+        this.#atom.reportObserved()
+        return this.#doc.export(...args)
+    }
+
+    fork(...args: Parameters<typeof L.fork>): ObservableLoroDoc {
+        this.#atom.reportObserved()
+        return new ObservableLoroDoc(this.#doc.fork(...args))
+    }
+
+    import(...args: Parameters<typeof L.import>): ReturnType<typeof L.import> {
+        this.#atom.reportChanged()
+        return this.#doc.import(...args)
+    }
+
+    toJSON(...args: Parameters<typeof L.toJSON>): ReturnType<typeof L.toJSON> {
+        this.#atom.reportObserved()
+        return this.#doc.toJSON(...args)
+    }
+
+    version(
+        ...args: Parameters<typeof L.version>
+    ): ReturnType<typeof L.version> {
+        this.#atom.reportObserved()
+        return this.#doc.version(...args)
+    }
+}
+
+
 // Apply all missing changes from `fromDoc` to `toDoc`
-const mergeChanges = (toDoc: LoroDoc, fromDoc: LoroDoc) => {
+const mergeChanges = (toDoc: ObservableLoroDoc, fromDoc: ObservableLoroDoc) => {
     const missingChanges = fromDoc.export({
         mode: "update",
         from: toDoc.version()
@@ -120,7 +172,10 @@ const mergeChanges = (toDoc: LoroDoc, fromDoc: LoroDoc) => {
 }
 
 // Check if `docA` has any changes that are not present in `docB`
-const hasChanges = (docA: LoroDoc, docB: LoroDoc): boolean => {
+const hasChanges = (
+    docA: ObservableLoroDoc,
+    docB: ObservableLoroDoc
+): boolean => {
     /* - -1: a < b
      * - 0: a == b
      * - 1: a > b
@@ -130,7 +185,7 @@ const hasChanges = (docA: LoroDoc, docB: LoroDoc): boolean => {
     return res === 1 || res === undefined
 }
 
-const loroToBase64 = (doc: LoroDoc) => {
+const loroToBase64 = (doc: ObservableLoroDoc) => {
     const snapshot = doc.export({ mode: "snapshot" })
     return Base64.fromUint8Array(snapshot)
 }
@@ -138,13 +193,13 @@ const loroToBase64 = (doc: LoroDoc) => {
 const loroFromBase64 = (data: string) => {
     const doc = new LoroDoc()
     doc.import(Base64.toUint8Array(data))
-    return doc
+    return new ObservableLoroDoc(doc)
 }
 
 type StoredItem = {
     id: string
-    remote: LoroDoc | null
-    local: LoroDoc | null
+    remote: ObservableLoroDoc | null
+    local: ObservableLoroDoc | null
     createdAt?: Date
     updatedAt?: Date
     localUpdatedAt?: Date
@@ -303,8 +358,8 @@ export enum ItemState {
 
 interface ItemInitialValues {
     id: string
-    remote: LoroDoc | null
-    local: LoroDoc | null
+    remote: ObservableLoroDoc | null
+    local: ObservableLoroDoc | null
     state: ItemState
     localUpdatedAt?: Date
     createdAt?: Date
@@ -317,10 +372,10 @@ export class Item<T> {
     id!: string
     // Remote version of the document. It is `null` until server acknowledges
     // creation.
-    remote!: LoroDoc | null
+    remote!: ObservableLoroDoc | null
     // Local version of the document. After deleting it remains in the
     // collection with `null` value until server acknowledges deletion.
-    local!: LoroDoc | null
+    local!: ObservableLoroDoc | null
     state!: ItemState
     // Used to sort items in when they are not in synchronized state
     localUpdatedAt?: Date = undefined
@@ -334,7 +389,7 @@ export class Item<T> {
         if (this.local === null) {
             return undefined
         } else {
-            return this.extractData?.(this.local)
+            return this.extractData?.(this.local.doc)
         }
     }
 
@@ -624,7 +679,7 @@ class SinkronCollection<T = undefined> {
             } else {
                 // If client tried to modify or delete document - should restore
                 // last known remote state
-                item.local = item.remote.fork()
+                item.local = new ObservableLoroDoc(item.remote.doc.fork())
                 item.state = ItemState.Synchronized
             }
             return
@@ -831,7 +886,7 @@ class SinkronCollection<T = undefined> {
             this.createItem({
                 id,
                 remote: null,
-                local: doc,
+                local: new ObservableLoroDoc(doc),
                 state: ItemState.Changed,
                 localUpdatedAt: new Date()
             })
@@ -850,7 +905,7 @@ class SinkronCollection<T = undefined> {
         }
 
         const version = item.local.version()
-        callback(item.local)
+        item.local.change(callback)
         if (item.local.version().compare(version) === 0) {
             // nothing changed
             return

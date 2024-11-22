@@ -1,5 +1,5 @@
 import { LoroDoc } from "loro-crdt"
-import { random, sample } from "lodash"
+import { random, sample } from "lodash-es"
 import pino, { Logger } from "pino"
 
 import { SinkronClient, Permissions } from "./client"

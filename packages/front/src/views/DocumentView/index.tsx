@@ -12,9 +12,9 @@ import {
     RenderLeafProps
 } from "slate-react"
 import { Col, Row } from "oriente"
-import { isEqual } from "lodash-es"
+import { isEqual, without } from "lodash-es"
 import { Transforms } from "slate"
-import { LoroDoc, LoroMap, LoroList } from "loro-crdt"
+import { LoroDoc, LoroMap } from "loro-crdt"
 import { fromLoro, applySlateOps } from "@sinkron/loro-slate"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
@@ -22,6 +22,7 @@ import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import env from "~/env"
+import { RootElement } from "~/types"
 import { useSpace } from "~/store"
 import { DocumentData } from "~/store/SpaceStore"
 import SelectCategoriesView from "~/views/SelectCategoriesView"
@@ -69,7 +70,8 @@ const EditorView = observer((props: EditorViewProps) => {
     const value = useMemo(() => {
         const content = doc.getMap("root").get("content")
         if (content instanceof LoroMap) {
-            return fromLoro(content).children
+            const root = fromLoro(content) as RootElement
+            return root.children
         } else {
             return []
         }
@@ -102,12 +104,11 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const isMobile = useMedia("(max-width: 1023px)")
 
-    const onRemoveCategory = (c: string) => {
+    const onRemoveCategory = (cat: string) => {
         spaceStore.changeDoc(id, (doc) => {
-            const list = doc.getMap("root").get("categories")
-            if (!(list instanceof LoroList)) return
-            const idx = list.toJSON().indexOf(c)
-            if (idx !== -1) list.delete(idx, 1)
+            const root = doc.getMap("root")
+            const categories = root.get("categories") as string[]
+            root.set("categories", without(categories, cat))
         })
     }
 
@@ -325,8 +326,8 @@ const EditorView = observer((props: EditorViewProps) => {
                     readOnly={readOnly}
                     onChange={(value) => {
                         spaceStore.collection.change(id, (doc) => {
-                            // TODO
-                            // doc.categories = value
+                            const root = doc.getMap("root")
+                            root.set("categories", value)
                         })
                     }}
                     categoryTree={spaceStore.categoryTree}
@@ -466,7 +467,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
         <EditorView
             id={id}
             data={item.data}
-            doc={item.local}
+            doc={item.local.doc}
             onChange={onChange}
             onDelete={onDelete}
         />

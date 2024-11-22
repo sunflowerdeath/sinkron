@@ -11,6 +11,7 @@ import { toLoro } from "@sinkron/loro-slate"
 import { compareDesc } from "date-fns"
 import { LoroDoc, LoroList, LoroMap } from "loro-crdt"
 import { Node } from "slate"
+import { without } from "lodash-es"
 
 import env from "~/env"
 import { Space, SpaceRole, Category, Metadata } from "~/entities"
@@ -47,13 +48,11 @@ const extractDocumentData = (doc: LoroDoc): ExtractedData => {
     if (root.get("isMeta")) {
         return { isMeta: true }
     } else {
-        const categories = root.get("categories")
         return {
             isMeta: false,
-            categories:
-                categories instanceof LoroList ? categories.toJSON() : [],
-            isPublished: Boolean(root.get("isPublished")),
-            isLocked: Boolean(root.get("isLocked"))
+            categories: root.get("categories") as string[],
+            isPublished: root.get("isPublished") as boolean,
+            isLocked: root.get("isLocked") as boolean
         }
     }
 }
@@ -71,36 +70,41 @@ export type UploadState = {
     state: IPromiseBasedObservable<object>
 }
 
+const getTextPreview = (doc: LoroDoc) => {
+    const result = { title: "", subtitle: "" }
+
+    const content = doc.getMap("root").get("content")
+    if (!(content instanceof LoroMap)) return result
+    const children = content.get("children")
+    if (!(children instanceof LoroList)) return result
+
+    if (children.length > 0) {
+        const firstChild = children.get(0).toJSON()
+        for (const item of Node.texts(firstChild)) {
+            const [text] = item
+            result.title += text.text
+            if (result.title.length >= 75) break
+        }
+    }
+
+    if (children.length > 1) {
+        outer: for (let i = 1; i < children.length; i++) {
+            const child = children.get(i).toJSON()
+            for (const item of Node.texts(child)) {
+                const [text] = item
+                result.subtitle += text.text + " "
+                if (result.subtitle.length >= 75) break outer
+            }
+        }
+    }
+
+    return result
+}
+
 const getDocumentListItemData = (
     item: Item<DocumentData>
 ): DocumentListItemData => {
-    const doc = item.local!.getMap("root")
-
-    const content = (doc.get("content") as LoroMap).toJSON()
-
-    let title = ""
-    let subtitle = ""
-
-    // TODO optimize - convert children lazily
-    try {
-        if (content.children.length > 0) {
-            const gen = Node.texts(content.children[0])
-            for (const text of gen) {
-                title += text
-                if (title.length >= 75) break
-            }
-        }
-        if (content.children.length > 1) {
-            const gen = Node.texts(content, { from: [1] })
-            for (const text of gen) {
-                subtitle += text + " "
-                if (subtitle.length >= 75) break
-            }
-        }
-    } catch {
-        // just in case
-    }
-
+    const { title, subtitle } = getTextPreview(item.local!.doc)
     return { id: item.id, item, title, subtitle }
 }
 
@@ -126,9 +130,8 @@ const createInitialDocument = (initialCategory: string | undefined) => {
         })
     )
 
-    const categories = new LoroList()
-    if (initialCategory !== undefined) categories.push(initialCategory)
-    root.setContainer("categories", categories)
+    const categories = initialCategory !== undefined ? [initialCategory] : []
+    root.set("categories", categories)
 
     root.set("isPublished", false)
     root.set("isLocked", false)
@@ -284,7 +287,7 @@ class SpaceStore {
         if (!this.metaItem || this.metaItem.local === null) {
             throw new Error("Metadata document not found!")
         }
-        return this.metaItem.local.toJSON() as Metadata
+        return this.metaItem.local.doc.getMap("root").toJSON() as Metadata
     }
 
     changeMeta(cb: (m: LoroDoc) => void) {
@@ -341,36 +344,34 @@ class SpaceStore {
 
     createCategory(data: { name: string; parent: string | null }) {
         const id = uuidv4()
-        this.setCategory(id, data)
+        this.updateCategory(id, data)
         return id
     }
 
-    setCategory(id: string, data: { name: string; parent: string | null }) {
+    updateCategory(id: string, data: { name: string; parent: string | null }) {
         this.changeMeta((meta) => {
-            const categories = meta.getMap("root").get("categories")
-            if (categories instanceof LoroMap) {
-                categories.set(id, { id, ...data })
-            }
+            const root = meta.getMap("root")
+            const categories = root.get("categories") as LoroMap
+            categories.set(id, { id, ...data })
         })
     }
 
     deleteCategory(id: string) {
         this.changeMeta((meta) => {
             // TODO if deleted category has subcategories, change their parents
-            const categories = meta.getMap("root").get("categories")
-            if (categories instanceof LoroMap) categories.delete(id)
+            const root = meta.getMap("root")
+            const categories = root.get("categories") as LoroMap
+            categories.delete(id)
         })
 
         this.collection.items.forEach((item) => {
             if (!item.data) return
             if (item.data.isMeta) return
-            const idx = item.data.categories.indexOf(id)
-            if (idx !== -1) {
+            if (item.data.categories.includes(id)) {
                 this.collection.change(item.id, (doc) => {
-                    const categories = doc.getMap("root").get("categories")
-                    if (categories instanceof LoroList) {
-                        categories.delete(idx, 1)
-                    }
+                    const root = doc.getMap("root")
+                    const categories = root.get("categories") as string[]
+                    root.set("categories", without(categories, id))
                 })
             }
         })
