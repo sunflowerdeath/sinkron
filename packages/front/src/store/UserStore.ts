@@ -1,8 +1,8 @@
 import { makeAutoObservable, reaction, autorun, toJS } from "mobx"
 import { fromPromise } from "mobx-utils"
-import { ChannelClient } from "sinkron-client"
+// import { ChannelClient } from "sinkron-client"
 
-import env from "~/env"
+// import env from "~/env"
 import { User, Space } from "~/entities"
 import { Api } from "~/api"
 import { FetchError } from "~/utils/fetchJson"
@@ -37,7 +37,7 @@ class UserStore {
     user: User
     spaceId?: string = undefined
     space?: SpaceStore = undefined
-    channel: ChannelClient
+    // channel: ChannelClient
     api: Api
 
     disposeReaction?: () => void
@@ -74,19 +74,19 @@ class UserStore {
             { fireImmediately: false }
         )
 
-        const token = this.api.getToken()
-        this.channel = new ChannelClient({
-            url: `${env.wsUrl}/channels/${token}`,
-            channel: `users/${user.id}`,
-            handler: (msg) => {
-                if (msg === "notification") {
-                    this.user.hasUnreadNotifications = true
-                }
-                if (msg === "profile") {
-                    this.fetchUser()
-                }
-            }
-        })
+        // const token = this.api.getToken()
+        // this.channel = new ChannelClient({
+            // url: `${env.wsUrl}/channels/${token}`,
+            // channel: `users/${user.id}`,
+            // handler: (msg) => {
+                // if (msg === "notification") {
+                    // this.user.hasUnreadNotifications = true
+                // }
+                // if (msg === "profile") {
+                    // this.fetchUser()
+                // }
+            // }
+        // })
     }
 
     setSpace() {
@@ -105,7 +105,7 @@ class UserStore {
         this.disposeReaction?.()
         this.stopFetchUser?.()
         this.space?.dispose()
-        this.channel.dispose()
+        // this.channel.dispose()
     }
 
     fetchUser() {

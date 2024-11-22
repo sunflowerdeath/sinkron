@@ -4,7 +4,13 @@ import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { nanoid } from "nanoid"
 import pino, { Logger } from "pino"
-import { makeObservable, makeAutoObservable, observable, action } from "mobx"
+import {
+    makeObservable,
+    makeAutoObservable,
+    observable,
+    action,
+    computed
+} from "mobx"
 import { debounce } from "lodash-es"
 import { parseISO } from "date-fns"
 
@@ -104,14 +110,6 @@ const autoReconnect = (t: Transport) => {
     }
 }
 
-// Clone document to new independent instance
-const cloneLoro = (doc: LoroDoc): LoroDoc => {
-    const snapshot = doc.export({ mode: "snapshot" })
-    const clone = new LoroDoc()
-    clone.import(snapshot)
-    return clone
-}
-
 // Apply all missing changes from `fromDoc` to `toDoc`
 const mergeChanges = (toDoc: LoroDoc, fromDoc: LoroDoc) => {
     const missingChanges = fromDoc.export({
@@ -153,7 +151,7 @@ type StoredItem = {
 }
 
 export interface CollectionStore {
-    save(id: string, item: Item, colrev: string): Promise<void>
+    save(id: string, item: Item<any>, colrev: string): Promise<void>
     delete(id: string, colrev: string): Promise<void>
     load(): Promise<{ items: StoredItem[]; colrev: string }>
     dispose(): void
@@ -215,7 +213,7 @@ class IndexedDbCollectionStore implements CollectionStore {
         localStorage.setItem(`stored_collection/${this.key}`, "-1")
     }
 
-    async save(id: string, item: Item, colrev: string) {
+    async save(id: string, item: Item<any>, colrev: string) {
         const { local, remote, localUpdatedAt, createdAt, updatedAt } = item
         const store = this.db!.transaction("items", "readwrite").objectStore(
             "items"
@@ -303,22 +301,6 @@ export enum ItemState {
     Error = 4
 }
 
-export interface Item {
-    id: string
-    // Remote version of the document. It is `null` until server acknowledges
-    // creation.
-    remote: LoroDoc | null
-    // Local version of the document. After deleting it remains in the
-    // collection with `null` value until server acknowledges deletion.
-    local: LoroDoc | null
-    state: ItemState
-    // Used to sort items in when they are not in synchronized state
-    localUpdatedAt?: Date
-    createdAt?: Date
-    updatedAt?: Date
-    sentChanges: Set<string>
-}
-
 interface ItemInitialValues {
     id: string
     remote: LoroDoc | null
@@ -329,27 +311,53 @@ interface ItemInitialValues {
     updatedAt?: Date
 }
 
-const createItem = (values: ItemInitialValues): Item =>
-    makeObservable(
-        {
-            sentChanges: new Set(),
-            localUpdatedAt: undefined,
-            createdAt: undefined,
-            updatedAt: undefined,
-            ...values
-        },
-        {
+export type ExtractData<T> = (doc: LoroDoc) => T
+
+export class Item<T> {
+    id!: string
+    // Remote version of the document. It is `null` until server acknowledges
+    // creation.
+    remote!: LoroDoc | null
+    // Local version of the document. After deleting it remains in the
+    // collection with `null` value until server acknowledges deletion.
+    local!: LoroDoc | null
+    state!: ItemState
+    // Used to sort items in when they are not in synchronized state
+    localUpdatedAt?: Date = undefined
+    createdAt?: Date = undefined
+    updatedAt?: Date = undefined
+    sentChanges: Set<string> = new Set()
+
+    extractData?: ExtractData<T> | undefined
+
+    get data() {
+        if (this.local === null) {
+            return undefined
+        } else {
+            return this.extractData?.(this.local)
+        }
+    }
+
+    constructor(
+        initialValues: ItemInitialValues,
+        extractData: ExtractData<T> | undefined = undefined
+    ) {
+        Object.assign(this, initialValues)
+        this.extractData = extractData
+        makeObservable(this, {
             remote: observable.ref,
             local: observable.ref,
             state: observable,
             createdAt: observable.ref,
             updatedAt: observable.ref,
-            localUpdatedAt: observable.ref
-        }
-    )
+            localUpdatedAt: observable.ref,
+            data: computed
+        })
+    }
+}
 
-const flushDelay = 1000
-const flushMaxWait = 2000
+const FLUSH_DELAY = 1000
+const FLUSH_MAX_WAIT = 2000
 
 // Interval between hearbeats. Should be less than disconnect timeout for being
 // inactive on the server (=60s)
@@ -364,7 +372,7 @@ export enum ConnectionStatus {
     Error = "error"
 }
 
-interface SinkronCollectionProps {
+interface SinkronCollectionProps<T> {
     url: string
     token: string
     col: string
@@ -373,6 +381,7 @@ interface SinkronCollectionProps {
     errorHandler?: (msg: SyncErrorMessage) => void
     logger?: Logger<string>
     webSocketImpl?: typeof WebSocket
+    extractData?: ExtractData<T>
 }
 
 const defaultLogger = (level = "debug"): Logger<string> => {
@@ -383,13 +392,14 @@ const defaultLogger = (level = "debug"): Logger<string> => {
     return logger
 }
 
-class SinkronCollection {
-    constructor(props: SinkronCollectionProps) {
-        const { col, store, errorHandler, logger } = props
+class SinkronCollection<T = undefined> {
+    constructor(props: SinkronCollectionProps<T>) {
+        const { col, store, errorHandler, logger, extractData } = props
         this.col = col
         this.store = store
         this.errorHandler = errorHandler
         this.logger = logger === undefined ? defaultLogger() : logger
+        this.extractData = extractData
         makeAutoObservable(this, {
             items: observable.shallow,
             transport: false,
@@ -399,8 +409,8 @@ class SinkronCollection {
             flushQueue: false,
             flushDebounced: false
         })
-        this.flushDebounced = debounce(this.flush.bind(this), flushDelay, {
-            maxWait: flushMaxWait
+        this.flushDebounced = debounce(this.flush.bind(this), FLUSH_DELAY, {
+            maxWait: FLUSH_MAX_WAIT
         })
         this.init(props)
     }
@@ -412,7 +422,8 @@ class SinkronCollection {
     errorHandler?: (msg: SyncErrorMessage) => void
 
     colrev: string = "0"
-    items: Map<string, Item> = new Map()
+    extractData?: ExtractData<T>
+    items: Map<string, Item<T>> = new Map()
     isLoaded = false
     status = ConnectionStatus.Disconnected
     initialSyncCompleted = false
@@ -436,7 +447,7 @@ class SinkronCollection {
         clearTimeout(this.disconnectTimeout)
     }
 
-    async init(props: SinkronCollectionProps) {
+    async init(props: SinkronCollectionProps<T>) {
         const { url, token, webSocketImpl } = props
 
         if (this.store) await this.loadFromStore()
@@ -484,6 +495,10 @@ class SinkronCollection {
         }
     }
 
+    createItem(initialValues: ItemInitialValues) {
+        return new Item(initialValues, this.extractData)
+    }
+
     async loadFromStore() {
         const { colrev, items } = await this.store!.load()
         this.colrev = colrev
@@ -491,7 +506,7 @@ class SinkronCollection {
             const { id, local, remote } = stored
             const isChanged =
                 local === null || remote === null || hasChanges(local, remote)
-            const item = createItem({
+            const item = this.createItem({
                 id,
                 local,
                 remote,
@@ -609,7 +624,7 @@ class SinkronCollection {
             } else {
                 // If client tried to modify or delete document - should restore
                 // last known remote state
-                item.local = cloneLoro(item.remote)
+                item.local = item.remote.fork()
                 item.state = ItemState.Synchronized
             }
             return
@@ -657,10 +672,10 @@ class SinkronCollection {
 
         const item = this.items.get(id)
         if (item === undefined || item.state === ItemState.Error) {
-            const item = createItem({
+            const item = this.createItem({
                 id,
                 remote: doc,
-                local: cloneLoro(doc),
+                local: doc.fork(),
                 state: ItemState.Synchronized,
                 updatedAt: parseISO(updatedAt),
                 createdAt: parseISO(createdAt)
@@ -813,7 +828,7 @@ class SinkronCollection {
         const id = uuidv4()
         this.items.set(
             id,
-            createItem({
+            this.createItem({
                 id,
                 remote: null,
                 local: doc,

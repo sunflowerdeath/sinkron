@@ -1,13 +1,13 @@
 mod actors;
-mod groups;
-mod api_types;
 mod db;
 mod error;
+mod groups;
 mod models;
 mod permissions;
 mod protocol;
 mod schema;
 mod sinkron;
+mod types;
 
 use std::env;
 

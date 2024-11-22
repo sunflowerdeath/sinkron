@@ -380,6 +380,22 @@ class App {
             reply.send("Sinkron API")
         })
 
+        fastify.post<{ Params: { token: string } }>(
+            "/sinkron_auth/:token",
+            async (request, reply) => {
+                const { token } = request.params
+                const res = await this.services.auth.verifyAuthToken(
+                    this.models,
+                    token
+                )
+                if (res.isOk && res.value !== null) {
+                    reply.send(res.value.userId)
+                } else {
+                    reply.code(401).send("Couldn't authorize")
+                }
+            }
+        )
+
         fastify.get<{ Params: { postId: string } }>(
             "/posts/:postId/content",
             async (request, reply) => {

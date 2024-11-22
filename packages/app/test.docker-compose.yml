@@ -7,23 +7,35 @@ services:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=password
             - POSTGRES_DB=sinkron
-        command: ["postgres", "-c", "log_statement=all"]
+        command: postgres -c log_statement=all
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres -d sinkron"]
+            test: pg_isready
             interval: 3s
             retries: 3
             start_period: 3s
             timeout: 3s
 
     sinkron:
-        build: ../../rust
+        build: ../../sinkron
         environment:
-            - SINKRON_CONFIG=${SINKRON_CONFIG}
-            - RUST_LOG=sinkron=trace
+            RUST_LOG: sinkron=trace
+            SINKRON_CONFIG: >
+                {
+                    "host": "0.0.0.0",
+                    "port": 80,
+                    "apiToken": "SINKRON_API_TOKEN",
+                    "syncAuthUrl": "-",
+                    "db": {
+                        "host": "postgres_sinkron",
+                        "port": 5432,
+                        "user": "postgres",
+                        "password": "password",
+                        "database": "sinkron"
+                    }
+                }
         depends_on:
             postgres:
                 condition: service_healthy
-                restart: true
         ports:
             - 3001:80
 
@@ -33,9 +45,9 @@ services:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=password
             - POSTGRES_DB=sinkron
-        command: ["postgres", "-c", "log_statement=all"]
+        command: postgres -c log_statement=all
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres -d sinkron"]
+            test: pg_isready
             interval: 3s
             retries: 3
             start_period: 3s

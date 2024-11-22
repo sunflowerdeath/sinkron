@@ -27,7 +27,7 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, "./lib"),
         filename: "[name].js",
-        library: { type: "commonjs" }
+        library: { type: "module" }
     },
     // target: "web",
     resolve: {

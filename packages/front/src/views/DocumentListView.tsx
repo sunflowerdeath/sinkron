@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite"
 import { useLocation, useRoute } from "wouter"
 import { Col, Row } from "oriente"
-import { ItemState } from "sinkron-client"
+import { ItemState } from "@sinkron/client/lib/collection"
 
 import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
@@ -110,7 +110,7 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
                 {subtitle}
             </Col>
             <Row gap={4}>
-                {data.item.local?.isLocked && (
+                {data.item.data?.isLocked && (
                     <Icon
                         svg={lockSvg}
                         style={{ fill: "var(--color-secondary)" }}

@@ -11,6 +11,7 @@ use axum::{
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use log::trace;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -20,13 +21,13 @@ use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::{
     ConnectMessage, GetCollectionMessage, SinkronActorMessage, SinkronHandle,
 };
-use crate::api_types::{Collection, Document};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::groups::{AddRemoveUserToGroup, GroupsApi};
 use crate::models;
 use crate::protocol::*;
 use crate::schema;
+use crate::types::{Collection, Document};
 
 type CreateCollection = models::NewCollection;
 
@@ -334,8 +335,9 @@ impl Sinkron {
     }
 
     async fn auth(&self, token: &str) -> Result<String, SinkronError> {
+        let url = "".to_string() + &self.sync_auth_url + &token;
         let req = reqwest::Client::new()
-            .post("".to_string() + &self.sync_auth_url + &token)
+            .post(url)
             .body("".to_string())
             .send()
             .await
@@ -343,13 +345,18 @@ impl Sinkron {
         if req.status() != reqwest::StatusCode::OK {
             return Err(SinkronError::auth_failed("Authentication failed"));
         }
-        let user = req.text().await.map_err(internal_error)?;
+        let Ok(user) = req.text().await else {
+            return Err(SinkronError::auth_failed("Authentication failed"));
+        };
         return Ok(user);
     }
 
     async fn handle_connect(&self, mut websocket: WebSocket, query: SyncQuery) {
         let user = match self.auth(&query.token).await {
-            Ok(user) => user,
+            Ok(user) => {
+                trace!("sinkron: authorized client as {}", user);
+                user
+            }
             Err(err) => {
                 let msg = ServerMessage::SyncError(SyncErrorMessage {
                     col: query.col,

@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { fromPromise } from "mobx-utils"
-import { ConnectionStatus } from "sinkron-client"
+import { ConnectionStatus } from "@sinkron/client/lib/collection"
 import { Col, Row, useModal } from "oriente"
 
 import { spaceRoleMap } from "~/entities"
@@ -22,7 +22,6 @@ import { useStore, useSpace } from "~/store"
 const statusMap: { [key in ConnectionStatus]: string } = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",
     [ConnectionStatus.Connected]: "Connecting...",
-    [ConnectionStatus.Sync]: "Receiving changes...",
     [ConnectionStatus.Ready]: "Connected to server",
     [ConnectionStatus.Error]: "Connection error"
 }

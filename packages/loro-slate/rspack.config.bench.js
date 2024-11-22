@@ -1,6 +1,7 @@
 const path = require("path")
 const nodeExternals = require("webpack-node-externals")
 
+const isProduction = process.env.NODE_ENV === "production"
 const src = path.resolve(__dirname, "src")
 
 const rules = [
@@ -20,22 +21,20 @@ const rules = [
 
 module.exports = {
     entry: {
-        test: [
-            "./src/tests/users.test.ts",
-            "./src/tests/spaces.test.ts",
-            "./src/tests/invites.test.ts",
-            "./src/tests/posts.test.ts"
-        ]
+        bench: "./src/bench.ts"
     },
     output: {
         path: path.resolve(__dirname, "./build")
     },
-    mode: "development",
+    mode: isProduction ? "production" : "development",
     target: "node",
     externals: [nodeExternals({ additionalModuleDirs: ["../node_modules"] })],
     resolve: {
         extensions: [".js", ".ts"]
     },
     module: { rules },
-    devtool: "cheap-module-source-map"
+    devtool: "cheap-module-source-map",
+    optimization: {
+        minimize: false
+    }
 }

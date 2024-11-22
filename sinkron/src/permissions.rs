@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::api_types::User;
+use crate::types::User;
 
 pub enum Action {
     Read,

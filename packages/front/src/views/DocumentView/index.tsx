@@ -12,9 +12,10 @@ import {
     RenderLeafProps
 } from "slate-react"
 import { Col, Row } from "oriente"
-import { without, isEqual } from "lodash-es"
-import * as Automerge from "@automerge/automerge"
+import { isEqual } from "lodash-es"
 import { Transforms } from "slate"
+import { LoroDoc, LoroMap, LoroList } from "loro-crdt"
+import { fromLoro, applySlateOps } from "@sinkron/loro-slate"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
@@ -22,8 +23,7 @@ import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import env from "~/env"
 import { useSpace } from "~/store"
-import type { Document } from "~/entities"
-import { fromAutomerge, applySlateOps } from "~/slate"
+import { DocumentData } from "~/store/SpaceStore"
 import SelectCategoriesView from "~/views/SelectCategoriesView"
 import ShareAndAccessView from "~/views/ShareAndAccessView"
 import PublishView from "~/views/PublishView"
@@ -45,13 +45,14 @@ const useForceUpdate = () => {
 
 type EditorViewProps = {
     id: string
-    doc: Automerge.Doc<Document>
+    doc: LoroDoc
+    data: DocumentData
     onChange: (editor: ReactEditor) => void
     onDelete: () => void
 }
 
 const EditorView = observer((props: EditorViewProps) => {
-    const { id, doc, onChange, onDelete } = props
+    const { id, doc, data, onChange, onDelete } = props
 
     const spaceStore = useSpace()
 
@@ -62,11 +63,16 @@ const EditorView = observer((props: EditorViewProps) => {
     )
     const editor = documentViewStore.editor
 
-    const readOnly = spaceStore.space.role === "readonly" || doc.isLocked
+    const readOnly = spaceStore.space.role === "readonly" || data.isLocked
 
     const forceUpdate = useForceUpdate()
     const value = useMemo(() => {
-        return (fromAutomerge(doc.content) as any).children
+        const content = doc.getMap("root").get("content")
+        if (content instanceof LoroMap) {
+            return fromLoro(content).children
+        } else {
+            return []
+        }
     }, [doc])
     useMemo(() => {
         if (!isEqual(editor.children, value)) {
@@ -96,6 +102,15 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const isMobile = useMedia("(max-width: 1023px)")
 
+    const onRemoveCategory = (c: string) => {
+        spaceStore.changeDoc(id, (doc) => {
+            const list = doc.getMap("root").get("categories")
+            if (!(list instanceof LoroList)) return
+            const idx = list.toJSON().indexOf(c)
+            if (idx !== -1) list.delete(idx, 1)
+        })
+    }
+
     const [showToolbar, setShowToolbar] = useState(false)
     let bottomElem
     if (showToolbar) {
@@ -113,19 +128,15 @@ const EditorView = observer((props: EditorViewProps) => {
         )
     } else {
         let categoriesList
-        if (doc.categories.length > 0) {
+        if (data.categories.length > 0) {
             categoriesList = (
                 <Row gap={8} align="center" style={{ width: "100%" }}>
                     <div style={{ overflow: "scroll" }}>
                         <CategoriesList
-                            items={doc.categories.map(
+                            items={data.categories.map(
                                 (id) => spaceStore.meta.categories[id]!
                             )}
-                            onRemove={(c) => {
-                                spaceStore.changeDoc(id, (doc) => {
-                                    doc.categories = without(doc.categories, c)
-                                })
-                            }}
+                            onRemove={onRemoveCategory}
                             readOnly={readOnly}
                         />
                     </div>
@@ -164,7 +175,7 @@ const EditorView = observer((props: EditorViewProps) => {
     }
 
     const menu = () => {
-        const isLocked = doc.isLocked
+        const isLocked = data.isLocked
         const canDelete = spaceStore.space.role !== "readonly"
 
         const canLock = ["admin", "owner"].includes(spaceStore.space.role)
@@ -210,7 +221,7 @@ const EditorView = observer((props: EditorViewProps) => {
                         Publish
                     </MenuItem>
                 )}
-                {doc.isPublished && (
+                {data.isPublished && (
                     <MenuItem onSelect={open}>Open published version</MenuItem>
                 )}
             </>
@@ -310,11 +321,12 @@ const EditorView = observer((props: EditorViewProps) => {
         if (view === "categories") {
             content = (
                 <SelectCategoriesView
-                    value={doc.categories}
+                    value={data.categories}
                     readOnly={readOnly}
                     onChange={(value) => {
                         spaceStore.collection.change(id, (doc) => {
-                            doc.categories = value
+                            // TODO
+                            // doc.categories = value
                         })
                     }}
                     categoryTree={spaceStore.categoryTree}
@@ -422,7 +434,12 @@ const DocumentView = observer((props: DocumentViewProps) => {
     const [_location, navigate] = useLocation()
 
     const item = space.collection.items.get(id)
-    if (item === undefined || item.local === null || "meta" in item.local) {
+    if (
+        item === undefined ||
+        item.local === null ||
+        item.data === undefined ||
+        item.data.isMeta
+    ) {
         return <Redirect to="/" />
     }
 
@@ -432,7 +449,10 @@ const DocumentView = observer((props: DocumentViewProps) => {
         )
         if (ops.length > 0) {
             space.changeDoc(id, (doc) => {
-                applySlateOps(doc.content, ops)
+                const content = doc.getMap("root").get("content")
+                if (content instanceof LoroMap) {
+                    applySlateOps(content, ops)
+                }
             })
         }
     }
@@ -445,6 +465,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
     return (
         <EditorView
             id={id}
+            data={item.data}
             doc={item.local}
             onChange={onChange}
             onDelete={onDelete}

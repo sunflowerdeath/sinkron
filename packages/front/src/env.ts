@@ -6,7 +6,7 @@ const wsUrl = isProductionEnv
     ? "wss://api.sinkron.xyz"
     : tauri
     ? "ws://10.0.2.2:80"
-    : `ws://${window.location.hostname}:80`
+    : `ws://${window.location.hostname}:3333/sync`
 
 const apiUrl = isProductionEnv
     ? "https://api.sinkron.xyz"

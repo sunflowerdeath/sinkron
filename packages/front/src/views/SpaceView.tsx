@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite"
 import { useMedia } from "react-use"
 import { Route, Switch, Redirect } from "wouter"
 import { useFavicon } from "react-use"
-import { ConnectionStatus } from "sinkron-client"
+import { ConnectionStatus } from "@sinkron/client/lib/collection"
 
 import defaultFaviconUrl from "../favicon.ico"
 import offFaviconUrl from "../favicon_off.ico"

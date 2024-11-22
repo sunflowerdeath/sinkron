@@ -4,9 +4,9 @@
     "description": "",
     "scripts": {
         "lint": "pnpm -r lint",
-        "app:build": "pnpm --F=sinkron-app... build",
-        "app:start": "pnpm --F=sinkron-app start",
-        "app:dev": "pnpm app:build && pnpm --F=sinkron-app dev",
+        "dev": "docker-compose -f local.docker-compose.yml up --detach --force-recreate --renew-anon-volumes",
+        "app:build": "pnpm --F=@sinkron/app... build",
+        "app:start": "pnpm --F=@sinkron/app start",
         "front:build": "pnpm --F=sinkron-front... build",
         "front:dev": "pnpm --F=sinkron-front dev",
         "test": "pnpm -r run test"

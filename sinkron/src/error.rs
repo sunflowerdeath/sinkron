@@ -1,3 +1,5 @@
+use log::debug;
+
 use crate::protocol::ErrorCode;
 
 #[derive(serde::Serialize, Debug)]
@@ -50,5 +52,6 @@ pub fn internal_error<E>(err: E) -> SinkronError
 where
     E: std::error::Error,
 {
+    debug!("internal error: {:?}", err);
     SinkronError::internal(&err.to_string())
 }

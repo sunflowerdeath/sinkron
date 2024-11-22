@@ -2,11 +2,11 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use serde::Deserialize;
 
-use crate::api_types::{Group, User};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::models;
 use crate::schema;
+use crate::types::{Group, User};
 
 #[derive(Deserialize)]
 pub struct AddRemoveUserToGroup {

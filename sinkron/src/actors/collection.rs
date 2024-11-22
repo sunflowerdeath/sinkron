@@ -9,7 +9,6 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::actors::client::ClientHandle;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
-use crate::api_types::{Collection, Document};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::groups::GroupsApi;
@@ -17,6 +16,7 @@ use crate::models;
 use crate::permissions::{Action, Permissions};
 use crate::protocol::*;
 use crate::schema;
+use crate::types::{Collection, Document};
 
 // Collection actor performs document operations over single collection,
 // then replies back with results and also broadcasts messages to all
@@ -382,7 +382,7 @@ impl CollectionActor {
             col_id: self.id.clone(),
             colrev: next_colrev,
             data: decoded,
-            permissions: &permissions
+            permissions: &permissions,
         };
         let created_at: chrono::DateTime<chrono::Utc> =
             diesel::insert_into(schema::documents::table)
@@ -414,7 +414,7 @@ impl CollectionActor {
             data: Some(data),
             col: self.id.clone(),
             colrev: next_colrev,
-            permissions
+            permissions,
         };
 
         Ok(doc)

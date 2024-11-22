@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::actors::client::ClientHandle;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::supervisor::ExitCallback;
-use crate::api_types::Collection;
+use crate::types::Collection;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::groups::GroupsApi;
