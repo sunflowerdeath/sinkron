@@ -76,7 +76,9 @@ class FieldStore<V = string, N = V> {
             this.asyncValidate.bind(this),
             asyncValidationDelay === undefined ? 100 : asyncValidationDelay
         )
-        this.change(initialValue)
+        // Assume that V should allow "undefined", when "initialValue" is
+        // not provided
+        this.change(initialValue as V)
     }
 
     on(event: string, cb: (data: any) => void) {
@@ -102,7 +104,7 @@ class FieldStore<V = string, N = V> {
     }
 
     reset() {
-        this.setValue(this.props.initialValue)
+        this.setValue(this.props.initialValue as V)
         this.emitter.emit("reset")
         this.validate()
     }

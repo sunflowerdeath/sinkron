@@ -15,6 +15,7 @@ import {
 } from "mobx"
 import debounce from "lodash-es/debounce"
 import { parseISO } from "date-fns"
+import queryString from "query-string"
 
 import { Op } from "./protocol"
 import type {
@@ -160,7 +161,6 @@ class ObservableLoroDoc {
         return this.#doc.version(...args)
     }
 }
-
 
 // Apply all missing changes from `fromDoc` to `toDoc`
 const mergeChanges = (toDoc: ObservableLoroDoc, fromDoc: ObservableLoroDoc) => {
@@ -503,13 +503,14 @@ class SinkronCollection<T = undefined> {
     }
 
     async init(props: SinkronCollectionProps<T>) {
-        const { url, token, webSocketImpl } = props
+        const { url, token, col, webSocketImpl } = props
 
         if (this.store) await this.loadFromStore()
         this.isLoaded = true
 
+        const query = queryString.stringify({ token, col, colrev: this.colrev })
         this.transport = new WebSocketTransport({
-            url: `${url}?col=${this.col}&colrev=${this.colrev}&token=${token}`,
+            url: `${url}?${query}`,
             webSocketImpl,
             logger: this.logger
         })

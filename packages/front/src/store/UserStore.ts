@@ -3,7 +3,7 @@ import { fromPromise } from "mobx-utils"
 // import { ChannelClient } from "sinkron-client"
 
 // import env from "~/env"
-import { User, Space } from "~/entities"
+import { User, Space, Invite } from "~/entities"
 import { Api } from "~/api"
 import { FetchError } from "~/utils/fetchJson"
 
@@ -76,16 +76,16 @@ class UserStore {
 
         // const token = this.api.getToken()
         // this.channel = new ChannelClient({
-            // url: `${env.wsUrl}/channels/${token}`,
-            // channel: `users/${user.id}`,
-            // handler: (msg) => {
-                // if (msg === "notification") {
-                    // this.user.hasUnreadNotifications = true
-                // }
-                // if (msg === "profile") {
-                    // this.fetchUser()
-                // }
-            // }
+        // url: `${env.wsUrl}/channels/${token}`,
+        // channel: `users/${user.id}`,
+        // handler: (msg) => {
+        // if (msg === "notification") {
+        // this.user.hasUnreadNotifications = true
+        // }
+        // if (msg === "profile") {
+        // this.fetchUser()
+        // }
+        // }
         // })
     }
 
@@ -189,13 +189,16 @@ class UserStore {
     fetchNotifications() {
         this.user.hasUnreadNotifications = false
         return fromPromise(
-            this.api.fetch({ method: "GET", url: "/notifications" })
+            this.api.fetch<{ invites: Invite[] }>({
+                method: "GET",
+                url: "/notifications"
+            })
         )
     }
 
     inviteAction(id: string, action: "accept" | "decline" | "cancel" | "hide") {
         return fromPromise(
-            this.api.fetch({
+            this.api.fetch<Invite>({
                 method: "POST",
                 url: `/invites/${id}/${action}`
             })

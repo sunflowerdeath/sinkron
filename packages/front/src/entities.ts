@@ -1,5 +1,3 @@
-import { AutomergeNode } from "./slate"
-
 export interface Space {
     id: string
     name: string
@@ -61,15 +59,8 @@ export type Category = {
 }
 
 export type Metadata = {
-    meta: true
+    isMeta: true
     categories: { [key: string]: Category }
-}
-
-export type Document = {
-    content: AutomergeNode
-    categories: string[]
-    isPublished: boolean
-    isLocked: boolean
 }
 
 export type Post = {

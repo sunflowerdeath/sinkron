@@ -1,6 +1,4 @@
 const path = require("path")
-// const { DefinePlugin } = require("webpack")
-const { DefinePlugin } = require("@rspack/core")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 

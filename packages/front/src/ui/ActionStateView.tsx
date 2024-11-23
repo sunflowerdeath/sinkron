@@ -4,10 +4,10 @@ import { observer, Observer } from "mobx-react-lite"
 
 export type ActionState<T> = IPromiseBasedObservable<T>
 
-interface ActionStateViewProps<T> {
+export interface ActionStateViewProps<T> {
     state: ActionState<T>
-    ErrorComponent?: React.Component
-    PendingComponent?: React.Component
+    ErrorComponent?: React.ComponentType<ErrorComponentProps>
+    PendingComponent?: React.ComponentType
     children: React.ReactNode | ((value: T) => React.ReactNode)
 }
 
@@ -26,7 +26,11 @@ const PendingComponent = () => (
     </div>
 )
 
-const ErrorComponent = (props) => (
+type ErrorComponentProps = {
+    children: React.ReactNode
+}
+
+const ErrorComponent = (props: ErrorComponentProps) => (
     <div style={{ color: "var(--color-error)" }}>Error: {props.children}</div>
 )
 
@@ -45,7 +49,10 @@ const ActionStateView = observer(<T,>(props: ActionStateViewProps<T>) => {
         return <PendingComponent />
     }
     if (state.state === "rejected") {
-        return <ErrorComponent>{String(state.value.message)}</ErrorComponent>
+        const error = state.value
+        const message =
+            error instanceof Error ? String(error.message) : "Unknown error"
+        return <ErrorComponent>{message}</ErrorComponent>
     }
     return (
         <Observer>
@@ -63,10 +70,10 @@ const ActionStateView = observer(<T,>(props: ActionStateViewProps<T>) => {
 const makeInitialActionState = <T,>() =>
     fromPromise.resolve({}) as ActionState<T>
 
-const initialActionState = makeInitialActionState<object>()
+const initialActionState = makeInitialActionState<any>()
 
-const useActionState = <T = object,>(initialValue: T = null) => {
-    return useState<ActionState<T>>(fromPromise.resolve({}) as ActionState<T>)
+const useActionState = <T = object,>(initialValue: T = null as T) => {
+    return useState<ActionState<T>>(fromPromise.resolve(initialValue))
 }
 
 export default ActionStateView

@@ -1,4 +1,11 @@
-import { reaction, makeObservable, computed, observable, autorun } from "mobx"
+import {
+    reaction,
+    makeObservable,
+    computed,
+    observable,
+    autorun,
+    ObservableMap
+} from "mobx"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { v4 as uuidv4 } from "uuid"
 import {
@@ -13,8 +20,16 @@ import { LoroDoc, LoroList, LoroMap } from "loro-crdt"
 import { Node } from "slate"
 import { without } from "lodash-es"
 
+import { TitleElement, RootElement } from "~/types"
 import env from "~/env"
-import { Space, SpaceRole, Category, Metadata } from "~/entities"
+import {
+    Space,
+    SpaceMember,
+    Invite,
+    SpaceRole,
+    Metadata,
+    Category
+} from "~/entities"
 import { Api } from "~/api"
 import { TransformedMap } from "~/utils/transformedMap"
 
@@ -30,8 +45,9 @@ export type CategoryTree = {
     nodes: CategoryTreeNode[]
 }
 
-export type ExtractedMetadata = {
-    isMeta: true
+export type FetchMembersResponse = {
+    members: SpaceMember[]
+    invites: Invite[]
 }
 
 export type DocumentData = {
@@ -41,12 +57,12 @@ export type DocumentData = {
     isLocked: boolean
 }
 
-export type ExtractedData = ExtractedMetadata | DocumentData
+export type ExtractedData = Metadata | DocumentData
 
 const extractDocumentData = (doc: LoroDoc): ExtractedData => {
     const root = doc.getMap("root")
     if (root.get("isMeta")) {
-        return { isMeta: true }
+        return root.toJSON() as Metadata
     } else {
         return {
             isMeta: false,
@@ -117,18 +133,9 @@ const createInitialDocument = (initialCategory: string | undefined) => {
     const doc = new LoroDoc()
     const root = doc.getMap("root")
 
-    root.setContainer(
-        "content",
-        toLoro({
-            children: [
-                {
-                    // @ts-expect-error TitleElement
-                    type: "title",
-                    children: [{ text: "" }]
-                }
-            ]
-        })
-    )
+    const title: TitleElement = { type: "title", children: [{ text: "" }] }
+    const rootElem: RootElement = { children: [title] }
+    root.setContainer("content", toLoro(rootElem as Node))
 
     const categories = initialCategory !== undefined ? [initialCategory] : []
     root.set("categories", categories)
@@ -188,8 +195,7 @@ class SpaceStore {
         )
 
         this.documentList = new TransformedMap({
-            // @ts-expect-error "this.collection.items" is ObservableMap
-            source: this.collection.items,
+            source: this.collection.items as ObservableMap,
             filter: (item) => {
                 if (item.data === undefined) return false
                 if (item.data.isMeta) return false
@@ -276,18 +282,18 @@ class SpaceStore {
         )
     }
 
-    get metaItem() {
+    get metaItem(): Item<Metadata> | undefined {
         for (const item of this.collection.items.values()) {
-            if (item.data?.isMeta) return item
+            if (item.data?.isMeta) return item as Item<Metadata>
         }
         return undefined
     }
 
-    get meta() {
+    get meta(): Metadata {
         if (!this.metaItem || this.metaItem.local === null) {
             throw new Error("Metadata document not found!")
         }
-        return this.metaItem.local.doc.getMap("root").toJSON() as Metadata
+        return this.metaItem.data!
     }
 
     changeMeta(cb: (m: LoroDoc) => void) {
@@ -385,7 +391,7 @@ class SpaceStore {
 
     fetchMembers() {
         return fromPromise(
-            this.api.fetch({
+            this.api.fetch<FetchMembersResponse>({
                 method: "GET",
                 url: `/spaces/${this.space.id}/members`
             })

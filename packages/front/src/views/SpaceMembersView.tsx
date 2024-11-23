@@ -7,7 +7,8 @@ import { Col, Row } from "oriente"
 
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore, useSpace, SpaceStore } from "../store"
+import { useStore, useSpace, SpaceStore } from "~/store"
+import { FetchMembersResponse } from "~/store/SpaceStore"
 import { SpaceRole, spaceRoleMap, SpaceMember, Invite } from "../entities"
 import {
     Avatar,
@@ -18,6 +19,7 @@ import {
     MenuItem,
     ActionStateView,
     initialActionState,
+    ActionState,
     useActionState,
     useStateToast,
     useDialog,
@@ -36,7 +38,7 @@ class SpaceMembersStore {
     space: SpaceStore
     members: SpaceMember[] = []
     invites: Invite[] = []
-    fetchState = initialActionState
+    fetchState: ActionState<FetchMembersResponse> = initialActionState
     toast: ReturnType<typeof useStateToast>
 
     constructor(props: SpaceMembersStoreProps) {

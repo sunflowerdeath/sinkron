@@ -34,6 +34,7 @@
         "nanoevents": "^7.0.1",
         "nanoid": "^4.0.2",
         "pino": "^9.5.0",
+        "query-string": "^9.1.1",
         "uuid": "^9.0.1"
     }
 }

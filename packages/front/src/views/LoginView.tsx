@@ -30,7 +30,7 @@ const EmailStep = observer((props: EmailStepProps) => {
         setState(fromPromise(state))
     }
 
-    const onKeyPress = (event: KeyboardEvent) => {
+    const onKeyPress = (event: React.KeyboardEvent) => {
         if (event.key === "Enter") {
             if (isValid) login()
         }
@@ -41,7 +41,7 @@ const EmailStep = observer((props: EmailStepProps) => {
             <div style={{ height: "3rem" }}>
                 {state.state === "rejected" && (
                     <div style={{ color: "var(--color-error)" }}>
-                        {state.value.message}
+                        {(state.value as Error).message}
                     </div>
                 )}
             </div>
@@ -86,7 +86,7 @@ const CodeStep = observer((props: CodeStepProps) => {
         setState(fromPromise(state))
     }
 
-    const onKeyPress = (event: KeyboardEvent) => {
+    const onKeyPress = (event: React.KeyboardEvent) => {
         if (event.key === "Enter") {
             if (isValid) sendCode()
         }
@@ -97,7 +97,7 @@ const CodeStep = observer((props: CodeStepProps) => {
             <div style={{ height: "3rem" }}>
                 {state.state === "rejected" && (
                     <div style={{ color: "var(--color-error)" }}>
-                        {state.value.message}
+                        {(state.value as Error).message}
                     </div>
                 )}
             </div>
