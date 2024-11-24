@@ -14,6 +14,8 @@ use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::error::SinkronError;
 use crate::protocol::*;
 
+// Period after which the client is considered inactive and will be disconnected
+// (Client should send heartbeat messages every 30 seconds)
 const DISCONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 
 // Client actor receives messages from the webscoket connection,

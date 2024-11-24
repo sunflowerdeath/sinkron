@@ -66,8 +66,7 @@ class UserService {
         value: boolean = true
     ) {
         await models.users.update({ id }, { hasUnreadNotifications: value })
-        // TODO
-        // if (value) this.app.channels.send(`users/${id}`, "notification")
+        if (value) this.app.channels.send(`users/${id}`, "notification")
     }
 
     async delete(

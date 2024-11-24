@@ -1,5 +1,4 @@
 import { LoroDoc } from "loro-crdt"
-import { createNanoEvents } from "nanoevents"
 import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
 import { nanoid } from "nanoid"
@@ -17,6 +16,7 @@ import debounce from "lodash-es/debounce"
 import { parseISO } from "date-fns"
 import queryString from "query-string"
 
+import { Channel } from "./channel"
 import { Op } from "./protocol"
 import type {
     SyncErrorMessage,
@@ -28,90 +28,9 @@ import type {
     ChangeErrorMessage,
     HeartbeatMessage
 } from "./protocol"
-
-export interface Transport {
-    open(): void
-    close(): void
-    send(msg: string): void
-    emitter: ReturnType<typeof createNanoEvents>
-}
-
-export type WebSocketTransportProps = {
-    url: string
-    webSocketImpl?: typeof WebSocket
-    logger: Logger<string>
-}
-
-class WebSocketTransport implements Transport {
-    constructor(props: WebSocketTransportProps) {
-        const { url, webSocketImpl, logger } = props
-        this.url = url
-        this.webSocketImpl = webSocketImpl || global.WebSocket
-        this.logger = logger
-    }
-
-    emitter = createNanoEvents()
-    url: string
-    webSocketImpl: typeof WebSocket
-    ws?: WebSocket
-    logger: Logger<string>
-
-    open() {
-        this.logger.debug("Connecting to websocket: %s", this.url)
-        this.ws = new this.webSocketImpl(this.url)
-        this.ws.addEventListener("open", () => {
-            this.emitter.emit("open")
-        })
-        this.ws.addEventListener("message", (event) => {
-            this.emitter.emit("message", event.data)
-        })
-        this.ws.addEventListener("close", () => {
-            this.emitter.emit("close")
-            this.ws = undefined
-        })
-        this.ws.addEventListener("error", (err) => {
-            this.logger.debug("Websocket connection error: %o", err)
-            this.ws?.close()
-        })
-    }
-
-    close() {
-        this.ws?.close()
-    }
-
-    send(msg: string) {
-        if (this.ws && this.ws.readyState === 1 /* open */) {
-            this.ws.send(msg)
-        } else {
-            throw new Error("Couldn't send message: connection is closed")
-        }
-    }
-}
-
-const INITIAL_RECONNECT_TIMEOUT = 333
-const MAX_RECONNECT_TIMEOUT = 10000
-
-const autoReconnect = (t: Transport) => {
-    let timeout = INITIAL_RECONNECT_TIMEOUT
-    let isEnabled = true
-    t.open()
-    t.emitter.on("open", () => {
-        // reset reconnect timeout
-        timeout = INITIAL_RECONNECT_TIMEOUT
-    })
-    t.emitter.on("close", () => {
-        if (!isEnabled) return
-        console.log(`Connection closed. Auto-reconnect in ${timeout}ms`)
-        setTimeout(() => {
-            t.open()
-        }, timeout)
-        timeout = Math.min(MAX_RECONNECT_TIMEOUT, timeout * 2)
-    })
-    return () => {
-        isEnabled = false
-        t.close()
-    }
-}
+import { Transport, WebSocketTransport } from "./utils/transport"
+import { Heartbeat } from "./utils/heartbeat"
+import { AutoReconnect } from "./utils/autoReconnect"
 
 const L = LoroDoc.prototype
 
@@ -414,12 +333,6 @@ export class Item<T> {
 const FLUSH_DELAY = 1000
 const FLUSH_MAX_WAIT = 2000
 
-// Interval between hearbeats. Should be less than disconnect timeout for being
-// inactive on the server (=60s)
-const HEARTBEAT_INTERVAL = 30000 // 30s
-// Max wait time of the server's reply to heartbeat before closing connection.
-const DISCONNECT_TIMEOUT = 5000
-
 export enum ConnectionStatus {
     Disconnected = "disconnected",
     Connected = "connected",
@@ -472,10 +385,11 @@ class SinkronCollection<T = undefined> {
 
     col: string
     transport!: Transport
+    autoReconnect?: AutoReconnect
+    disconnect?: () => void
     store?: CollectionStore = undefined
     logger: Logger<string>
     errorHandler?: (msg: SyncErrorMessage) => void
-
     colrev: string = "0"
     extractData?: ExtractData<T>
     items: Map<string, Item<T>> = new Map()
@@ -483,23 +397,16 @@ class SinkronCollection<T = undefined> {
     status = ConnectionStatus.Disconnected
     initialSyncCompleted = false
     isDestroyed = false
-
     flushDebounced: ReturnType<typeof debounce>
-    disconnect?: () => void
     backupQueue = new Set<string>()
     flushQueue = new Set<string>()
-
-    // timeout for sending next heartbeat
-    heartbeatTimeout?: ReturnType<typeof setTimeout>
-    // timeout for disconnecting if not recieved hearbeat response
-    disconnectTimeout?: ReturnType<typeof setTimeout>
+    heartbeat?: Heartbeat
 
     destroy() {
         this.isDestroyed = true
         this.disconnect?.()
         this.store?.dispose()
-        clearTimeout(this.heartbeatTimeout)
-        clearTimeout(this.disconnectTimeout)
+        this.heartbeat?.dispose()
     }
 
     async init(props: SinkronCollectionProps<T>) {
@@ -519,7 +426,22 @@ class SinkronCollection<T = undefined> {
             action(() => {
                 this.logger.debug("Connected to websocket")
                 this.status = ConnectionStatus.Connected
-                this.heartbeat(0)
+                this.heartbeat = new Heartbeat({
+                    logger: this.logger,
+                    heartbeat: (i: number) => {
+                        this.logger.trace(`Sending heartbeat: ${i}`, i)
+                        const heartbeat = { kind: "h", i }
+                        this.transport.send(JSON.stringify(heartbeat))
+                    },
+                    heartbeatInterval: 30000,
+                    timeout: 5000,
+                    onTimeout: () => {
+                        this.logger.warn(
+                            "No response from server for too long, disconnecting"
+                        )
+                        this.transport.close()
+                    }
+                })
             })
         )
         this.transport.emitter.on(
@@ -528,8 +450,8 @@ class SinkronCollection<T = undefined> {
                 this.logger.debug("Connection closed")
                 this.status = ConnectionStatus.Disconnected
                 this.flushDebounced.cancel()
-                clearTimeout(this.heartbeatTimeout)
-                clearTimeout(this.disconnectTimeout)
+                this.heartbeat?.dispose()
+                this.heartbeat = undefined
             })
         )
         this.transport.emitter.on("message", (msg: string) => {
@@ -547,7 +469,19 @@ class SinkronCollection<T = undefined> {
             this.transport.open()
             this.disconnect = () => this.transport.close()
         } else {
-            this.disconnect = autoReconnect(this.transport)
+            this.autoReconnect = new AutoReconnect({
+                connect: () => this.transport.open()
+            })
+            this.transport.emitter.on("open", () =>
+                this.autoReconnect?.onOpen()
+            )
+            this.transport.emitter.on("close", () =>
+                this.autoReconnect?.onClose()
+            )
+            this.disconnect = () => {
+                this.autoReconnect?.stop()
+                this.transport.close()
+            }
         }
     }
 
@@ -579,20 +513,6 @@ class SinkronCollection<T = undefined> {
         )
     }
 
-    heartbeat(i: number) {
-        this.logger.trace(`Sending heartbeat: ${i}`, i)
-
-        const heartbeat = { kind: "h", i }
-        this.transport.send(JSON.stringify(heartbeat))
-
-        this.disconnectTimeout = setTimeout(() => {
-            this.logger.warn(
-                "No response from server for too long, disconnecting"
-            )
-            this.transport.close()
-        }, DISCONNECT_TIMEOUT)
-    }
-
     onMessage(msg: string) {
         this.logger.trace("Received message: %o", msg)
         let parsed
@@ -619,15 +539,7 @@ class SinkronCollection<T = undefined> {
 
     handleHeartbeatMessage(msg: HeartbeatMessage) {
         this.logger.trace("Recieved hearbeat response")
-
-        // cancel disconnect by timeout
-        clearTimeout(this.disconnectTimeout)
-
-        // schedule next hearbeat
-        this.heartbeatTimeout = setTimeout(
-            () => this.heartbeat(msg.i + 1),
-            HEARTBEAT_INTERVAL
-        )
+        this.heartbeat?.handleHeartbeatResponse(msg.i)
     }
 
     handleSyncCompleteMessage(msg: SyncCompleteMessage) {
@@ -929,4 +841,4 @@ class SinkronCollection<T = undefined> {
     }
 }
 
-export { SinkronCollection, IndexedDbCollectionStore }
+export { SinkronCollection, IndexedDbCollectionStore, Channel }

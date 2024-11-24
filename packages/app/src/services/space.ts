@@ -276,8 +276,7 @@ class SpaceService {
         }
         await this.app.models.members.update({ spaceId, userId }, { role })
 
-        // TODO
-        // this.app.channels.send(`users/${userId}`, "profile")
+        this.app.channels.send(`users/${userId}`, "profile")
 
         return Result.ok({ ...member, role })
     }
@@ -310,8 +309,7 @@ class SpaceService {
             group: readonlyGroup
         })
 
-        // TODO
-        // this.app.channels.send(`users/${userId}`, "profile")
+        this.app.channels.send(`users/${userId}`, "profile")
 
         return Result.ok(true)
     }

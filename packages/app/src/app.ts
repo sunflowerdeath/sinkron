@@ -1,9 +1,8 @@
-import { createServer } from "http"
-// import type { IncomingMessage } from "http"
-// import { Duplex } from "stream"
 import path from "path"
 
+import { pino, Logger } from "pino"
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
+import fastifyWebsocket from "@fastify/websocket"
 import { DataSource, Repository } from "typeorm"
 import Bowser from "bowser"
 import cors from "@fastify/cors"
@@ -21,6 +20,7 @@ import {
     File,
     Post
 } from "./entities"
+import { ChannelServer } from "./channels"
 
 import { EmailSender, FakeEmailSender, SmtpEmailSender } from "./email"
 import { LocalObjectStorage } from "./files/local"
@@ -247,7 +247,7 @@ class App {
     sinkron: SinkronClient
     storage: ObjectStorage
     emailSender: EmailSender
-    // channels: ChannelServer
+    channels: ChannelServer
     fastify: FastifyInstance
     db: DataSource
     models: AppModels
@@ -285,7 +285,13 @@ class App {
             posts: this.db.getRepository<Post>("post")
         }
         this.sinkron = new SinkronClient(config.sinkron)
-        // this.channels = new ChannelServer({})
+
+        const logger: Logger<string> = pino({
+            transport: { target: "pino-pretty" },
+            level: "debug"
+        })
+        this.channels = new ChannelServer({ logger })
+
         this.fastify = this.createFastify()
     }
 
@@ -311,46 +317,11 @@ class App {
 
     async destroy() {
         await this.db.destroy()
-        // this.channels.dispose()
+        this.channels.dispose()
     }
-
-    /*
-    async handleUpgrade(
-        request: IncomingMessage,
-        socket: Duplex,
-        head: Buffer
-    ) {
-        const matchChannels = request.url!.match(/^\/channels\/(.+)$/)
-        if (matchChannels) {
-            const token = matchChannels[1]
-            const res = await this.services.auth.verifyAuthToken(
-                this.models,
-                token
-            )
-            if (res.isOk && res.value !== null) {
-                this.channels.ws.handleUpgrade(request, socket, head, (ws) => {
-                    this.channels.ws.emit("connection", ws, request)
-                })
-            } else {
-                socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
-                socket.destroy()
-            }
-            return
-        }
-
-        socket.write("HTTP/1.1 404 Not Found\r\n\r\n")
-        socket.destroy()
-    }
-    */
 
     createFastify() {
-        const fastify = Fastify({
-            serverFactory: (handler) => {
-                const server = createServer(handler)
-                // server.on("upgrade", this.handleUpgrade.bind(this))
-                return server
-            }
-        })
+        const fastify = Fastify()
 
         fastify.addContentTypeParser(
             "application/octet-stream",
@@ -377,7 +348,7 @@ class App {
         })
 
         fastify.get("/", (_request, reply) => {
-            reply.send("Sinkron API")
+            reply.send("Sinkron Api")
         })
 
         fastify.post<{ Params: { token: string } }>(
@@ -395,6 +366,27 @@ class App {
                 }
             }
         )
+
+        fastify.register(fastifyWebsocket)
+        fastify.register((fastify) => {
+            fastify.get<{ Params: { token: string } }>(
+                "/channel/:token",
+                { websocket: true },
+                async (ws, request) => {
+                    const { token } = request.params
+                    const res = await this.services.auth.verifyAuthToken(
+                        this.models,
+                        token
+                    )
+                    if (res.isOk && res.value !== null) {
+                        const token = res.value
+                        this.channels.onConnect(ws, `users/${token.userId}`)
+                    } else {
+                        ws.close()
+                    }
+                }
+            )
+        })
 
         fastify.get<{ Params: { postId: string } }>(
             "/posts/:postId/content",

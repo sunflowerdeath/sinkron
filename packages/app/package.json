@@ -20,12 +20,14 @@
         "@types/node": "^18.19.55",
         "@types/nodemailer": "^6.4.16",
         "@types/uuid": "^9.0.8",
+        "@types/ws": "^8.5.13",
         "mocha": "^10.7.3",
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.668.0",
         "@fastify/cors": "^10.0.1",
+        "@fastify/websocket": "^11.0.1",
         "@sinkron/client": "workspace:*",
         "@sinkron/loro-slate": "workspace:*",
         "ajv": "^8.17.1",
@@ -38,8 +40,10 @@
         "nodemailer": "^6.9.15",
         "pg": "^8.13.0",
         "pino": "^8.21.0",
+        "pino-pretty": "^10.3.1",
         "sharp": "^0.33.5",
         "typeorm": "^0.3.20",
-        "uuid": "^9.0.1"
+        "uuid": "^9.0.1",
+        "ws": "^8.18.0"
     }
 }

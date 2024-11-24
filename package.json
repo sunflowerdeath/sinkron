@@ -4,7 +4,7 @@
     "description": "",
     "scripts": {
         "lint": "pnpm -r lint",
-        "dev": "docker-compose -f local.docker-compose.yml up --detach --force-recreate --renew-anon-volumes",
+        "dev": "docker-compose -f local.docker-compose.yml up --detach --build --force-recreate --renew-anon-volumes",
         "app:build": "pnpm --F=@sinkron/app... build",
         "app:start": "pnpm --F=@sinkron/app start",
         "front:build": "pnpm --F=sinkron-front... build",
