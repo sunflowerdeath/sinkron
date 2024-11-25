@@ -32,7 +32,7 @@ services:
     sinkron:
         build: ./sinkron
         environment:
-            SINKRON_CONFIG: >
+            SINKRON_APP_CONFIG: >
                 {
                     "host": "0.0.0.0",
                     "port": 80,
