@@ -36,7 +36,7 @@
         "mobx-react-lite": "^4.0.7",
         "mobx-utils": "^6.1.0",
         "nanoevents": "^7.0.1",
-        "oriente": "^0.1.5",
+        "oriente": "^0.1.7",
         "pino": "^9.5.0",
         "pino-pretty": "^10.3.1",
         "query-string": "^9.1.1",

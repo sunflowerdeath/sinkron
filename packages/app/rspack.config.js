@@ -1,11 +1,10 @@
-// import path from "node:path"
-// import nodeExternals from "webpack-node-externals"
+import path from "node:path"
+import nodeExternals from "webpack-node-externals"
 const path = require("path")
 const nodeExternals = require("webpack-node-externals")
 
 const isProduction = process.env.NODE_ENV === "production"
-// const dir = import.meta.dirname
-const dir = __dirname
+const dir = import.meta.dirname
 const src = path.resolve(dir, "src")
 const build = path.resolve(dir, "build")
 
@@ -72,4 +71,4 @@ const testConfig = {
     }
 }
 
-module.exports = [appConfig, dbConfig, testConfig]
+export default [appConfig, dbConfig, testConfig]

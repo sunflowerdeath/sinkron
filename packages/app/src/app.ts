@@ -244,6 +244,7 @@ type Services = {
 
 class App {
     config: SinkronAppConfig
+    logger: Logger<string>
     sinkron: SinkronClient
     storage: ObjectStorage
     emailSender: EmailSender
@@ -255,6 +256,10 @@ class App {
 
     constructor() {
         this.config = config
+        this.logger = pino({
+            transport: { target: "pino-pretty" },
+            level: "debug"
+        })
         this.db = dataSource
         this.emailSender =
             config.mail.type === "console"
@@ -285,13 +290,7 @@ class App {
             posts: this.db.getRepository<Post>("post")
         }
         this.sinkron = new SinkronClient(config.sinkron)
-
-        const logger: Logger<string> = pino({
-            transport: { target: "pino-pretty" },
-            level: "debug"
-        })
-        this.channels = new ChannelServer({ logger })
-
+        this.channels = new ChannelServer({ logger: this.logger })
         this.fastify = this.createFastify()
     }
 
@@ -343,7 +342,7 @@ class App {
                 reply.status(500).send({
                     error: { message: "Internal server error" }
                 })
-                console.log(error)
+                this.logger.error("Internal server error: %o", error)
             }
         })
 
@@ -382,6 +381,7 @@ class App {
                         const token = res.value
                         this.channels.onConnect(ws, `users/${token.userId}`)
                     } else {
+                        ws.send("auth_failed")
                         ws.close()
                     }
                 }

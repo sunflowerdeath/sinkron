@@ -40,6 +40,7 @@ class UserStore {
     space?: SpaceStore = undefined
     channel: Channel
     api: Api
+    logger: Logger<string>
 
     disposeReaction?: () => void
     stopFetchUser?: () => void
@@ -49,6 +50,8 @@ class UserStore {
         this.authStore = authStore
         this.api = authStore.api
         this.user = user
+
+        this.logger = pino({ level: "debug" })
 
         if (
             spaceId !== undefined &&
@@ -75,17 +78,16 @@ class UserStore {
             { fireImmediately: false }
         )
 
-        const logger: Logger<string> = pino({ level: "debug" })
-
         const token = this.api.getToken()
         this.channel = new Channel({
-            logger,
+            logger: this.logger,
             url: `${env.apiUrl}/channel/${token}`,
             handler: (msg) => {
-                if (msg === "notification") {
+                if (msg === "auth_failed") {
+                    this.logout()
+                } else if (msg === "notification") {
                     this.user.hasUnreadNotifications = true
-                }
-                if (msg === "profile") {
+                } else if (msg === "profile") {
                     this.fetchUser()
                 }
             }
@@ -114,7 +116,7 @@ class UserStore {
     fetchUser() {
         this.stopFetchUser?.()
         this.stopFetchUser = autoRetry(async (retry) => {
-            console.log("Fetching user...")
+            this.logger.debug("Fetching user...")
             let user
             try {
                 user = await this.api.fetch<User>({
@@ -123,16 +125,16 @@ class UserStore {
                 })
             } catch (e) {
                 if (e instanceof FetchError && e.kind === "http") {
-                    console.log("Fetch user error")
+                    this.logger.error("Fetch user received error response")
                     this.logout()
                 } else {
-                    console.log("Couldn't fetch user, will retry")
+                    this.logger.error("Couldn't fetch user, will retry")
                     retry()
                 }
                 return
             }
             this.updateUser(user)
-            console.log("Fetch user success")
+            this.logger.info("Fetch user success")
         })
     }
 
