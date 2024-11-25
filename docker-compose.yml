@@ -5,12 +5,8 @@ services:
         build: ./sinkron
         environment:
             SINKRON_CONFIG: ${SINKRON_CONFIG}
-        ports:
-            - 3333:80
     app:
         build:
             dockerfile: app.Dockerfile
         environment:
             SINKRON_APP_CONFIG: ${SINKRON_APP_CONFIG}
-        ports:
-            - 80:80
