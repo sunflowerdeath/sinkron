@@ -20,9 +20,7 @@ pub async fn run_migrations(
         let res = async_wrapper.run_pending_migrations(MIGRATIONS);
         match res {
             Ok(_) => Ok(()),
-            Err(err) => {
-                Err(format!("Couldn't run migrations: {}", err.to_string()))
-            }
+            Err(err) => Err(format!("Couldn't run migrations: {}", err)),
         }
     })
     .await
@@ -54,11 +52,10 @@ pub async fn create_pool(config: DbConfig) -> DbConnectionPool {
         AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
             config_string,
         );
-    let pool = Pool::builder(manager)
+    Pool::builder(manager)
         .max_size(50)
         .runtime(deadpool::Runtime::Tokio1)
         .wait_timeout(Some(Duration::from_millis(1000)))
         .build()
-        .unwrap();
-    pool
+        .unwrap()
 }

@@ -149,17 +149,12 @@ impl ClientActor {
 
     async fn handle_get(&mut self, msg: GetMessage) {
         let (sender, receiver) = oneshot::channel();
-        let send = self.collection.send(CollectionMessage::Get(
-            collection::GetMessage {
-                id: msg.id,
-                source: self.source(),
-                reply: sender,
-            },
-        ));
-        if send.is_err() {
-            // TODO couldn't send, just exit ?
-            return;
-        }
+        let get_msg = CollectionMessage::Get(collection::GetMessage {
+            id: msg.id,
+            source: self.source(),
+            reply: sender,
+        });
+        self.send_col_message(get_msg);
         match receiver.await {
             Ok(Ok(doc)) => {
                 let msg = DocMessage {
@@ -181,8 +176,6 @@ impl ClientActor {
                 self.send_ws_message(ServerMessage::GetError(err)).await;
             }
             Err(_) => {
-                // Couldn't receive reply
-                // TODO - just exit ?
                 let err = GetErrorMessage {
                     id: msg.id,
                     code: ErrorCode::InternalServerError,
@@ -258,7 +251,6 @@ impl ClientActor {
         let res = self.collection.send(msg);
         if res.is_err() {
             self.supervisor.stop();
-            return;
         }
     }
 
@@ -309,7 +301,6 @@ impl ClientHandle {
             timeout: Box::pin(sleep(DISCONNECT_TIMEOUT)),
         };
         supervisor.spawn(async move { reader.run().await }, on_exit);
-
         Self { supervisor, sender }
     }
 

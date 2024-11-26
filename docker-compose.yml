@@ -10,3 +10,7 @@ services:
             dockerfile: app.Dockerfile
         environment:
             SINKRON_APP_CONFIG: ${SINKRON_APP_CONFIG}
+    front:
+        build:
+            dockerfile: front.Dockerfile
+        # TODO - env vars {SINKRON_API_URL /  SINKRON_URL / CONFIG} ?

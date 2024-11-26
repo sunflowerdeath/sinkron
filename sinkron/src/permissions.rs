@@ -37,8 +37,7 @@ impl Permissions {
     }
 
     pub fn parse_or_empty(input: &str) -> Self {
-        serde_json::from_str(&input)
-            .unwrap_or_else(|_| Permissions::empty())
+        serde_json::from_str(input).unwrap_or_else(|_| Permissions::empty())
     }
 
     pub fn check(&self, user: &User, action: Action) -> bool {
@@ -59,7 +58,7 @@ impl Permissions {
                     }
                 }
                 Role::Group { id } => {
-                    if user.groups.contains(&id) {
+                    if user.groups.contains(id) {
                         return true;
                     }
                 }
@@ -67,8 +66,10 @@ impl Permissions {
         }
         false
     }
+}
 
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+impl std::fmt::Display for Permissions {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string(self).unwrap())
     }
 }

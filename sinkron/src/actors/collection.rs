@@ -240,7 +240,7 @@ impl CollectionActor {
 
     async fn handle_unsubscribe(&mut self, id: i32) {
         self.subscribers.remove(&id);
-        if self.subscribers.len() == 0 {
+        if self.subscribers.is_empty() {
             trace!("col-{}: last client unsubscribed", self.id);
             self.supervisor.stop();
         }
@@ -293,7 +293,7 @@ impl CollectionActor {
         colrev: i64,
         source: Source,
     ) -> Result<SyncResult, SinkronError> {
-        _ = self.check_col_permission(source, Action::Read).await?;
+        self.check_col_permission(source, Action::Read).await?;
 
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
@@ -338,9 +338,7 @@ impl CollectionActor {
                 err => SinkronError::internal(&err.to_string()),
             })?;
 
-        _ = self
-            .check_doc_permission(&doc, source, Action::Read)
-            .await?;
+        self.check_doc_permission(&doc, source, Action::Read).await?;
 
         Ok(Self::doc_from_model(doc))
     }
@@ -351,7 +349,7 @@ impl CollectionActor {
         data: String,
         source: Source,
     ) -> Result<Document, SinkronError> {
-        _ = self.check_col_permission(source, Action::Create).await?;
+        self.check_col_permission(source, Action::Create).await?;
 
         let mut conn = self.connect().await?;
 
@@ -400,8 +398,8 @@ impl CollectionActor {
             colrev: next_colrev,
             op: Op::Create,
             data: Some(data.clone()),
-            created_at: created_at.clone(),
-            updated_at: created_at.clone(),
+            created_at,
+            updated_at: created_at,
             changeid: "".to_string(), // TODO payload.changeid
         };
         self.broadcast(ServerMessage::Change(msg)).await;
@@ -409,7 +407,7 @@ impl CollectionActor {
         // return document
         let doc = Document {
             id,
-            created_at: created_at.clone(),
+            created_at,
             updated_at: created_at,
             data: Some(data),
             col: self.id.clone(),
@@ -447,7 +445,7 @@ impl CollectionActor {
         } else {
             Action::Update
         };
-        _ = self.check_doc_permission(&doc, source, action).await?;
+        self.check_doc_permission(&doc, source, action).await?;
 
         let new_data = match &data {
             Some(update) => {
@@ -456,13 +454,13 @@ impl CollectionActor {
                         "Couldn't update deleted document",
                     ));
                 };
-                let Ok(decoded_update) = BASE64_STANDARD.decode(&update) else {
+                let Ok(decoded_update) = BASE64_STANDARD.decode(update) else {
                     return Err(SinkronError::bad_request(
                         "Couldn't decode update from base64",
                     ));
                 };
                 let loro_doc = loro::LoroDoc::new();
-                if let Err(_) = loro_doc.import(&data) {
+                if loro_doc.import(&data).is_err() {
                     return Err(SinkronError::internal(
                         "Couldn't open document, data might be corrupted",
                     ));
@@ -523,8 +521,8 @@ impl CollectionActor {
             colrev: next_colrev,
             op,
             data: serialized_new_data.clone(),
-            created_at: doc.created_at.clone(),
-            updated_at: updated_at.clone(),
+            created_at: doc.created_at,
+            updated_at,
             changeid: "".to_string(), // TODO payload.changeid
         };
         self.broadcast(ServerMessage::Change(msg)).await;

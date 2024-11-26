@@ -12,7 +12,6 @@ use axum::{
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use log::trace;
-use reqwest;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
@@ -335,7 +334,7 @@ impl Sinkron {
     }
 
     async fn auth(&self, token: &str) -> Result<String, SinkronError> {
-        let url = "".to_string() + &self.sync_auth_url + &token;
+        let url = "".to_string() + &self.sync_auth_url + token;
         let req = reqwest::Client::new()
             .post(url)
             .body("".to_string())
@@ -348,7 +347,7 @@ impl Sinkron {
         let Ok(user) = req.text().await else {
             return Err(SinkronError::auth_failed("Authentication failed"));
         };
-        return Ok(user);
+        Ok(user)
     }
 
     async fn handle_connect(&self, mut websocket: WebSocket, query: SyncQuery) {
@@ -412,9 +411,7 @@ async fn handle_connect(
 // Api auth middleware
 
 fn get_header_value(req: &Request, header: &str) -> Option<String> {
-    let Some(header_value) = req.headers().get(header) else {
-        return None;
-    };
+    let header_value = req.headers().get(header)?;
     if let Ok(str) = header_value.to_str() {
         Some(str.to_string())
     } else {
