@@ -270,9 +270,9 @@ impl CollectionActor {
     }
 
     async fn broadcast(&self, msg: ServerMessage) {
-        // TODO more efficient ?
+        // TODO more efficient
         for client in self.subscribers.values() {
-            client.send_message(msg.clone()).await; // TODO unbounded ?
+            client.send(msg.clone());
         }
     }
 
@@ -294,6 +294,17 @@ impl CollectionActor {
         source: Source,
     ) -> Result<SyncResult, SinkronError> {
         self.check_col_permission(source, Action::Read).await?;
+
+        if colrev > self.state.colrev {
+            return Err(SinkronError::unprocessable("Invalid colrev"));
+        }
+
+        if colrev == self.state.colrev {
+            return Ok(SyncResult {
+                documents: Vec::new(),
+                colrev: self.state.colrev,
+            });
+        }
 
         let mut conn = self.connect().await?;
         let req_base = schema::documents::table
@@ -338,7 +349,8 @@ impl CollectionActor {
                 err => SinkronError::internal(&err.to_string()),
             })?;
 
-        self.check_doc_permission(&doc, source, Action::Read).await?;
+        self.check_doc_permission(&doc, source, Action::Read)
+            .await?;
 
         Ok(Self::doc_from_model(doc))
     }

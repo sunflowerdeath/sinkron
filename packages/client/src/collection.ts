@@ -26,7 +26,9 @@ import type {
     ServerCreateMessage,
     ServerUpdateMessage,
     ChangeErrorMessage,
-    HeartbeatMessage
+    HeartbeatMessage,
+    GetErrorMessage,
+    ServerMessage
 } from "./protocol"
 import { Transport, WebSocketTransport } from "./utils/transport"
 import { Heartbeat } from "./utils/heartbeat"
@@ -162,7 +164,7 @@ class IndexedDbCollectionStore implements CollectionStore {
         req.onupgradeneeded = (event) => {
             // @ts-ignore
             const db = event.target.result
-            db!.createObjectStore("items") // TODO wait until success?
+            db!.createObjectStore("items") // XXX wait until success?
             localStorage.setItem(`stored_collection/${key}`, "-1")
         }
         this.isReady = deferred.promise
@@ -346,7 +348,7 @@ interface SinkronCollectionProps<T> {
     col: string
     store?: CollectionStore
     noAutoReconnect?: boolean
-    errorHandler?: (msg: SyncErrorMessage) => void
+    errorHandler?: (msg: ServerMessage) => void
     logger?: Logger<string>
     webSocketImpl?: typeof WebSocket
     extractData?: ExtractData<T>
@@ -389,7 +391,7 @@ class SinkronCollection<T = undefined> {
     disconnect?: () => void
     store?: CollectionStore = undefined
     logger: Logger<string>
-    errorHandler?: (msg: SyncErrorMessage) => void
+    errorHandler?: (msg: ServerMessage) => void
     colrev: string = "0"
     extractData?: ExtractData<T>
     items: Map<string, Item<T>> = new Map()
@@ -526,6 +528,8 @@ class SinkronCollection<T = undefined> {
             this.handleHeartbeatMessage(parsed)
         } else if (parsed.kind === "doc") {
             this.handleDocMessage(parsed)
+        } else if (parsed.kind === "get_error") {
+            this.handleGetErrorMessage(parsed)
         } else if (parsed.kind === "sync_complete") {
             this.handleSyncCompleteMessage(parsed)
         } else if (parsed.kind === "sync_error") {
@@ -557,6 +561,22 @@ class SinkronCollection<T = undefined> {
         this.errorHandler?.(msg)
     }
 
+    handleGetErrorMessage(msg: GetErrorMessage) {
+        const { id, code } = msg
+        if (code === "auth_failed") {
+            this.logger.warn("Auth failed: %s", id)
+            this.disconnect?.()
+            this.errorHandler?.(msg)
+            return
+        }
+        if (code === "not_found") {
+            this.logger.warn("Document doesn't exist: %s", id)
+            this.items.delete(id)
+            return
+        }
+        this.logger.warn("Get error: %o", msg)
+    }
+
     handleChangeErrorMessage(msg: ChangeErrorMessage) {
         const { id, changeid, code } = msg
 
@@ -570,7 +590,8 @@ class SinkronCollection<T = undefined> {
 
         if (code === "auth_failed") {
             this.logger.warn("Auth failed: %s", id)
-            // TODO should reconnect
+            this.disconnect?.()
+            this.errorHandler?.(msg)
             return
         }
 

@@ -11,7 +11,13 @@ type SpaceCreateBody = { name: string }
 const spaceCreateRenameSchema = {
     type: "object",
     properties: {
-        name: { type: "string", minLength: 1 } // TODO proper validdtion
+        name: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100,
+            // no leading or trailing spaces
+            allOf: [{ pattern: "^\\S" }, { pattern: "\\S$" }]
+        }
     },
     required: ["name"],
     additionalProperties: false

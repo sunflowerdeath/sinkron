@@ -3,6 +3,7 @@ import assert from "node:assert"
 import { LoroDoc } from "loro-crdt"
 import { v4 as uuidv4 } from "uuid"
 
+import { Action } from "@sinkron/client"
 import { App } from "../app"
 import { User } from "../entities"
 
@@ -80,82 +81,97 @@ describe("Spaces", () => {
 
     it("lock, unlock", async () => {
         // create space
-        const res = await app.fastify.inject({
+        const createSpaceRes = await app.fastify.inject({
             method: "POST",
             url: "/spaces/new",
             headers,
             payload: { name: "test" }
         })
-        assert.strictEqual(res.statusCode, 200, "create space")
-        const space = JSON.parse(res.payload)
+        assert.strictEqual(createSpaceRes.statusCode, 200, "create space")
+        const space = JSON.parse(createSpaceRes.payload)
 
         // create doc
         const docId = uuidv4()
         const col = `spaces/${space.id}`
         const doc = createDoc()
-        const res2 = await app.sinkron.createDocument({
+        const createDocRes = await app.sinkron.createDocument({
             id: docId,
             col,
             data: doc.export({ mode: "snapshot" })
         })
-        assert(res2.isOk, "create doc")
+        assert(createDocRes.isOk, "create doc")
 
         // lock
-        const res3 = await app.fastify.inject({
+        const lockRes = await app.fastify.inject({
             method: "POST",
             url: `/spaces/${space.id}/lock/${docId}`,
             headers
         })
-        assert.strictEqual(res3.statusCode, 200, "lock")
+        assert.strictEqual(lockRes.statusCode, 200, "lock")
 
-        // check is locked
-        // TODO
-        // const res4 = await app.sinkron.checkDocumentPermission({
-        // id: docId,
-        // user: user!.id,
-        // action: Action.update
-        // })
-        // assert(res4.isOk, "check permissions")
-        // assert(!res4.value, "update not permitted")
+        const getUserRes = await app.sinkron.getUser(user!.email)
+        assert(getUserRes.isOk, "get user object")
+        const userObject = getUserRes.value
 
-        // TODO
-        // const res5 = await app.sinkron.checkDocumentPermission({
-        // id: docId,
-        // user: user!.id,
-        // action: Action.delete
-        // })
-        // assert(res5.isOk, "check permissions")
-        // assert(!res5.value, "delete not permitted")
+        // check locked
+        const getLockedDocRes = await app.sinkron.getDocument({
+            id: docId,
+            col
+        })
+        assert(getLockedDocRes.isOk)
+        const lockedDoc = getLockedDocRes.value
+        assert(lockedDoc !== null, "get locked doc")
 
-        const res6 = await app.sinkron.getDocument({ id: docId, col })
-        assert(res6.isOk)
-        assert(res6.value !== null, "doc")
-        const lockedDoc = LoroDoc.fromSnapshot(res6.value.data!)
-        assert(lockedDoc.getMap("root").get("isLocked"), "isLocked=true")
+        // isLocked is set
+        const lockedDocContent = LoroDoc.fromSnapshot(lockedDoc.data!)
+        assert(
+            lockedDocContent.getMap("root").get("isLocked"),
+            "isLocked is set"
+        )
+
+        // read is permitted
+        const readIsPermitted = lockedDoc.permissions.check(
+            userObject,
+            Action.read
+        )
+        assert(readIsPermitted, "read is permitted")
+
+        // update is not permitted
+        const updateIsPermitted = lockedDoc.permissions.check(
+            userObject,
+            Action.update
+        )
+        assert(!updateIsPermitted, "update is not permitted")
 
         // unlock
-        const res7 = await app.fastify.inject({
+        const unlockRes = await app.fastify.inject({
             method: "POST",
             url: `/spaces/${space.id}/unlock/${docId}`,
             headers
         })
-        assert.strictEqual(res7.statusCode, 200, "unlock")
+        assert.strictEqual(unlockRes.statusCode, 200, "unlock")
 
-        // check is unlocked
-        // TODO
-        // const res8 = await app.sinkron.checkDocumentPermission({
-        // id: docId,
-        // user: user!.id,
-        // action: Action.update
-        // })
-        // assert(res8.isOk, "check permissions")
-        // assert(res8.value, "permitted")
+        // check unlocked
+        const getUnlockedDocRes = await app.sinkron.getDocument({
+            id: docId,
+            col
+        })
+        assert(getUnlockedDocRes.isOk)
+        assert(getUnlockedDocRes.value !== null, "get unlocked doc")
+        const unlockedDoc = getUnlockedDocRes.value
 
-        const res9 = await app.sinkron.getDocument({ id: docId, col })
-        assert(res9.isOk)
-        assert(res9.value !== null, "doc")
-        const unlockedDoc = LoroDoc.fromSnapshot(res9.value.data!)
-        assert(!unlockedDoc.getMap("root").get("isLocked"), "isLocked=false")
+        // isLocked not set
+        const unlockedDocContent = LoroDoc.fromSnapshot(unlockedDoc.data!)
+        assert(
+            !unlockedDocContent.getMap("root").get("isLocked"),
+            "isLocked not set"
+        )
+        // update is permitted
+        const updateIsPermittedUnlocked = unlockedDoc.permissions.check(
+            userObject,
+            Action.update
+        )
+        assert(updateIsPermittedUnlocked, "update is permitted")
     })
 
     it("members update / remove", async () => {

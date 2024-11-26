@@ -32,7 +32,7 @@ services:
     sinkron:
         build: ./sinkron
         environment:
-            SINKRON_APP_CONFIG: >
+            SINKRON_CONFIG: >
                 {
                     "host": "0.0.0.0",
                     "port": 80,
@@ -57,7 +57,7 @@ services:
         build:
             dockerfile: app.Dockerfile
         environment:
-            SINKRON_CONFIG: >
+            SINKRON_APP_CONFIG: >
                 {
                     "db": {
                         "host": "postgres_app",

@@ -10,6 +10,8 @@
         "benchmark:server": "sh ./scripts/benchmark_server.sh"
     },
     "keywords": [],
+    "main": "lib/client.js",
+    "types": "lib/client.d.ts",
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {

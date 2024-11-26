@@ -133,24 +133,10 @@ impl SinkronActor {
             return;
         };
 
-        // TODO check permissions
-
-        if colrev > col_model.colrev {
-            // invalid colrev
-            let msg = ServerMessage::SyncError(SyncErrorMessage {
-                col: col.clone(),
-                code: ErrorCode::UnprocessableContent,
-            });
-            if let Ok(encoded) = serde_json::to_string(&msg) {
-                let _ = websocket.send(Message::Text(encoded)).await;
-            }
-            return;
-        }
-
         let collection = self.get_collection_actor(col_model);
 
         // spawn client actor
-        let client_id = self.get_client_id();
+        let client_id = self.next_client_id();
         let on_exit: ExitCallback = {
             let collection = collection.clone();
             Box::new(move || {
@@ -175,7 +161,7 @@ impl SinkronActor {
         });
     }
 
-    fn get_client_id(&mut self) -> i32 {
+    fn next_client_id(&mut self) -> i32 {
         self.client_id += 1;
         self.client_id
     }

@@ -27,7 +27,7 @@ struct ClientActor {
     client_id: i32,
     user_id: String,
     websocket: WebSocket,
-    receiver: mpsc::Receiver<ServerMessage>,
+    receiver: mpsc::UnboundedReceiver<ServerMessage>,
     collection: CollectionHandle,
     colrev: i64,
     timeout: Pin<Box<tokio::time::Sleep>>,
@@ -274,7 +274,7 @@ impl ClientActor {
 
 #[derive(Clone)]
 pub struct ClientHandle {
-    sender: mpsc::Sender<ServerMessage>,
+    sender: mpsc::UnboundedSender<ServerMessage>,
     #[allow(dead_code)]
     pub supervisor: Supervisor,
 }
@@ -288,7 +288,7 @@ impl ClientHandle {
         colrev: i64,
         on_exit: Option<ExitCallback>,
     ) -> Self {
-        let (sender, receiver) = mpsc::channel(8);
+        let (sender, receiver) = mpsc::unbounded_channel();
         let supervisor = Supervisor::new();
         let mut reader = ClientActor {
             supervisor: supervisor.clone(),
@@ -308,7 +308,7 @@ impl ClientHandle {
     // self.client_chan_sender.send(msg).await;
     // }
 
-    pub async fn send_message(&self, msg: ServerMessage) {
-        _ = self.sender.send(msg).await;
+    pub fn send(&self, msg: ServerMessage) {
+        _ = self.sender.send(msg);
     }
 }
