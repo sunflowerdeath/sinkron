@@ -59,7 +59,7 @@ pub struct SinkronConfig {
     #[serde(default = "default_port")]
     pub port: u32,
     pub api_token: String,
-    pub sync_auth_url: String,
+    pub sync_auth_url: Option<String>,
     pub db: db::DbConfig,
 }
 
@@ -70,7 +70,7 @@ pub struct Sinkron {
     host: String,
     port: u32,
     api_token: String,
-    sync_auth_url: String,
+    sync_auth_url: Option<String>,
     groups_api: Arc<GroupsApi>,
 }
 
@@ -338,20 +338,29 @@ impl Sinkron {
     }
 
     async fn auth(&self, token: &str) -> Result<String, SinkronError> {
-        let url = "".to_string() + &self.sync_auth_url + token;
-        let req = reqwest::Client::new()
-            .post(url)
-            .body("".to_string())
-            .send()
-            .await
-            .map_err(internal_error)?;
-        if req.status() != reqwest::StatusCode::OK {
-            return Err(SinkronError::auth_failed("Authentication failed"));
+        match &self.sync_auth_url {
+            Some(auth_url) => {
+                let url = "".to_string() + auth_url + token;
+                let req = reqwest::Client::new()
+                    .post(url)
+                    .body("".to_string())
+                    .send()
+                    .await
+                    .map_err(internal_error)?;
+                if req.status() != reqwest::StatusCode::OK {
+                    return Err(SinkronError::auth_failed(
+                        "Authentication failed",
+                    ));
+                }
+                let Ok(user) = req.text().await else {
+                    return Err(SinkronError::auth_failed(
+                        "Authentication failed",
+                    ));
+                };
+                Ok(user)
+            }
+            None => Ok("anonymous".to_string()),
         }
-        let Ok(user) = req.text().await else {
-            return Err(SinkronError::auth_failed("Authentication failed"));
-        };
-        Ok(user)
     }
 
     async fn handle_connect(&self, mut websocket: WebSocket, query: SyncQuery) {

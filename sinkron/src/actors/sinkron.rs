@@ -109,7 +109,7 @@ impl SinkronActor {
 
         let Ok(mut conn) = self.connect().await else {
             let msg = ServerMessage::SyncError(SyncErrorMessage {
-                col: col.clone(),
+                col,
                 code: ErrorCode::InternalServerError,
             });
             if let Ok(encoded) = serde_json::to_string(&msg) {
@@ -124,7 +124,7 @@ impl SinkronActor {
         let Ok(col_model) = res else {
             // collection not found
             let msg = ServerMessage::SyncError(SyncErrorMessage {
-                col: col.clone(),
+                col,
                 code: ErrorCode::NotFound,
             });
             if let Ok(encoded) = serde_json::to_string(&msg) {

@@ -51,7 +51,7 @@ impl GroupsApi {
 
     async fn get_user_from_cache(&self, id: &str) -> Option<User> {
         let mut cache = self.cache.lock().await;
-        cache.get(id).map(|val| val.clone())
+        cache.get(id).cloned()
     }
 
     async fn put_user_to_cache(&self, id: String, user: User) {

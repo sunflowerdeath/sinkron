@@ -180,11 +180,11 @@ impl CollectionActor {
     async fn handle_message(&mut self, msg: CollectionMessage) {
         match msg {
             CollectionMessage::Subscribe { client_id, handle } => {
-                self.handle_subscribe(client_id, handle).await;
+                self.handle_subscribe(client_id, handle);
                 trace!("col-{}: client subscribed, id: {}", self.id, client_id);
             }
             CollectionMessage::Unsubscribe { client_id } => {
-                self.handle_unsubscribe(client_id).await;
+                self.handle_unsubscribe(client_id);
                 trace!(
                     "col-{}: client unsubscribed, id: {}",
                     self.id,
@@ -246,11 +246,11 @@ impl CollectionActor {
         }
     }
 
-    async fn handle_subscribe(&mut self, id: i32, handle: ClientHandle) {
+    fn handle_subscribe(&mut self, id: i32, handle: ClientHandle) {
         self.subscribers.insert(id, handle);
     }
 
-    async fn handle_unsubscribe(&mut self, id: i32) {
+    fn handle_unsubscribe(&mut self, id: i32) {
         self.subscribers.remove(&id);
         if self.subscribers.is_empty() {
             trace!("col-{}: last client unsubscribed", self.id);
@@ -281,7 +281,7 @@ impl CollectionActor {
         Ok(colrev)
     }
 
-    async fn broadcast(&self, msg: ServerMessage) {
+    fn broadcast(&self, msg: ServerMessage) {
         if let Ok(serialized) = serde_json::to_string(&msg) {
             for client in self.subscribers.values() {
                 client.send(ClientActorMessage::Raw(serialized.clone()));
@@ -428,7 +428,7 @@ impl CollectionActor {
             updated_at: created_at,
             changeid,
         };
-        self.broadcast(ServerMessage::Change(msg)).await;
+        self.broadcast(ServerMessage::Change(msg));
 
         // return document
         let doc = Document {
@@ -552,7 +552,7 @@ impl CollectionActor {
             updated_at,
             changeid,
         };
-        self.broadcast(ServerMessage::Change(msg)).await;
+        self.broadcast(ServerMessage::Change(msg));
 
         let updated_doc = Document {
             id: doc.id,

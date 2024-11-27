@@ -52,11 +52,9 @@ impl ClientActor {
 
         loop {
             select! {
-                msg = self.websocket.recv() => {
-                    match msg {
-                        Some(Ok(msg)) => self.handle_message(msg).await,
-                        _ => break
-                    }
+                _ = &mut self.timeout => {
+                    trace!("client-{}: disconnect by timeout", self.client_id);
+                    break
                 },
                 Some(msg) = self.receiver.recv() => {
                     match msg {
@@ -68,10 +66,12 @@ impl ClientActor {
                         }
                     };
                 },
-                _ = &mut self.timeout => {
-                    trace!("client-{}: disconnect by timeout", self.client_id);
-                    break
-                }
+                msg = self.websocket.recv() => {
+                    match msg {
+                        Some(Ok(msg)) => self.handle_message(msg).await,
+                        _ => break
+                    }
+                },
             }
         }
     }
