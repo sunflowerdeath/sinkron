@@ -1,5 +1,4 @@
-import uniq from "lodash-es/uniq"
-import eq from "lodash-es/eq"
+import isEqual from "lodash-es/isEqual"
 
 export type Role =
     | { kind: "any" }
@@ -53,14 +52,16 @@ class Permissions {
     add(action: Action, role: Role) {
         const list = this.table[action]
         for (const item of list) {
-            if (eq(item, role)) return
+            if (isEqual(item, role)) return
         }
         list.push(role)
     }
 
     // Removes permission from the table
     remove(action: Action, role: Role) {
-        this.table[action] = this.table[action].filter((item) => eq(item, role))
+        this.table[action] = this.table[action].filter(
+            (item) => !isEqual(item, role)
+        )
     }
 
     // Checks if user has permission (issued directly on him or on his group)

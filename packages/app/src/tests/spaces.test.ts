@@ -109,7 +109,7 @@ describe("Spaces", () => {
         })
         assert.strictEqual(lockRes.statusCode, 200, "lock")
 
-        const getUserRes = await app.sinkron.getUser(user!.email)
+        const getUserRes = await app.sinkron.getUser(user!.id)
         assert(getUserRes.isOk, "get user object")
         const userObject = getUserRes.value
 

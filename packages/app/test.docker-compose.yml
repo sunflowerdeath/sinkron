@@ -9,7 +9,7 @@ services:
             - POSTGRES_DB=sinkron
         command: postgres -c log_statement=all
         healthcheck:
-            test: pg_isready
+            test: pg_isready -U postgres
             interval: 3s
             retries: 3
             start_period: 3s
@@ -47,7 +47,7 @@ services:
             - POSTGRES_DB=sinkron
         command: postgres -c log_statement=all
         healthcheck:
-            test: pg_isready
+            test: pg_isready -U postgres
             interval: 3s
             retries: 3
             start_period: 3s
