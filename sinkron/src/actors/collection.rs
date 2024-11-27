@@ -349,7 +349,6 @@ impl CollectionActor {
         source: Source,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
-
         let doc: models::Document = schema::documents::table
             .find(id)
             .filter(schema::documents::col_id.eq(&self.id))
@@ -361,6 +360,7 @@ impl CollectionActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
+        drop(conn);
 
         self.check_doc_permission(&doc, source, Action::Read)
             .await?;
@@ -452,7 +452,6 @@ impl CollectionActor {
         changeid: Uuid,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
-
         let doc: models::Document = schema::documents::table
             .find(id)
             .filter(schema::documents::col_id.eq(&self.id))
@@ -464,9 +463,9 @@ impl CollectionActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
+        drop(conn);
 
         let is_delete = data.is_none();
-
         let action = if is_delete {
             Action::Delete
         } else {
@@ -515,6 +514,8 @@ impl CollectionActor {
                 None
             }
         };
+
+        let mut conn = self.connect().await?;
 
         // Increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;

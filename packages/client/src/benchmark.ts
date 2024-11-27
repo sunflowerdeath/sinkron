@@ -5,7 +5,7 @@ import pino, { Logger } from "pino"
 import { SinkronClient, Permissions } from "./client"
 import { SinkronCollection } from "./collection"
 
-const numCols = 100 // 250
+const numCols = 250 // 250
 const numUsers = numCols * 2
 const actionTimeout = () => random(1000, 1500)
 

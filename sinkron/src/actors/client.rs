@@ -52,6 +52,11 @@ impl ClientActor {
 
         loop {
             select! {
+                // Always send to ws first, before processing incoming messaged.
+                // This should ensure disconnecting slow clients.
+                // XXX Another option is to use bounded channel and disconnect
+                // client when it reaches limit
+                biased;
                 _ = &mut self.timeout => {
                     trace!("client-{}: disconnect by timeout", self.client_id);
                     break

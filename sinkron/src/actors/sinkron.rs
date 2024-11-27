@@ -121,6 +121,8 @@ impl SinkronActor {
             .find(&col)
             .first::<Collection>(&mut conn)
             .await;
+        drop(conn);
+
         let Ok(col_model) = res else {
             // collection not found
             let msg = ServerMessage::SyncError(SyncErrorMessage {

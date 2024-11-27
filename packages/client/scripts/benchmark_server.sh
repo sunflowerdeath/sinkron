@@ -1,6 +1,11 @@
 set -e # exit on error
 export SINKRON_CONFIG=$(cat config.benchmark.json)
 cd ../../sinkron
+
 cargo build --release
 ./target/release/sinkron
- # sudo -E flamegraph -- ./target/benchmark/sinkron"
+
+# cargo build
+# ./target/debug/sinkron
+
+# sudo -E flamegraph -- ./target/debug/sinkron
