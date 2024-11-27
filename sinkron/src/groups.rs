@@ -1,6 +1,10 @@
+use std::num::NonZeroUsize;
+
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use lru::LruCache;
 use serde::Deserialize;
+use tokio::sync::Mutex;
 
 use crate::db;
 use crate::error::{internal_error, SinkronError};
@@ -16,11 +20,15 @@ pub struct AddRemoveUserToGroup {
 
 pub struct GroupsApi {
     pool: db::DbConnectionPool,
+    cache: Mutex<LruCache<String, User>>,
 }
 
 impl GroupsApi {
     pub fn new(pool: db::DbConnectionPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            cache: Mutex::new(LruCache::new(NonZeroUsize::new(5000).unwrap())),
+        }
     }
 
     async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
@@ -41,8 +49,25 @@ impl GroupsApi {
         Ok(cnt != 0)
     }
 
+    async fn get_user_from_cache(&self, id: &str) -> Option<User> {
+        let mut cache = self.cache.lock().await;
+        cache.get(id).map(|val| val.clone())
+    }
+
+    async fn put_user_to_cache(&self, id: String, user: User) {
+        let mut cache = self.cache.lock().await;
+        cache.put(id, user);
+    }
+
+    async fn remove_user_from_cache(&self, id: &str) {
+        let mut cache = self.cache.lock().await;
+        cache.pop(id);
+    }
+
     pub async fn get_user(&self, id: String) -> Result<User, SinkronError> {
-        // TODO cache
+        if let Some(user) = self.get_user_from_cache(&id).await {
+            return Ok(user);
+        }
         let mut conn = self.connect().await?;
         let groups: Vec<String> = schema::members::table
             .filter(schema::members::user.eq(&id))
@@ -50,7 +75,12 @@ impl GroupsApi {
             .get_results(&mut conn)
             .await
             .map_err(internal_error)?;
-        Ok(User { id, groups })
+        let user = User {
+            id: id.clone(),
+            groups,
+        };
+        self.put_user_to_cache(id, user.clone()).await;
+        Ok(user)
     }
 
     pub async fn get_group(&self, id: String) -> Result<Group, SinkronError> {
@@ -86,6 +116,7 @@ impl GroupsApi {
             .execute(&mut conn)
             .await
             .map_err(internal_error)?;
+        // TODO invalidate users that were members of the group
         let num = diesel::delete(schema::groups::table)
             .filter(schema::groups::id.eq(&id))
             .execute(&mut conn)
@@ -108,12 +139,16 @@ impl GroupsApi {
         if !exists {
             return Err(SinkronError::not_found("Group not found"));
         }
-        let new_member = models::Member { user, group };
+        let new_member = models::Member {
+            user: user.clone(),
+            group,
+        };
         let _ = diesel::insert_into(schema::members::table)
             .values(&new_member)
             .execute(&mut conn)
             .await
             .map_err(internal_error)?;
+        self.remove_user_from_cache(&user).await;
         Ok(())
     }
 
@@ -132,6 +167,7 @@ impl GroupsApi {
         if num == 0 {
             Err(SinkronError::not_found("Group member not found"))
         } else {
+            self.remove_user_from_cache(&user).await;
             Ok(())
         }
     }
@@ -146,6 +182,7 @@ impl GroupsApi {
             .execute(&mut conn)
             .await
             .map_err(internal_error)?;
+        self.remove_user_from_cache(&id).await;
         Ok(())
     }
 }

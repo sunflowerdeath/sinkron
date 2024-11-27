@@ -20,7 +20,7 @@ pub struct Group {
     pub members: Vec<String>
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct User {
     pub id: String,
     pub groups: Vec<String>
