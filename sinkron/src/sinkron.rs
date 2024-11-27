@@ -14,6 +14,7 @@ use diesel_async::RunQueryDsl;
 use log::trace;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
+use uuid::Uuid;
 
 use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
@@ -38,7 +39,7 @@ struct UpdateCollectionPermissions {
 
 #[derive(Deserialize)]
 struct UpdateDocumentPermissions {
-    id: uuid::Uuid,
+    id: Uuid,
     col: String,
     permissions: String,
 }
@@ -153,7 +154,7 @@ impl Sinkron {
 
     async fn get_document(
         &self,
-        id: uuid::Uuid,
+        id: Uuid,
         col: String,
     ) -> Result<Document, SinkronError> {
         let col = self.get_collection_actor(col).await?;
@@ -186,6 +187,7 @@ impl Sinkron {
             id,
             data,
             source: collection::Source::Api,
+            changeid: Uuid::new_v4(),
             reply: sender,
         }))
         .map_err(internal_error)?;
@@ -205,6 +207,7 @@ impl Sinkron {
             id,
             data,
             source: collection::Source::Api,
+            changeid: Uuid::new_v4(),
             reply: sender,
         }))
         .map_err(internal_error)?;
@@ -213,7 +216,7 @@ impl Sinkron {
 
     async fn delete_document(
         &self,
-        id: uuid::Uuid,
+        id: Uuid,
         col: String,
     ) -> Result<Document, SinkronError> {
         let col = self.get_collection_actor(col).await?;
@@ -222,6 +225,7 @@ impl Sinkron {
         col.send(CollectionMessage::Delete(collection::DeleteMessage {
             id,
             source: collection::Source::Api,
+            changeid: Uuid::new_v4(),
             reply: sender,
         }))
         .map_err(internal_error)?;
@@ -491,7 +495,7 @@ async fn get_collection(
 
 #[derive(Deserialize)]
 struct GetDocument {
-    id: uuid::Uuid,
+    id: Uuid,
     col: String,
 }
 
@@ -499,7 +503,7 @@ type DeleteDocument = GetDocument;
 
 #[derive(Deserialize)]
 struct CreateDocument {
-    id: uuid::Uuid,
+    id: Uuid,
     col: String,
     data: String,
     permissions: Option<String>,
@@ -507,7 +511,7 @@ struct CreateDocument {
 
 #[derive(Deserialize)]
 struct UpdateDocument {
-    id: uuid::Uuid,
+    id: Uuid,
     col: String,
     data: String,
 }

@@ -55,7 +55,7 @@ interface BaseClientChangeMessage {
     kind: "change"
     id: string // uuid
     col: string
-    changeid: string
+    changeid: string // uuid
 }
 
 export interface ClientCreateMessage extends BaseClientChangeMessage {

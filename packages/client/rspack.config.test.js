@@ -35,7 +35,7 @@ module.exports = {
     externals: [
         nodeExternals({
             additionalModuleDirs: ["../node_modules"],
-            allowlist: ["nanoevents", "nanoid", /^lodash-es/, "query-string"]
+            allowlist: ["nanoevents", /^lodash-es/, "query-string"]
         })
     ],
     resolve: {

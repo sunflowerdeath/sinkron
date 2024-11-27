@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use uuid::Uuid;
 
 use crate::schema;
 
@@ -25,7 +26,7 @@ pub struct NewCollection {
 #[diesel(table_name = schema::documents)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Document {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub col_id: String,
@@ -38,7 +39,7 @@ pub struct Document {
 #[derive(Insertable)]
 #[diesel(table_name = schema::documents)]
 pub struct NewDocument<'a> {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub col_id: String,
     pub colrev: i64,
     pub data: Vec<u8>,
@@ -58,8 +59,8 @@ pub struct DocumentUpdate<'a> {
 #[diesel(table_name = schema::refs)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Ref {
-    pub id: uuid::Uuid,
-    pub doc_id: uuid::Uuid,
+    pub id: Uuid,
+    pub doc_id: Uuid,
     pub col_id: String,
 }
 
@@ -67,7 +68,7 @@ pub struct Ref {
 #[diesel(table_name = schema::refs)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewRef {
-    pub doc_id: uuid::Uuid,
+    pub doc_id: Uuid,
     pub col_id: String,
 }
 

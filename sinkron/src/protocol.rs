@@ -1,3 +1,4 @@
+use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -35,20 +36,20 @@ pub struct SyncCompleteMessage {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GetMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub col: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GetErrorMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub code: ErrorCode
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DocMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub col: String,
     pub colrev: i64,
     pub data: Option<String>,
@@ -68,22 +69,22 @@ pub enum Op {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ClientChangeMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub col: String,
     pub op: Op,
     pub data: Option<String>,
-    pub changeid: String,
+    pub changeid: Uuid,
 }
 
 // TODO remove clone, instead serialize one time only when broadcast
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerChangeMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub col: String,
     pub op: Op,
     pub data: Option<String>,
-    pub changeid: String,
+    pub changeid: Uuid,
     pub colrev: i64,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -92,8 +93,8 @@ pub struct ServerChangeMessage {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ChangeErrorMessage {
     pub code: ErrorCode,
-    pub id: uuid::Uuid,
-    pub changeid: String,
+    pub id: Uuid,
+    pub changeid: Uuid,
 }
 
 #[derive(Serialize, Deserialize)]

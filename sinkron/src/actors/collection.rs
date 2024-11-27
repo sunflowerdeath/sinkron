@@ -6,8 +6,9 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use log::{trace, warn};
 use tokio::sync::{mpsc, oneshot};
+use uuid::Uuid;
 
-use crate::actors::client::ClientHandle;
+use crate::actors::client::{ClientActorMessage, ClientHandle};
 use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::db;
 use crate::error::{internal_error, SinkronError};
@@ -39,28 +40,31 @@ pub struct SyncMessage {
 }
 
 pub struct GetMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub source: Source,
     pub reply: oneshot::Sender<Result<Document, SinkronError>>,
 }
 
 pub struct CreateMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub data: String,
     pub source: Source,
+    pub changeid: Uuid,
     pub reply: oneshot::Sender<Result<Document, SinkronError>>,
 }
 
 pub struct UpdateMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub data: String,
     pub source: Source,
+    pub changeid: Uuid,
     pub reply: oneshot::Sender<Result<Document, SinkronError>>,
 }
 
 pub struct DeleteMessage {
-    pub id: uuid::Uuid,
+    pub id: Uuid,
     pub source: Source,
+    pub changeid: Uuid,
     pub reply: oneshot::Sender<Result<Document, SinkronError>>,
 }
 
@@ -208,10 +212,11 @@ impl CollectionActor {
                     id,
                     data,
                     source,
+                    changeid,
                     reply,
                 } = msg;
                 trace!("col-{}: create, id: {}", self.id, id);
-                let res = self.handle_create(id, data, source).await;
+                let res = self.handle_create(id, data, source, changeid).await;
                 _ = reply.send(res);
             }
             CollectionMessage::Update(msg) => {
@@ -219,16 +224,23 @@ impl CollectionActor {
                     id,
                     data,
                     source,
+                    changeid,
                     reply,
                 } = msg;
                 trace!("col-{}: update, id: {}", self.id, id);
-                let res = self.handle_update(id, Some(data), source).await;
+                let res =
+                    self.handle_update(id, Some(data), source, changeid).await;
                 _ = reply.send(res);
             }
             CollectionMessage::Delete(msg) => {
-                let DeleteMessage { id, source, reply } = msg;
+                let DeleteMessage {
+                    id,
+                    source,
+                    changeid,
+                    reply,
+                } = msg;
                 trace!("col-{}: delete, id: {}", self.id, id);
-                let res = self.handle_update(id, None, source).await;
+                let res = self.handle_update(id, None, source, changeid).await;
                 _ = reply.send(res);
             }
         }
@@ -270,9 +282,10 @@ impl CollectionActor {
     }
 
     async fn broadcast(&self, msg: ServerMessage) {
-        // TODO more efficient
-        for client in self.subscribers.values() {
-            client.send(msg.clone());
+        if let Ok(serialized) = serde_json::to_string(&msg) {
+            for client in self.subscribers.values() {
+                client.send(ClientActorMessage::Raw(serialized.clone()));
+            }
         }
     }
 
@@ -332,7 +345,7 @@ impl CollectionActor {
 
     async fn handle_get(
         &self,
-        id: uuid::Uuid,
+        id: Uuid,
         source: Source,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
@@ -357,9 +370,10 @@ impl CollectionActor {
 
     async fn handle_create(
         &mut self,
-        id: uuid::Uuid,
+        id: Uuid,
         data: String,
         source: Source,
+        changeid: Uuid,
     ) -> Result<Document, SinkronError> {
         self.check_col_permission(source, Action::Create).await?;
 
@@ -412,7 +426,7 @@ impl CollectionActor {
             data: Some(data.clone()),
             created_at,
             updated_at: created_at,
-            changeid: "".to_string(), // TODO payload.changeid
+            changeid,
         };
         self.broadcast(ServerMessage::Change(msg)).await;
 
@@ -432,9 +446,10 @@ impl CollectionActor {
 
     async fn handle_update(
         &mut self,
-        id: uuid::Uuid,
+        id: Uuid,
         data: Option<String>,
         source: Source,
+        changeid: Uuid,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
 
@@ -535,7 +550,7 @@ impl CollectionActor {
             data: serialized_new_data.clone(),
             created_at: doc.created_at,
             updated_at,
-            changeid: "".to_string(), // TODO payload.changeid
+            changeid,
         };
         self.broadcast(ServerMessage::Change(msg)).await;
 

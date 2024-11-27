@@ -1,7 +1,6 @@
 import { LoroDoc } from "loro-crdt"
 import { Base64 } from "js-base64"
 import { v4 as uuidv4 } from "uuid"
-import { nanoid } from "nanoid"
 import pino, { Logger } from "pino"
 import {
     makeObservable,
@@ -770,15 +769,13 @@ class SinkronCollection<T = undefined> {
             const item = this.items.get(id)
             if (item === undefined) return
 
-            const changeid = nanoid(8)
-
+            const changeid = uuidv4()
             const msg: any = {
                 kind: "change",
                 id,
                 changeid,
                 col: this.col
             }
-
             if (item.local !== null && item.remote === null) {
                 msg.op = Op.Create
                 msg.data = loroToBase64(item.local)

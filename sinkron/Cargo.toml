@@ -4,22 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7.7", features = ["ws"] }
+axum = { version = "0.7.9", features = ["ws"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
 deadpool = { version = "0.12.1", features = ["rt_tokio_1"] }
-diesel = { version = "2.2.4", features = ["uuid", "chrono"] }
-diesel-async = { version = "0.5", features = ["postgres", "deadpool", "async-connection-wrapper"] }
+diesel = { version = "2.2.5", features = ["chrono", "uuid"] }
+diesel-async = { version = "0.5.2", features = ["async-connection-wrapper", "deadpool", "postgres"] }
 diesel_migrations = "2.2.0"
 env_logger = "0.11.5"
 log = "0.4.22"
-loro = "1.0.0-beta.5"
+loro = "1.1.0"
 lru = "0.12.5"
 reqwest = { version = "0.12.9", default-features = false }
 serde = { version = "1.0.213", features = ["derive"] }
 serde_json = "1.0.132"
 tokio = { version = "1.41.0", features = ["rt-multi-thread", "time"] } 
-uuid = { version = "1.11.0", features = ["serde"] }
+uuid = { version = "1.11.0", features = ["serde", "v4"] }
 
 [profile.benchmark]
 inherits = "release"
