@@ -17,36 +17,36 @@ pub enum ErrorCode {
     InternalServerError,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct HeartbeatMessage {
     pub i: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct SyncErrorMessage {
     pub col: String,
     pub code: ErrorCode,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct SyncCompleteMessage {
     pub col: String,
     pub colrev: i64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct GetMessage {
     pub id: Uuid,
     pub col: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct GetErrorMessage {
     pub id: Uuid,
     pub code: ErrorCode
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocMessage {
     pub id: Uuid,
@@ -57,7 +57,7 @@ pub struct DocMessage {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub enum Op {
     #[serde(rename = "+")]
     Create,
@@ -67,7 +67,7 @@ pub enum Op {
     Update,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct ClientChangeMessage {
     pub id: Uuid,
     pub col: String,
@@ -76,8 +76,7 @@ pub struct ClientChangeMessage {
     pub changeid: Uuid,
 }
 
-// TODO remove clone, instead serialize one time only when broadcast
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerChangeMessage {
     pub id: Uuid,
@@ -90,7 +89,7 @@ pub struct ServerChangeMessage {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct ChangeErrorMessage {
     pub code: ErrorCode,
     pub id: Uuid,
@@ -110,7 +109,7 @@ pub enum ClientMessage {
     Change(ClientChangeMessage),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ServerMessage {
     #[serde(rename = "h")]
