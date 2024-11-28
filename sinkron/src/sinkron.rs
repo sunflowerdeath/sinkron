@@ -102,9 +102,10 @@ impl Sinkron {
         col: String,
     ) -> Result<CollectionHandle, SinkronError> {
         let (sender, receiver) = oneshot::channel();
-        self.actor.send(SinkronActorMessage::GetCollection(
-            GetCollectionMessage { col, reply: sender },
-        ));
+        let get_msg = GetCollectionMessage { col, reply: sender };
+        self.actor
+            .send(SinkronActorMessage::GetCollection(get_msg))
+            .expect("SinkronActor shoudn't exit");
         receiver.await.map_err(internal_error)?
     }
 
@@ -381,14 +382,14 @@ impl Sinkron {
                 return;
             }
         };
-        _ = self
-            .actor
+        self.actor
             .send(SinkronActorMessage::Connect(ConnectMessage {
                 websocket,
                 user,
                 col: query.col,
                 colrev: query.colrev,
-            }));
+            }))
+            .expect("SinkronActor shoudn't exit");
     }
 }
 

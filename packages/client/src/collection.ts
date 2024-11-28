@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from "uuid"
 import pino, { Logger } from "pino"
 import {
     makeObservable,
-    makeAutoObservable,
     observable,
     action,
     computed,
@@ -301,7 +300,8 @@ export class Item<T> {
     localUpdatedAt?: Date = undefined
     createdAt?: Date = undefined
     updatedAt?: Date = undefined
-    sentChanges: Set<string> = new Set()
+    // XXX sentChanges
+    // sentChanges: Set<string> = new Set()
 
     extractData?: ExtractData<T> | undefined
 
@@ -369,14 +369,12 @@ class SinkronCollection<T = undefined> {
         this.errorHandler = errorHandler
         this.logger = logger === undefined ? defaultLogger() : logger
         this.extractData = extractData
-        makeAutoObservable(this, {
+        makeObservable(this, {
             items: observable.shallow,
-            transport: false,
-            store: false,
-            logger: false,
-            backupQueue: false,
-            flushQueue: false,
-            flushDebounced: false
+            colrev: observable,
+            isLoaded: observable,
+            status: observable,
+            initialSyncCompleted: observable
         })
         this.flushDebounced = debounce(this.flush.bind(this), FLUSH_DELAY, {
             maxWait: FLUSH_MAX_WAIT
@@ -425,7 +423,7 @@ class SinkronCollection<T = undefined> {
         this.transport.emitter.on(
             "open",
             action(() => {
-                this.logger.debug("Connected to websocket")
+                this.logger.info("Connected to websocket")
                 this.status = ConnectionStatus.Connected
                 this.heartbeat = new Heartbeat({
                     logger: this.logger,
@@ -448,7 +446,7 @@ class SinkronCollection<T = undefined> {
         this.transport.emitter.on(
             "close",
             action(() => {
-                this.logger.debug("Connection closed")
+                this.logger.info("Connection closed")
                 this.status = ConnectionStatus.Disconnected
                 this.flushDebounced.cancel()
                 this.heartbeat?.dispose()
@@ -457,7 +455,7 @@ class SinkronCollection<T = undefined> {
         )
         this.transport.emitter.on("message", (msg: string) => {
             try {
-                this.onMessage(msg)
+                this.handleMessage(msg)
             } catch (e) {
                 this.logger.error(
                     "Unhandled exception in message handler, %o",
@@ -514,7 +512,7 @@ class SinkronCollection<T = undefined> {
         )
     }
 
-    onMessage(msg: string) {
+    handleMessage(msg: string) {
         this.logger.trace("Received message: %o", msg)
         let parsed
         try {
@@ -577,15 +575,16 @@ class SinkronCollection<T = undefined> {
     }
 
     handleChangeErrorMessage(msg: ChangeErrorMessage) {
-        const { id, changeid, code } = msg
+        const { id, code } = msg
 
         const item = this.items.get(id)
         if (item === undefined) return
 
-        if (changeid !== undefined && item.sentChanges.has(changeid)) {
-            this.logger.warn("Rejected change: %s %s", id, code)
-            item.sentChanges.delete(changeid)
-        }
+        this.logger.warn("Rejected change: %s %s", id, code)
+        // XXX sentChanges
+        // if (changeid !== undefined && item.sentChanges.has(changeid)) {
+            // item.sentChanges.delete(changeid)
+        // }
 
         if (code === "auth_failed") {
             this.logger.warn("Auth failed: %s", id)
@@ -623,15 +622,16 @@ class SinkronCollection<T = undefined> {
     }
 
     handleChangeMessage(msg: ServerChangeMessage) {
-        const { id, colrev, op, changeid } = msg
+        const { id, colrev, op } = msg
 
-        if (this.items.has(id)) {
-            const item = this.items.get(id)!
-            if (item.sentChanges.has(changeid)) {
-                this.logger.debug("Acknowledged own change: %s", changeid)
-                item.sentChanges.delete(changeid)
-            }
-        }
+        // XXX sentChanges
+        // if (this.items.has(id)) {
+            // const item = this.items.get(id)!
+            // if (item.sentChanges.has(changeid)) {
+                // this.logger.debug("Acknowledged own change: %s", changeid)
+                // item.sentChanges.delete(changeid)
+            // }
+        // }
 
         if (op === Op.Delete) {
             if (this.items.has(id)) {
@@ -681,7 +681,7 @@ class SinkronCollection<T = undefined> {
             const isChanged =
                 item.local === null || hasChanges(item.local, item.remote)
             item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
-            item.sentChanges.clear()
+            // item.sentChanges.clear()
             if (isChanged) {
                 this.logger.debug("Merged remote doc into local: %s", id)
                 this.flushQueue.add(id)
@@ -717,6 +717,7 @@ class SinkronCollection<T = undefined> {
             if (item.local !== null) item.local.import(update)
         } catch {
             this.logger.warn("Can't import changes, loro error: %s", id)
+            this.transport.send(JSON.stringify({ kind: "get", id }))
             return
         }
 
@@ -724,11 +725,11 @@ class SinkronCollection<T = undefined> {
             item.updatedAt = parseISO(msg.updatedAt)
         }
 
-        // update state
+        // update items state
         const isChanged =
             item.local === null || hasChanges(item.local, item.remote)
         item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
-        item.sentChanges.clear()
+        // item.sentChanges.clear()
         if (isChanged) {
             this.flushQueue.add(id)
         } else {
@@ -791,8 +792,8 @@ class SinkronCollection<T = undefined> {
             }
             this.transport.send(JSON.stringify(msg))
             item.state = ItemState.ChangesSent
-            item.sentChanges.clear()
-            item.sentChanges.add(changeid)
+            // item.sentChanges.clear()
+            // item.sentChanges.add(changeid)
         })
         this.flushQueue.clear()
     }

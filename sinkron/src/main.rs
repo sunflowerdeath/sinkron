@@ -13,6 +13,7 @@ use std::env;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() {
+    // console_subscriber::init();
     env_logger::init();
 
     let Ok(config_str) = &env::var("SINKRON_CONFIG") else {

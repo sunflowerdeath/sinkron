@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
 use axum::extract::ws::{Message, WebSocket};
-use log::trace;
+use log::{trace, debug};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -41,13 +41,13 @@ struct ClientActor {
 
 impl ClientActor {
     async fn run(&mut self) {
-        trace!("client-{}: start", self.client_id);
+        debug!("client-{}: start", self.client_id);
 
         if self.sync(self.colrev).await.is_err() {
-            trace!("client-{}: sync failed", self.client_id);
+            debug!("client-{}: sync failed", self.client_id);
             return;
         } else {
-            trace!("client-{}: sync completed", self.client_id);
+            debug!("client-{}: sync completed", self.client_id);
         }
 
         loop {
@@ -57,10 +57,12 @@ impl ClientActor {
                 // XXX Another option is to use bounded channel and disconnect
                 // client when it reaches limit
                 biased;
-                _ = &mut self.timeout => {
-                    trace!("client-{}: disconnect by timeout", self.client_id);
+                () = &mut self.timeout => {
+                    debug!("client-{}: disconnect by timeout", self.client_id);
                     break
                 },
+                // XXX could break if not Some ?
+                // e.g. if all handles dropped
                 Some(msg) = self.receiver.recv() => {
                     match msg {
                         ClientActorMessage::Sinkron(msg) => {
@@ -328,11 +330,13 @@ impl ClientHandle {
             receiver,
             timeout: Box::pin(sleep(DISCONNECT_TIMEOUT)),
         };
-        supervisor.spawn(async move { reader.run().await }, on_exit);
+        let name = format!("client:{}", client_id);
+        supervisor.spawn(name, async move { reader.run().await }, on_exit);
         Self { supervisor, sender }
     }
 
     pub fn send(&self, msg: ClientActorMessage) {
+        // XXX should return error
         _ = self.sender.send(msg);
     }
 }

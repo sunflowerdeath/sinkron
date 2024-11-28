@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use tokio::select;
 use tokio::sync::Notify;
+// use tokio::task::Builder;
 
 #[derive(Clone)]
 pub struct Supervisor {
     pub stop: Arc<Notify>,
-    pub exit: Arc<Notify>,
 }
 
 pub type ExitCallback = Box<dyn FnOnce() + Send>;
@@ -15,22 +15,24 @@ impl Supervisor {
     pub fn new() -> Self {
         Self {
             stop: Arc::new(Notify::new()),
-            exit: Arc::new(Notify::new()),
         }
     }
 
-    pub fn spawn<T>(&self, task: T, on_exit: Option<ExitCallback>)
-    where
+    pub fn spawn<T>(
+        &self,
+        _name: String,
+        task: T,
+        on_exit: Option<ExitCallback>,
+    ) where
         T: std::future::Future + Send + 'static,
     {
         let stop = self.stop.clone();
-        let exit = self.exit.clone();
-        tokio::spawn(async move {
+        // Builder::new().name(&name).spawn(async move {
+        tokio::task::spawn(async move {
             select! {
-                _ = stop.notified() => {},
                 _ = task => {},
+                () = stop.notified() => {},
             }
-            exit.notify_waiters();
             if let Some(on_exit) = on_exit {
                 on_exit();
             }

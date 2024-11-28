@@ -22,7 +22,8 @@ module.exports = {
     mode: isProduction ? "production" : "development",
     entry: {
         client: "./src/client.ts",
-        collection: "./src/collection.ts"
+        collection: "./src/collection.ts",
+        qwe: "./src/qwe.ts"
     },
     output: {
         path: path.resolve(__dirname, "./lib"),

@@ -4,19 +4,19 @@ use std::sync::Arc;
 use axum::extract::ws::{Message, WebSocket};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use log::trace;
+use log::debug;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::actors::client::ClientHandle;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::supervisor::ExitCallback;
-use crate::types::Collection;
 use crate::db;
 use crate::error::{internal_error, SinkronError};
 use crate::groups::GroupsApi;
 use crate::protocol::*;
 use crate::schema;
+use crate::types::Collection;
 
 pub struct ConnectMessage {
     pub websocket: WebSocket,
@@ -64,7 +64,7 @@ impl SinkronActor {
     }
 
     async fn run(&mut self) {
-        trace!("sinkron: actor start");
+        debug!("sinkron: actor start");
         loop {
             select! {
                 msg = self.receiver.recv() => {
@@ -73,13 +73,15 @@ impl SinkronActor {
                         None => break
                     }
                 },
+                // XXX could break if not some?
+                // if exit_channel is dropped ? should not be possible ?
                 Some(id) = self.exit_channel.1.recv() => {
-                    trace!("sinkron: col exit, id: {}", id);
+                    debug!("sinkron: col exit, id: {}", id);
                     self.collections.remove(&id);
                 },
             }
         }
-        trace!("sinkron: actor exit");
+        debug!("sinkron: actor exit");
     }
 
     async fn handle_message(&mut self, msg: SinkronActorMessage) {
@@ -99,13 +101,15 @@ impl SinkronActor {
         self.pool.get().await.map_err(internal_error)
     }
 
-    async fn handle_connect(
-        &mut self,
-        msg: ConnectMessage,
-    ) {
-        trace!("sinkron: client connect");
+    async fn handle_connect(&mut self, msg: ConnectMessage) {
+        let ConnectMessage {
+            mut websocket,
+            user,
+            col,
+            colrev,
+        } = msg;
 
-        let ConnectMessage { mut websocket, user, col, colrev } = msg;
+        debug!("sinkron: client connect: {}", user);
 
         let Ok(mut conn) = self.connect().await else {
             let msg = ServerMessage::SyncError(SyncErrorMessage {
@@ -142,7 +146,7 @@ impl SinkronActor {
         let on_exit: ExitCallback = {
             let collection = collection.clone();
             Box::new(move || {
-                trace!("client-{}: exit", client_id);
+                debug!("client-{}: exit", client_id);
                 _ = collection
                     .send(CollectionMessage::Unsubscribe { client_id });
             })
@@ -226,7 +230,10 @@ impl SinkronHandle {
         Self { sender }
     }
 
-    pub fn send(&self, msg: SinkronActorMessage) {
-        _ = self.sender.send(msg);
+    pub fn send(
+        &self,
+        msg: SinkronActorMessage,
+    ) -> Result<(), mpsc::error::SendError<SinkronActorMessage>> {
+        self.sender.send(msg)
     }
 }

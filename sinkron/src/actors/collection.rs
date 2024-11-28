@@ -4,7 +4,7 @@ use std::sync::Arc;
 use base64::prelude::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use log::{trace, warn};
+use log::{debug, trace, warn};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
@@ -128,11 +128,11 @@ impl CollectionActor {
     }
 
     async fn run(&mut self) {
-        trace!("col-{}: actor start", self.id);
+        debug!("col-{}: actor start", self.id);
         while let Some(msg) = self.receiver.recv().await {
             self.handle_message(msg).await;
         }
-        trace!("col-{}: actor exit", self.id);
+        debug!("col-{}: actor exit", self.id);
     }
 
     async fn check_col_permission(
@@ -181,14 +181,13 @@ impl CollectionActor {
         match msg {
             CollectionMessage::Subscribe { client_id, handle } => {
                 self.handle_subscribe(client_id, handle);
-                trace!("col-{}: client subscribed, id: {}", self.id, client_id);
+                debug!("col-{}: client subscribed, id: {}", self.id, client_id);
             }
             CollectionMessage::Unsubscribe { client_id } => {
                 self.handle_unsubscribe(client_id);
-                trace!(
+                debug!(
                     "col-{}: client unsubscribed, id: {}",
-                    self.id,
-                    client_id
+                    self.id, client_id
                 );
             }
             CollectionMessage::Sync(msg) => {
@@ -228,8 +227,9 @@ impl CollectionActor {
                     reply,
                 } = msg;
                 trace!("col-{}: update, id: {}", self.id, id);
-                let res =
-                    self.handle_update(id, Some(data), source, changeid).await;
+                let res = self
+                    .handle_update(id, Some(data.clone()), source, changeid)
+                    .await;
                 _ = reply.send(res);
             }
             CollectionMessage::Delete(msg) => {
@@ -253,7 +253,7 @@ impl CollectionActor {
     fn handle_unsubscribe(&mut self, id: i32) {
         self.subscribers.remove(&id);
         if self.subscribers.is_empty() {
-            trace!("col-{}: last client unsubscribed", self.id);
+            debug!("col-{}: last client unsubscribed", self.id);
             self.supervisor.stop();
         }
     }
@@ -284,6 +284,8 @@ impl CollectionActor {
     fn broadcast(&self, msg: ServerMessage) {
         if let Ok(serialized) = serde_json::to_string(&msg) {
             for client in self.subscribers.values() {
+                // XXX should handle if it couldn't write to client
+                // should unsubscribe and stop it
                 client.send(ClientActorMessage::Raw(serialized.clone()));
             }
         }
@@ -444,6 +446,46 @@ impl CollectionActor {
         Ok(doc)
     }
 
+    async fn update_loro_doc(
+        &self,
+        snapshot: Vec<u8>,
+        update: &str,
+    ) -> Result<Vec<u8>, SinkronError> {
+        let Ok(decoded_update) = BASE64_STANDARD.decode(update) else {
+            return Err(SinkronError::bad_request(
+                "Couldn't decode update from base64",
+            ));
+        };
+        let task = tokio::task::spawn_blocking(move || {
+            let loro_doc = loro::LoroDoc::new();
+            if loro_doc.import(&snapshot).is_err() {
+                return Err(SinkronError::internal(
+                    "Couldn't import snapshot, data might be corrupted",
+                ));
+            }
+            if loro_doc.import(&decoded_update).is_err() {
+                return Err(SinkronError::bad_request(
+                    "Couldn't import update",
+                ));
+            }
+            loro_doc.export(loro::ExportMode::Snapshot).map_err(|_| {
+                SinkronError::bad_request("Couldn't export snapshot")
+            })
+        });
+        let res =
+            tokio::time::timeout(tokio::time::Duration::from_millis(500), task)
+                .await;
+        match res {
+            Ok(Ok(res)) => res,
+            Ok(Err(_)) => {
+                panic!("Couldn't join update task!")
+            }
+            Err(_) => {
+                panic!("Update task timeout!")
+            }
+        }
+    }
+
     async fn handle_update(
         &mut self,
         id: Uuid,
@@ -480,30 +522,7 @@ impl CollectionActor {
                         "Couldn't update deleted document",
                     ));
                 };
-                let Ok(decoded_update) = BASE64_STANDARD.decode(update) else {
-                    return Err(SinkronError::bad_request(
-                        "Couldn't decode update from base64",
-                    ));
-                };
-                let loro_doc = loro::LoroDoc::new();
-                if loro_doc.import(&data).is_err() {
-                    return Err(SinkronError::internal(
-                        "Couldn't open document, data might be corrupted",
-                    ));
-                }
-                if loro_doc.import(&decoded_update).is_err() {
-                    return Err(SinkronError::bad_request(
-                        "Couldn't import update",
-                    ));
-                }
-                let Ok(snapshot) = loro_doc.export(loro::ExportMode::Snapshot)
-                else {
-                    return Err(SinkronError::bad_request(
-                        "Couldn't export snapshot",
-                    ));
-                };
-
-                Some(snapshot)
+                Some(self.update_loro_doc(data, &update).await?)
             }
             None => {
                 if doc.data.is_none() {
@@ -595,7 +614,8 @@ impl CollectionHandle {
             groups_api,
             supervisor.clone(),
         );
-        supervisor.spawn(async move { actor.run().await }, on_exit);
+        let name = format!("collection:{}", &col.id);
+        supervisor.spawn(name, async move { actor.run().await }, on_exit);
         CollectionHandle {
             id: col.id.clone(),
             sender,

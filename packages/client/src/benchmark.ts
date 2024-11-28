@@ -1,11 +1,12 @@
 import { LoroDoc } from "loro-crdt"
 import { random, sample } from "lodash-es"
 import pino, { Logger } from "pino"
+// import { WebSocket } from "ws"
 
 import { SinkronClient, Permissions } from "./client"
 import { SinkronCollection } from "./collection"
 
-const numCols = 250 // 250
+const numCols = 25 // 250
 const numUsers = numCols * 2
 const actionTimeout = () => random(1000, 1500)
 
@@ -19,20 +20,24 @@ const client = (userid: string, colid: string) => {
     const logger: Logger<string> = pino({
         transport: { target: "pino-pretty" }
     })
-    logger.level = "warn"
+    logger.level = "info"
     const col = new SinkronCollection({
         col: colid,
         url: `ws://localhost:3337/sync`,
         logger,
         token: `token-${userid}`
+        // @ts-ignore
+        // webSocketImpl: WebSocket
     })
     const doSomething = () => {
-        const n = random(20)
-        if (col.items.size == 0 || n === 1 || n == 2) {
+        const n = random(100)
+        if (col.items.size === 0 || n <= 10) {
             // 10% to create document
             col.create(makeDoc())
-        } else if (n === 3) {
-            // 5% to delete document
+        } else if (
+            col.items.size > 100 ? 10 <= n && n <= 20 : 10 <= n && n <= 15
+        ) {
+            // 5% to delete document (or 10% when 100+ items)
             const id = sample(Array.from(col.items.keys()))!
             if (col.items.get(id)!.local !== null) {
                 col.delete(id)
