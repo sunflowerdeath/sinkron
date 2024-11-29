@@ -15,7 +15,7 @@ import {
 import { Col, Row } from "oriente"
 import { isEqual, without } from "lodash-es"
 import { Transforms, Descendant } from "slate"
-import { LoroDoc, LoroMap } from "loro-crdt"
+import { LoroMap } from "loro-crdt"
 import { ObservableLoroDoc } from "@sinkron/client/lib/collection"
 import { fromLoro, applySlateOps } from "@sinkron/loro-slate"
 
@@ -68,6 +68,7 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const readOnly = spaceStore.space.role === "readonly" || data.isLocked
 
+    // XXX move computed to DocumentViewStore
     const valueCell = useMemo(() => {
         return computed((): Descendant[] => {
             const content = doc.doc.getMap("root").get("content")
