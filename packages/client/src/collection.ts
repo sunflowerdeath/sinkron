@@ -163,7 +163,7 @@ class IndexedDbCollectionStore implements CollectionStore {
             // @ts-ignore
             const db = event.target.result
             db!.createObjectStore("items") // XXX wait until success?
-            localStorage.setItem(`stored_collection/${key}`, "-1")
+            localStorage.setItem(`stored_collection/${key}`, "0")
         }
         this.isReady = deferred.promise
     }
@@ -184,7 +184,7 @@ class IndexedDbCollectionStore implements CollectionStore {
         const req = store.clear()
         req.onsuccess = () => deferred.resolve()
         await deferred.promise
-        localStorage.setItem(`stored_collection/${this.key}`, "-1")
+        localStorage.setItem(`stored_collection/${this.key}`, "0")
     }
 
     async save(id: string, item: Item<any>, colrev: string) {
@@ -232,7 +232,7 @@ class IndexedDbCollectionStore implements CollectionStore {
 
     async load() {
         const val = localStorage.getItem(`stored_collection/${this.key}`)
-        const colrev = val === null ? "-1" : val
+        const colrev = val === null ? "0" : val
 
         await this.isReady
 
@@ -414,9 +414,15 @@ class SinkronCollection<T = undefined> {
         if (this.store) await this.loadFromStore()
         this.isLoaded = true
 
-        const query = queryString.stringify({ token, col, colrev: this.colrev })
         this.transport = new WebSocketTransport({
-            url: `${url}?${query}`,
+            url: () => {
+                const query = queryString.stringify({
+                    token,
+                    col,
+                    colrev: this.colrev
+                })
+                return `${url}?${query}`
+            },
             webSocketImpl,
             logger: this.logger
         })
@@ -583,7 +589,7 @@ class SinkronCollection<T = undefined> {
         this.logger.warn("Rejected change: %s %s", id, code)
         // XXX sentChanges
         // if (changeid !== undefined && item.sentChanges.has(changeid)) {
-            // item.sentChanges.delete(changeid)
+        // item.sentChanges.delete(changeid)
         // }
 
         if (code === "auth_failed") {
@@ -626,11 +632,11 @@ class SinkronCollection<T = undefined> {
 
         // XXX sentChanges
         // if (this.items.has(id)) {
-            // const item = this.items.get(id)!
-            // if (item.sentChanges.has(changeid)) {
-                // this.logger.debug("Acknowledged own change: %s", changeid)
-                // item.sentChanges.delete(changeid)
-            // }
+        // const item = this.items.get(id)!
+        // if (item.sentChanges.has(changeid)) {
+        // this.logger.debug("Acknowledged own change: %s", changeid)
+        // item.sentChanges.delete(changeid)
+        // }
         // }
 
         if (op === Op.Delete) {

@@ -9,7 +9,7 @@ export interface Transport {
 }
 
 export type WebSocketTransportProps = {
-    url: string
+    url: string | (() => string)
     webSocketImpl?: typeof WebSocket
     logger?: Logger<string>
 }
@@ -23,14 +23,15 @@ class WebSocketTransport implements Transport {
     }
 
     emitter = createNanoEvents()
-    url: string
+    url: string | (() => string)
     webSocketImpl: typeof WebSocket
     ws?: WebSocket
     logger?: Logger<string>
 
     open() {
-        this.logger?.debug("Connecting to websocket: %s", this.url)
-        this.ws = new this.webSocketImpl(this.url)
+        const url = typeof this.url === "function" ? this.url() : this.url
+        this.logger?.debug("Connecting to websocket: %s", url)
+        this.ws = new this.webSocketImpl(url)
         this.ws.addEventListener("open", () => {
             this.logger?.debug("Websocket connection open")
             this.emitter.emit("open")
