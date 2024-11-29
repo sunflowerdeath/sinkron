@@ -58,7 +58,6 @@ class AuthService {
         this.lastCode = code
         const text = `Enter this code on the sign-in page:\n${code}`
         const res = await this.app.emailSender.send({
-            from: "admin@mail.sinkron.xyz",
             sender: "Sinkron",
             to: email,
             subject: "Sinkron Verification Code",

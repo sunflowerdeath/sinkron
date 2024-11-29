@@ -4,7 +4,7 @@ import { Result, ResultType } from "./utils/result"
 import { ErrorCode, RequestError } from "./error"
 
 export interface SendEmailProps {
-    from: string
+    from?: string
     sender: string
     to: string
     subject: string
@@ -22,23 +22,27 @@ interface SmtpEmailSenderProps {
     secure: boolean
     user: string
     password: string
+    from: string
 }
 
 class SmtpEmailSender implements EmailSender {
     transport: Transporter
+    from: string
 
     constructor(props: SmtpEmailSenderProps) {
-        const { host, port, secure, user, password } = props
+        const { host, port, secure, user, password, from } = props
         this.transport = createTransport({
             host,
             port,
             secure,
             auth: { user, pass: password }
         })
+        this.from = from
     }
 
     async send(props: SendEmailProps): Promise<ResultType<true, RequestError>> {
-        const { from, sender, to, subject, text, html } = props
+        const { sender, to, subject, text, html } = props
+        const from = props.from ?? this.from
 
         try {
             const info = await this.transport.sendMail({

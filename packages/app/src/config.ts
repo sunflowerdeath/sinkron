@@ -19,6 +19,7 @@ export type SmtpConfig = {
     secure: boolean
     user: string
     password: string
+    from: string
 }
 
 export type MailConfig = { type: "console" } | SmtpConfig
