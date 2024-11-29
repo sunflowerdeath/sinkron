@@ -14,7 +14,7 @@ const rules = [
         include: [src],
         use: [
             {
-                loader: "builtin:swc-loader",
+                loader: "swc-loader",
                 options: {
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: { parser: { syntax: "typescript" } }
@@ -27,7 +27,7 @@ const rules = [
         include: [src],
         use: [
             {
-                loader: "builtin:swc-loader",
+                loader: "swc-loader",
                 options: {
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: {
@@ -80,7 +80,7 @@ module.exports = {
         filename: "[name].[fullhash].js"
     },
     optimization: {
-        minimize: isProduction
+        minimize: false, // isProduction
     },
     target: "web",
     resolve: {
