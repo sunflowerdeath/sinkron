@@ -13,4 +13,3 @@ services:
     front:
         build:
             dockerfile: front.Dockerfile
-        # TODO - env vars {SINKRON_API_URL /  SINKRON_URL / CONFIG} ?

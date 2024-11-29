@@ -3,13 +3,13 @@ const isProductionEnv = process.env.NODE_ENV === "production"
 const tauri = window.location.hostname === "tauri.localhost"
 
 const wsUrl = isProductionEnv
-    ? "wss://api.sinkron.xyz"
+    ? "wss://sync.sinkron.xyz"
     : tauri
     ? "ws://10.0.2.2:80"
     : `ws://${window.location.hostname}:3333/sync`
 
 const apiUrl = isProductionEnv
-    ? "https://api.sinkron.xyz"
+    ? "https://app.sinkron.xyz"
     : tauri
     ? "http://10.0.2.2:80"
     : `http://${window.location.hostname}:80`

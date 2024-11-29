@@ -4,7 +4,8 @@ WORKDIR /app
 RUN apk add --no-cache musl-dev
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
-    cargo build && cp /app/target/debug/sinkron /app/sinkron
+    cargo build --locked --release && \
+    cp /app/target/release/sinkron /app/sinkron
 
 FROM alpine:3.20
 COPY --from=build /app/sinkron /app/sinkron
