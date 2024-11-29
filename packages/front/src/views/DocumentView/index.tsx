@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react"
 import { ErrorBoundary } from "react-error-boundary"
+import { computed } from "mobx"
 import { observer } from "mobx-react-lite"
 import { useLocation, Redirect } from "wouter"
 import { useMedia } from "react-use"
@@ -13,8 +14,9 @@ import {
 } from "slate-react"
 import { Col, Row } from "oriente"
 import { isEqual, without } from "lodash-es"
-import { Transforms } from "slate"
+import { Transforms, Descendant } from "slate"
 import { LoroDoc, LoroMap } from "loro-crdt"
+import { ObservableLoroDoc } from "@sinkron/client/lib/collection"
 import { fromLoro, applySlateOps } from "@sinkron/loro-slate"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
@@ -46,7 +48,7 @@ const useForceUpdate = () => {
 
 type EditorViewProps = {
     id: string
-    doc: LoroDoc
+    doc: ObservableLoroDoc
     data: DocumentData
     onChange: (editor: ReactEditor) => void
     onDelete: () => void
@@ -66,16 +68,20 @@ const EditorView = observer((props: EditorViewProps) => {
 
     const readOnly = spaceStore.space.role === "readonly" || data.isLocked
 
-    const forceUpdate = useForceUpdate()
-    const value = useMemo(() => {
-        const content = doc.getMap("root").get("content")
-        if (content instanceof LoroMap) {
-            const root = fromLoro(content) as RootElement
-            return root.children
-        } else {
-            return []
-        }
+    const valueCell = useMemo(() => {
+        return computed((): Descendant[] => {
+            const content = doc.doc.getMap("root").get("content")
+            if (content instanceof LoroMap) {
+                const root = fromLoro(content) as RootElement
+                return root.children
+            } else {
+                return []
+            }
+        })
     }, [doc])
+    const value = valueCell.get()
+
+    const forceUpdate = useForceUpdate()
     useMemo(() => {
         if (!isEqual(editor.children, value)) {
             editor.children = value
@@ -467,7 +473,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
         <EditorView
             id={id}
             data={item.data}
-            doc={item.local.doc}
+            doc={item.local}
             onChange={onChange}
             onDelete={onDelete}
         />

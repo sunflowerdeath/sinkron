@@ -64,8 +64,9 @@ class ObservableLoroDoc {
     }
 
     import(...args: Parameters<typeof L.import>): ReturnType<typeof L.import> {
+        const res = this.#doc.import(...args)
         this.#atom.reportChanged()
-        return this.#doc.import(...args)
+        return res
     }
 
     toJSON(...args: Parameters<typeof L.toJSON>): ReturnType<typeof L.toJSON> {
@@ -866,4 +867,4 @@ class SinkronCollection<T = undefined> {
     }
 }
 
-export { SinkronCollection, IndexedDbCollectionStore, Channel }
+export { SinkronCollection, IndexedDbCollectionStore, Channel, ObservableLoroDoc }
