@@ -11,7 +11,7 @@ use axum::{
 };
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use log::trace;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use uuid::Uuid;
@@ -344,7 +344,6 @@ impl Sinkron {
                 let url = "".to_string() + auth_url + token;
                 let req = reqwest::Client::new()
                     .post(url)
-                    .body("".to_string())
                     .send()
                     .await
                     .map_err(internal_error)?;
@@ -367,10 +366,11 @@ impl Sinkron {
     async fn handle_connect(&self, mut websocket: WebSocket, query: SyncQuery) {
         let user = match self.auth(&query.token).await {
             Ok(user) => {
-                trace!("sinkron: authorized client as {}", user);
+                debug!("sinkron: authorized client as {}", user);
                 user
             }
             Err(err) => {
+                debug!("sinkron: client authorization failed {:?}", err);
                 let msg = ServerMessage::SyncError(SyncErrorMessage {
                     col: query.col,
                     code: err.code,

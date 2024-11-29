@@ -4,7 +4,7 @@ use std::sync::Arc;
 use base64::prelude::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use log::{debug, trace, warn};
+use log::{debug, trace};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
@@ -259,10 +259,7 @@ impl CollectionActor {
     }
 
     async fn connect(&self) -> Result<db::DbConnection, SinkronError> {
-        self.pool.get().await.map_err(|e| {
-            warn!("Couldn't obtain db connection: {:?}", e);
-            internal_error(e)
-        })
+        self.pool.get().await.map_err(internal_error)
     }
 
     async fn increment_colrev(

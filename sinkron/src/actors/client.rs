@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
 use axum::extract::ws::{Message, WebSocket};
-use log::{trace, debug};
+use log::{debug, trace};
 use tokio::{
     select,
     sync::{mpsc, oneshot},
@@ -43,12 +43,15 @@ impl ClientActor {
     async fn run(&mut self) {
         debug!("client-{}: start", self.client_id);
 
-        if self.sync(self.colrev).await.is_err() {
-            debug!("client-{}: sync failed", self.client_id);
-            return;
-        } else {
-            debug!("client-{}: sync completed", self.client_id);
-        }
+        match self.sync(self.colrev).await {
+            Ok(()) => {
+                debug!("client-{}: sync completed", self.client_id);
+            }
+            Err(e) => {
+                debug!("client-{}: sync failed {:?}", self.client_id, e);
+                return;
+            }
+        };
 
         loop {
             select! {
@@ -160,7 +163,6 @@ impl ClientActor {
         self.timeout
             .as_mut()
             .reset(Instant::now() + DISCONNECT_TIMEOUT);
-
         let reply = HeartbeatMessage { i: msg.i + 1 };
         self.send_to_ws(ServerMessage::Heartbeat(reply)).await;
     }
