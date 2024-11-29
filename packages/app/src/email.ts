@@ -51,7 +51,8 @@ class SmtpEmailSender implements EmailSender {
 
             console.log("Message sent: %s", info.messageId)
             return Result.ok(true)
-        } catch {
+        } catch (e) {
+            console.log("Couldn't send email", e)
             return Result.err({
                 code: ErrorCode.InternalServerError,
                 message: "Email transport error"
