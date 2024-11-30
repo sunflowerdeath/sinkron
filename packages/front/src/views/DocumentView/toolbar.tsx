@@ -193,14 +193,14 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
 
     if (isMobile) {
         return (
-            <Col gap={8} align="normal">
+            <Col gap={6} align="normal">
                 <div
                     style={{
                         flexGrow: 1,
                         display: "grid",
                         gridTemplateColumns:
                             "repeat(auto-fill, minmax(75px, 1fr))",
-                        gap: 8
+                        gap: 6
                     }}
                 >
                     {blockButtons}
@@ -209,7 +209,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
                     style={{
                         display: "grid",
                         gridTemplateColumns: "repeat(4, 1fr)",
-                        gap: 8
+                        gap: 6
                     }}
                 >
                     {textButtons}

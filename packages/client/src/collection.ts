@@ -126,8 +126,9 @@ type StoredItem = {
 }
 
 export interface CollectionStore {
-    save(id: string, item: Item<any>, colrev: string): Promise<void>
-    delete(id: string, colrev: string): Promise<void>
+    save(id: string, item: Item<any>): Promise<void>
+    delete(id: string): Promise<void>
+    colrev(colrev: string): Promise<void>
     load(): Promise<{ items: StoredItem[]; colrev: string }>
     dispose(): void
 }
@@ -188,7 +189,7 @@ class IndexedDbCollectionStore implements CollectionStore {
         localStorage.setItem(`stored_collection/${this.key}`, "0")
     }
 
-    async save(id: string, item: Item<any>, colrev: string) {
+    async save(id: string, item: Item<any>) {
         const { local, remote, localUpdatedAt, createdAt, updatedAt } = item
         const store = this.db!.transaction("items", "readwrite").objectStore(
             "items"
@@ -205,10 +206,9 @@ class IndexedDbCollectionStore implements CollectionStore {
         const req = store.put(serialized, id)
         req.onsuccess = () => deferred.resolve()
         await deferred.promise
-        localStorage.setItem(`stored_collection/${this.key}`, colrev)
     }
 
-    async delete(id: string, colrev: string) {
+    async delete(id: string) {
         const store = this.db!.transaction("items", "readwrite").objectStore(
             "items"
         )
@@ -216,6 +216,9 @@ class IndexedDbCollectionStore implements CollectionStore {
         const req = store.delete(id)
         req.onsuccess = () => deferred.resolve()
         await deferred.promise
+    }
+
+    async colrev(colrev: string) {
         localStorage.setItem(`stored_collection/${this.key}`, colrev)
     }
 
@@ -301,8 +304,6 @@ export class Item<T> {
     localUpdatedAt?: Date = undefined
     createdAt?: Date = undefined
     updatedAt?: Date = undefined
-    // XXX sentChanges
-    // sentChanges: Set<string> = new Set()
 
     extractData?: ExtractData<T> | undefined
 
@@ -334,6 +335,9 @@ export class Item<T> {
 
 const FLUSH_DELAY = 1000
 const FLUSH_MAX_WAIT = 2000
+
+const BACKUP_DELAY = 10000
+const BACKUP_MAX_WAIT = 20000
 
 export enum ConnectionStatus {
     Disconnected = "disconnected",
@@ -380,30 +384,40 @@ class SinkronCollection<T = undefined> {
         this.flushDebounced = debounce(this.flush.bind(this), FLUSH_DELAY, {
             maxWait: FLUSH_MAX_WAIT
         })
+        this.backupDebounced = debounce(this.backup.bind(this), BACKUP_DELAY, {
+            maxWait: BACKUP_MAX_WAIT
+        })
         this.init(props)
     }
 
     col: string
-    transport!: Transport
-    autoReconnect?: AutoReconnect
-    disconnect?: () => void
-    store?: CollectionStore = undefined
-    logger: Logger<string>
-    errorHandler?: (msg: ServerMessage) => void
     colrev: string = "0"
-    extractData?: ExtractData<T>
     items: Map<string, Item<T>> = new Map()
-    isLoaded = false
+    isLoaded = false // XXX isLoadedFromStore ?
     status = ConnectionStatus.Disconnected
     initialSyncCompleted = false
     isDestroyed = false
-    flushDebounced: ReturnType<typeof debounce>
-    backupQueue = new Set<string>()
-    flushQueue = new Set<string>()
+
+    transport!: Transport
+    store?: CollectionStore = undefined
+    logger: Logger<string>
+    errorHandler?: (msg: ServerMessage) => void
+    extractData?: ExtractData<T>
+
     heartbeat?: Heartbeat
+    autoReconnect?: AutoReconnect
+    disconnect?: () => void
+
+    backupQueue = new Set<string>()
+    backupDebounced: ReturnType<typeof debounce>
+
+    flushQueue = new Set<string>()
+    flushDebounced: ReturnType<typeof debounce>
 
     destroy() {
         this.isDestroyed = true
+        this.backupDebounced.cancel()
+        this.flushDebounced.cancel()
         this.disconnect?.()
         this.store?.dispose()
         this.heartbeat?.dispose()
@@ -588,10 +602,6 @@ class SinkronCollection<T = undefined> {
         if (item === undefined) return
 
         this.logger.warn("Rejected change: %s %s", id, code)
-        // XXX sentChanges
-        // if (changeid !== undefined && item.sentChanges.has(changeid)) {
-        // item.sentChanges.delete(changeid)
-        // }
 
         if (code === "auth_failed") {
             this.logger.warn("Auth failed: %s", id)
@@ -631,15 +641,6 @@ class SinkronCollection<T = undefined> {
     handleChangeMessage(msg: ServerChangeMessage) {
         const { id, colrev, op } = msg
 
-        // XXX sentChanges
-        // if (this.items.has(id)) {
-        // const item = this.items.get(id)!
-        // if (item.sentChanges.has(changeid)) {
-        // this.logger.debug("Acknowledged own change: %s", changeid)
-        // item.sentChanges.delete(changeid)
-        // }
-        // }
-
         if (op === Op.Delete) {
             if (this.items.has(id)) {
                 this.items.delete(id)
@@ -660,7 +661,7 @@ class SinkronCollection<T = undefined> {
 
         if (data === null) {
             this.items.delete(id)
-            this.backupQueue.add(id)
+            this.enqueueBackup(id)
             return
         }
         const doc = loroFromBase64(data)
@@ -688,7 +689,6 @@ class SinkronCollection<T = undefined> {
             const isChanged =
                 item.local === null || hasChanges(item.local, item.remote)
             item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
-            // item.sentChanges.clear()
             if (isChanged) {
                 this.logger.debug("Merged remote doc into local: %s", id)
                 this.flushQueue.add(id)
@@ -700,7 +700,7 @@ class SinkronCollection<T = undefined> {
                 this.flushQueue.delete(id)
             }
         }
-        this.backupQueue.add(id)
+        this.enqueueBackup(id)
     }
 
     handleUpdateMessage(msg: ServerUpdateMessage) {
@@ -732,18 +732,22 @@ class SinkronCollection<T = undefined> {
             item.updatedAt = parseISO(msg.updatedAt)
         }
 
-        // update items state
+        // update item state
         const isChanged =
             item.local === null || hasChanges(item.local, item.remote)
         item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
-        // item.sentChanges.clear()
         if (isChanged) {
             this.flushQueue.add(id)
         } else {
             this.flushQueue.delete(id)
         }
 
+        this.enqueueBackup(id)
+    }
+
+    enqueueBackup(id: string) {
         this.backupQueue.add(id)
+        this.backupDebounced()
     }
 
     async backup() {
@@ -753,19 +757,19 @@ class SinkronCollection<T = undefined> {
             return
         }
 
+        const colrev = this.colrev
         const clonedQueue = new Set<string>()
         for (const key of this.backupQueue) clonedQueue.add(key)
         this.backupQueue.clear()
-        const colrev = this.colrev
-
         for (const key of clonedQueue) {
             const item = this.items.get(key)
             if (item) {
-                await this.store.save(key, item, colrev)
+                await this.store.save(key, item)
             } else {
-                await this.store.delete(key, colrev)
+                await this.store.delete(key)
             }
         }
+        await this.store.colrev(colrev)
         this.logger.debug(
             `Completed backup to local store, stored ${clonedQueue.size} items`
         )
@@ -799,14 +803,12 @@ class SinkronCollection<T = undefined> {
             }
             this.transport.send(JSON.stringify(msg))
             item.state = ItemState.ChangesSent
-            // item.sentChanges.clear()
-            // item.sentChanges.add(changeid)
         })
         this.flushQueue.clear()
     }
 
     onChangeItem(id: string, flushImmediate: boolean) {
-        this.backupQueue.add(id)
+        this.enqueueBackup(id)
         this.flushQueue.add(id)
         if (this.status === ConnectionStatus.Ready) {
             if (flushImmediate) {
@@ -867,4 +869,9 @@ class SinkronCollection<T = undefined> {
     }
 }
 
-export { SinkronCollection, IndexedDbCollectionStore, Channel, ObservableLoroDoc }
+export {
+    SinkronCollection,
+    IndexedDbCollectionStore,
+    Channel,
+    ObservableLoroDoc
+}

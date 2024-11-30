@@ -125,10 +125,10 @@ const EditorView = observer((props: EditorViewProps) => {
         bottomElem = (
             <div
                 style={{
-                    padding: isMobile ? 8 : "8px 40px",
+                    padding: isMobile ? 0 : "8px 40px",
                     boxSizing: "border-box",
                     background: "var(--color-background)",
-                    borderTop: "2px solid var(--color-elem)"
+                    borderTop: isMobile ? "none" : "2px solid var(--color-elem)"
                 }}
             >
                 <Toolbar document={documentViewStore} />
