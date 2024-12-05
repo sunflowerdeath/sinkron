@@ -43,23 +43,11 @@ const baseConfig = {
     }
 }
 
-const appConfig = {
+const config = {
     ...baseConfig,
     entry: {
-        main: "./src/index.ts"
-    }
-}
-
-const dbConfig = {
-    ...baseConfig,
-    entry: {
-        db: "./src/db.ts"
-    }
-}
-
-const testConfig = {
-    ...baseConfig,
-    entry: {
+        main: "./src/index.ts",
+        db: "./src/db.ts",
         test: [
             "./src/tests/users.test.ts",
             "./src/tests/spaces.test.ts",
@@ -69,4 +57,4 @@ const testConfig = {
     }
 }
 
-module.exports = [appConfig, dbConfig, testConfig]
+module.exports = config

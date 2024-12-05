@@ -6,5 +6,10 @@ Sinkron is a collaborative note-taking software with support for offline operati
 
 # Development
 
-- `pnpm dev` - Starts Sinkron app (without frontend) using Docker Compose
+- `pnpm dev` - Builds and starts Sinkron app (without frontend) using Docker 
+Compose
 - `pnpm front:dev` - Starts frontend dev-server at http://localhost:1337
+
+# License
+
+Public domain, see the `LICENCE` file.

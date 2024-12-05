@@ -22,9 +22,8 @@ type CategoriesListItemProps = {
 const CategoryListItem = (props: CategoriesListItemProps) => {
     const { category, readOnly, onSelect, onDelete } = props
 
-    const [isCollapsed, setIsCollapsed] = useState(true)
     const [_location, navigate] = useLocation()
-
+    const [isOpen, setIsOpen] = useState(false)
     const hasChildren = category.children.length > 0
 
     const menu = () => (
@@ -51,10 +50,10 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
         </>
     )
 
-    const expandButton = hasChildren && (
-        <Button onClick={() => setIsCollapsed((v) => !v)}>
+    const openButton = hasChildren && (
+        <Button onClick={() => setIsOpen((v) => !v)}>
             <Icon
-                svg={isCollapsed ? keyboardArrowDownSvg : keyboardArrowUpSvg}
+                svg={isOpen ? keyboardArrowUpSvg : keyboardArrowDownSvg}
             />
         </Button>
     )
@@ -62,7 +61,7 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
     return (
         <>
             <Row align="center" gap={8} style={{ alignSelf: "stretch" }}>
-                {expandButton}
+                {openButton}
                 <Button
                     style={{
                         flexGrow: 1,
@@ -109,7 +108,7 @@ const CategoryListItem = (props: CategoriesListItemProps) => {
                     </Menu>
                 )}
             </Row>
-            {hasChildren && !isCollapsed && (
+            {hasChildren && isOpen && (
                 <Col style={{ marginLeft: 32, alignSelf: "normal" }}>
                     <CategoryList
                         categories={category.children}

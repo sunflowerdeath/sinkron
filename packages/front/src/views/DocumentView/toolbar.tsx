@@ -452,6 +452,8 @@ type ToolbarProps = {
 }
 
 const Toolbar = observer((props: ToolbarProps) => {
+    const isMobile = useMedia("(max-width: 1023px)")
+
     const { document } = props
 
     const editor = useSlate() as ReactEditor
@@ -464,14 +466,28 @@ const Toolbar = observer((props: ToolbarProps) => {
         []
     )
 
+    let elem
     if (toolbarStore.view === "toolbar") {
-        return <ToolbarButtonsView store={toolbarStore} />
+        elem = <ToolbarButtonsView store={toolbarStore} />
     } else if (toolbarStore.view === "create_link") {
-        return <ToolbarCreateLinkView store={toolbarStore} />
+        elem = <ToolbarCreateLinkView store={toolbarStore} />
     } else if (toolbarStore.view === "edit_link") {
-        return <ToolbarEditLinkView store={toolbarStore} />
+        elem = <ToolbarEditLinkView store={toolbarStore} />
     }
-    return null
+
+    const noPadding = isMobile && toolbarStore.view === "toolbar"
+    return (
+        <div
+            style={{
+                boxSizing: "border-box",
+                background: "var(--color-background)",
+                padding: noPadding ? 0 : isMobile ? 8 : "8px 40px",
+                borderTop: noPadding ? "none" : "2px solid var(--color-elem)"
+            }}
+        >
+            {elem}
+        </div>
+    )
 })
 
 export { Toolbar }

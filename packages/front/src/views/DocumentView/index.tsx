@@ -122,18 +122,7 @@ const EditorView = observer((props: EditorViewProps) => {
     const [showToolbar, setShowToolbar] = useState(false)
     let bottomElem
     if (showToolbar) {
-        bottomElem = (
-            <div
-                style={{
-                    padding: isMobile ? 0 : "8px 40px",
-                    boxSizing: "border-box",
-                    background: "var(--color-background)",
-                    borderTop: isMobile ? "none" : "2px solid var(--color-elem)"
-                }}
-            >
-                <Toolbar document={documentViewStore} />
-            </div>
-        )
+        bottomElem = <Toolbar document={documentViewStore} />
     } else {
         let categoriesList
         if (data.categories.length > 0) {
@@ -170,7 +159,7 @@ const EditorView = observer((props: EditorViewProps) => {
                 style={{
                     background: "var(--color-background)",
                     height: 60,
-                    padding: isMobile ? "0 10px" : "0 40px",
+                    padding: isMobile ? "0 8px" : "0 40px",
                     boxSizing: "border-box",
                     overflowX: "auto",
                     flexShrink: 0
@@ -182,9 +171,17 @@ const EditorView = observer((props: EditorViewProps) => {
         )
     }
 
+    const setIsPinned = (value: boolean) => {
+        spaceStore.collection.change(id, (doc) => {
+            const root = doc.getMap("root")
+            root.set("isPinned", value)
+        })
+    }
+
     const menu = () => {
         const isLocked = data.isLocked
-        const canDelete = spaceStore.space.role !== "readonly"
+        const isPinned = data.isPinned
+        const isReadonly = spaceStore.space.role === "readonly"
 
         const canLock = ["admin", "owner"].includes(spaceStore.space.role)
         const lockItems = (
@@ -238,6 +235,12 @@ const EditorView = observer((props: EditorViewProps) => {
         return (
             <>
                 {lockItems}
+                <MenuItem
+                    onSelect={() => setIsPinned(!isPinned)}
+                    isDisabled={isReadonly || isLocked}
+                >
+                    {isPinned ? "Unpin" : "Pin to top"}
+                </MenuItem>
                 {publishItems}
                 {/*<MenuItem onSelect={() => setView("share")}>
                     Share & Access
@@ -246,7 +249,7 @@ const EditorView = observer((props: EditorViewProps) => {
                 {/*<MenuItem isDisabled={true}>Copy to another space</MenuItem>*/}
                 <MenuItem
                     onSelect={onDelete}
-                    isDisabled={!canDelete || isLocked}
+                    isDisabled={isReadonly || isLocked}
                 >
                     Delete
                 </MenuItem>
@@ -315,7 +318,6 @@ const EditorView = observer((props: EditorViewProps) => {
                     boxSizing: "border-box",
                     overflow: "auto"
                 }}
-                autoFocus={!isMobile}
             />
         </ErrorBoundary>
     )

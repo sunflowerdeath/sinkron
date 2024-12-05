@@ -7,6 +7,7 @@ import notificationsSvg from "@material-design-icons/svg/outlined/notifications.
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
 import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
 import lockSvg from "@material-design-icons/svg/outlined/lock.svg"
+import pinSvg from "@material-design-icons/svg/outlined/push_pin.svg"
 import folderSvg from "@material-design-icons/svg/outlined/folder.svg"
 import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
@@ -110,15 +111,21 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
                 {subtitle}
             </Col>
             <Row gap={4}>
-                {data.item.data?.isLocked && (
-                    <Icon
-                        svg={lockSvg}
-                        style={{ fill: "var(--color-secondary)" }}
-                    />
-                )}
                 {data.item.state !== ItemState.Synchronized && (
                     <Icon
                         svg={syncSvg}
+                        style={{ fill: "var(--color-secondary)" }}
+                    />
+                )}
+                {data.item.data?.isPinned && (
+                    <Icon
+                        svg={pinSvg}
+                        style={{ fill: "var(--color-secondary)" }}
+                    />
+                )}
+                {data.item.data?.isLocked && (
+                    <Icon
+                        svg={lockSvg}
                         style={{ fill: "var(--color-secondary)" }}
                     />
                 )}

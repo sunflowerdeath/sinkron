@@ -55,6 +55,7 @@ export type DocumentData = {
     categories: string[]
     isPublished: boolean
     isLocked: boolean
+    isPinned: boolean
 }
 
 export type ExtractedData = Metadata | DocumentData
@@ -68,7 +69,8 @@ const extractDocumentData = (doc: LoroDoc): ExtractedData => {
             isMeta: false,
             categories: root.get("categories") as string[],
             isPublished: root.get("isPublished") as boolean,
-            isLocked: root.get("isLocked") as boolean
+            isLocked: root.get("isLocked") as boolean,
+            isPinned: root.get("isPinned") as boolean
         }
     }
 }
@@ -142,6 +144,7 @@ const createInitialDocument = (initialCategory: string | undefined) => {
 
     root.set("isPublished", false)
     root.set("isLocked", false)
+    root.set("isPinned", false)
 
     return doc
 }
@@ -277,8 +280,14 @@ class SpaceStore {
     }
 
     get sortedDocumentList() {
-        return Array.from(this.documentList.map.values()).sort((a, b) =>
-            compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
+        const cmpBool = (
+            a: boolean | null | undefined,
+            b: boolean | null | undefined
+        ) => (a === b ? 0 : a ? -1 : 1)
+        return Array.from(this.documentList.map.values()).sort(
+            (a, b) =>
+                cmpBool(a.item.data?.isPinned, b.item.data?.isPinned) ||
+                compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
         )
     }
 
