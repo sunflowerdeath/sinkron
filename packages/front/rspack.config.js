@@ -44,6 +44,11 @@ const rules = [
         type: "asset/source"
     },
     {
+        test: /\.css$/i,
+        issuer: /\.(js|jsx|ts|tsx)$/,
+        type: "css"
+    },
+    {
         test: /\.(png|ico)/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
         type: "asset/resource"
@@ -80,7 +85,7 @@ module.exports = {
         filename: "[name].[fullhash].js"
     },
     optimization: {
-        minimize: false, // isProduction
+        minimize: false // isProduction
     },
     target: "web",
     resolve: {
@@ -91,7 +96,10 @@ module.exports = {
     },
     module: { rules },
     devtool: "cheap-module-source-map",
-    experiments: { asyncWebAssembly: true },
+    experiments: {
+        asyncWebAssembly: true,
+        css: true
+    },
     plugins,
     devServer: {
         host: "0.0.0.0",
