@@ -1,8 +1,7 @@
 // import { v4 as uuidv4 } from "uuid"
 import sharp from "sharp"
-import { union, difference, sum } from "lodash"
 import { In } from "typeorm"
-import * as Automerge from "@automerge/automerge"
+import { sum } from "lodash"
 
 import { App, AppModels } from "../app"
 import { Result, ResultType } from "../utils/result"

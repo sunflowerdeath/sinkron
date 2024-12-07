@@ -3,7 +3,7 @@
     "private": true,
     "description": "",
     "scripts": {
-        "lint": "pnpm -r lint",
+        "lint": "pnpm -r --aggregate-output lint",
         "dev": "docker-compose -f local.docker-compose.yml up --detach --build --force-recreate --renew-anon-volumes",
         "app:build": "pnpm --F=@sinkron/app... build",
         "app:start": "pnpm --F=@sinkron/app start",
@@ -15,7 +15,7 @@
     "license": "Unlicense",
     "packageManager": "pnpm@9.14.3+sha512.c0f53ee99477ed969b82b289ad011a5d16bf1623c957e7f29eabe8d0c00b574c29b8c7f54f6c67ee710c73f285c8154d07ce44b46fe2c0eeb476a90441bac371",
     "devDependencies": {
-        "oxlint": "^0.9.10",
+        "oxlint": "^0.14.1",
         "prettier": "^2.8.8",
         "typescript": "^5.6.3"
     }

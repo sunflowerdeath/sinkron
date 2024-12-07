@@ -51,7 +51,7 @@ const rules = [
     {
         test: /\.(png|ico)/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
-        type: "asset/resource"
+        type: "asset"
     }
 ]
 

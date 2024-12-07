@@ -12,4 +12,4 @@ Compose
 
 # License
 
-Public domain, see the `LICENCE` file.
+Public domain (with an exception of third-party dependencies), see the `LICENCE` file.

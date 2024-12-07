@@ -4,7 +4,7 @@ import { Row } from "oriente"
 
 import { useStore } from "~/store"
 import Container from "~/ui/Container"
-import { Button, LinkButton, Avatar } from "~/ui"
+import { LinkButton, Avatar } from "~/ui"
 import ButtonsGrid from "~/ui/ButtonsGrid"
 
 const AccountSettingsView = observer(() => {
@@ -17,7 +17,7 @@ const AccountSettingsView = observer(() => {
                 <div>{store.user!.email}</div>
             </Row>
             <ButtonsGrid>
-                <Button>Change image</Button>
+                <LinkButton to="/account/image">Change image</LinkButton>
                 <LinkButton to="/account/sessions">Active sessions</LinkButton>
             </ButtonsGrid>
         </Container>

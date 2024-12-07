@@ -1,0 +1,46 @@
+🙂 - slightly smiling face - U+1F642.png
+😆 - grinning squinting face - U+1F606.png
+😐 - neutral face - U+1F610.png
+🫤 - face with diagonal mouth - U+1FAE4.png
+😈 - smiling face with horns - U+1F608.png
+🧑 - person - U+1F9D1.png
+💀 - skull - U+1F480.png
+👽 - alien - U+1F47D.png
+🤖 - robot - U+1F916.png
+👻 - ghost - U+1F47B.png
+😺 - grinning cat - U+1F63A.png
+🐱 - cat face - U+1F431.png
+🐶 - dog face - U+1F436.png
+🐎 - horse - U+1F40E.png
+🐷 - pig face - U+1F437.png
+🐭 - mouse face - U+1F42D.png
+🦤 - dodo - U+1F9A4.png
+🐸 - frog - U+1F438.png
+🐟 - fish - U+1F41F.png
+🌻 - sunflower - U+1F33B.png
+🌲 - evergreen tree - U+1F332.png
+🍎 - red apple - U+1F34E.png
+🍓 - strawberry - U+1F353.png
+🍔 - hamburger - U+1F354.png
+🍰 - shortcake - U+1F370.png
+🍭 - lollipop - U+1F36D.png
+🍴 - fork and knife - U+1F374.png
+🚲 - bicycle - U+1F6B2.png
+⭐ - star - U+2B50.png
+🏝 - desert island - U+1F3DD.png
+🏛 - classical building - U+1F3DB.png
+🏠 - house - U+1F3E0.png
+🏭 - factory - U+1F3ED.png
+🚗 - automobile - U+1F697.png
+✈ - airplane - U+2708.png
+🚀 - rocket - U+1F680.png
+⏰ - alarm clock - U+23F0.png
+🎁 - wrapped gift - U+1F381.png
+💰 - money bag - U+1F4B0.png
+💼 - briefcase - U+1F4BC.png
+📅 - calendar - U+1F4C5.png
+☀ - sun - U+2600.png
+🎃 - jack-o-lantern - U+1F383.png
+⚡ - high voltage - U+26A1.png
+🌎 - globe showing Americas - U+1F30E.png
+❤ - red heart - U+2764.png

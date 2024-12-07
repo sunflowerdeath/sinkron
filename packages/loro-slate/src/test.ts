@@ -98,13 +98,19 @@ const testOps: { [key: string]: Operation } = {
     }
 }
 
+const LOG_ON = false
+
+const log = (a: string) => {
+    if (LOG_ON) console.log(a)
+}
+
 const logObject = (obj: object) => {
-    console.log(util.inspect(obj, { depth: null }))
+    if (LOG_ON) console.log(util.inspect(obj, { depth: null }))
 }
 
 const testOp = (op: Operation) => {
-    // console.log("Op:")
-    // logObject(op)
+    log("Op:")
+    logObject(op)
 
     // create loro doc
     const doc = new LoroDoc()
@@ -124,10 +130,10 @@ const testOp = (op: Operation) => {
     applySlateOps(loroRoot, [op])
     const changed = (fromLoro(loroRoot) as Element).children
 
-    // console.log("Expected:")
-    // logObject(expected)
-    // console.log("Changed:")
-    // logObject(changed)
+    log("Expected:")
+    logObject(expected)
+    log("Changed:")
+    logObject(changed)
 
     assert.deepEqual(expected, changed)
 }

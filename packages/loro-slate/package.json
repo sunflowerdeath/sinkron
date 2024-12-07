@@ -3,7 +3,7 @@
     "version": "0.0.1",
     "description": "",
     "scripts": {
-        "lint": "oxlint -c ./oxlintrc.json src",
+        "lint": "oxlint src",
         "build": "tsc && NODE_ENV=production rspack --config rspack.config.js",
         "test:build": "rspack --config rspack.config.test.js",
         "test:run": "mocha ./build/test.js",
