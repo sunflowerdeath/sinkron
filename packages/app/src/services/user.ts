@@ -4,11 +4,13 @@ import { User } from "../entities"
 import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
 import { validateEmail } from "../utils/validations"
+import { Picture } from "../types"
 
 export type Profile = {
     id: string
     email: string
-    spaces: { id: string; role: string }[]
+    picture: Picture
+    spaces: { id: string; picture: Picture, role: string }[]
     hasUnreadNotifications: boolean
 }
 
@@ -62,34 +64,56 @@ class UserService {
 
     async setUnreadNotifications(
         models: AppModels,
-        id: string,
+        userId: string,
         value: boolean = true
     ) {
-        await models.users.update({ id }, { hasUnreadNotifications: value })
-        if (value) this.app.channels.send(`users/${id}`, "notification")
+        await models.users.update(
+            { id: userId },
+            { hasUnreadNotifications: value }
+        )
+        if (value) this.app.channels.send(`users/${userId}`, "notification")
     }
 
     async delete(
         models: AppModels,
-        id: string
+        userId: string
     ): Promise<ResultType<true, RequestError>> {
-        const count = await models.users.countBy({ id })
+        const count = await models.users.countBy({ id: userId })
         if (count === 0) {
             return Result.err({
                 code: ErrorCode.NotFound,
                 message: "User not found",
-                details: { id }
+                details: { id: userId }
             })
         }
 
-        const spaces = await models.spaces.findBy({ ownerId: id })
+        const spaces = await models.spaces.findBy({ ownerId: userId })
         for (const i in spaces) {
             await this.app.services.spaces.delete(models, spaces[i].id)
         }
-        await models.members.delete({ userId: id })
-        await models.tokens.delete({ userId: id })
-        await models.users.delete(id)
+        await models.members.delete({ userId })
+        await models.tokens.delete({ userId })
+        await models.users.delete(userId)
 
+        return Result.ok(true)
+    }
+
+    async setPicture(
+        models: AppModels,
+        userId: string,
+        picture: Picture
+    ): Promise<ResultType<true, RequestError>> {
+        const res = await models.users.update(
+            { id: userId, isDisabled: false },
+            { picture: JSON.stringify(picture) }
+        )
+        if (res.affected === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "User not found",
+                details: { userId }
+            })
+        }
         return Result.ok(true)
     }
 
@@ -102,6 +126,7 @@ class UserService {
             select: {
                 id: true,
                 email: true,
+                picture: true,
                 hasUnreadNotifications: true
             }
         })
@@ -118,7 +143,11 @@ class UserService {
         )
         if (!getSpacesRes.isOk) return getSpacesRes
 
-        const profile = { ...user, spaces: getSpacesRes.value } as Profile
+        const profile = {
+            ...user,
+            picture: JSON.parse(user.picture),
+            spaces: getSpacesRes.value
+        } as Profile
         return Result.ok(profile)
     }
 }

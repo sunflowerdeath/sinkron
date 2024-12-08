@@ -1,3 +1,4 @@
+🫥 - dotted line face - U+1FAE5.png
 🙂 - slightly smiling face - U+1F642.png
 😆 - grinning squinting face - U+1F606.png
 😐 - neutral face - U+1F610.png

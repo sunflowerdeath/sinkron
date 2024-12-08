@@ -5,9 +5,8 @@ import { Permissions, Action, role } from "@sinkron/client/lib/client"
 
 import { App, AppModels } from "../app"
 import { User, SpaceRole } from "../entities"
-
+import { Picture } from "../types"
 import { ajv } from "../ajv"
-
 import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
 
@@ -26,6 +25,7 @@ export type SpaceView = {
     id: string
     name: string
     role: SpaceRole
+    picture: Picture
     usedStorage: number
     membersCount: number
     owner: { id: string }
@@ -34,6 +34,7 @@ export type SpaceView = {
 export type SpaceMemberView = {
     id: string
     email: string
+    picture: Picture
     role: string
 }
 
@@ -83,11 +84,17 @@ class SpaceService {
             })
         }
 
-        const insertRes = await models.spaces.insert({ name, ownerId })
+        const picture = { color: "grey", emoji: "factory" }
+        const insertRes = await models.spaces.insert({
+            name,
+            ownerId,
+            picture: JSON.stringify(picture)
+        })
         const { id } = insertRes.generatedMaps[0]
         const space: SpaceView = {
             id,
             name,
+            picture,
             owner: { id: ownerId } as User,
             role: "owner",
             membersCount: 1,
@@ -177,9 +184,17 @@ class SpaceService {
         const res = await models.members.find({
             where: { spaceId },
             relations: { user: true },
-            select: { user: { id: true, email: true }, role: true }
+            select: {
+                user: { id: true, email: true, picture: true },
+                role: true
+            }
         })
-        return res.map((m) => ({ role: m.role, ...m.user }))
+        return res.map((m) => ({
+            id: m.user.id,
+            email: m.user.email,
+            picture: JSON.parse(m.user.picture),
+            role: m.role
+        }))
     }
 
     async addMember(models: AppModels, props: AddMemberProps) {
@@ -225,10 +240,19 @@ class SpaceService {
         const member = await this.app.models.members.findOne({
             where: { userId, spaceId },
             relations: { user: true },
-            select: { id: true, role: true, user: { id: true, email: true } }
+            select: {
+                id: true,
+                role: true,
+                user: { id: true, email: true, picture: true }
+            }
         })
         if (member === null) return null
-        return { role: member.role, id: userId, email: member.user.email }
+        return {
+            role: member.role,
+            id: userId,
+            email: member.user.email,
+            picture: JSON.parse(member.user.picture)
+        }
     }
 
     async changeMemberRole(props: {
@@ -328,6 +352,7 @@ class SpaceService {
                 role: true,
                 space: {
                     id: true,
+                    picture: true,
                     ownerId: true,
                     name: true,
                     usedStorage: true
@@ -345,6 +370,7 @@ class SpaceService {
         const space = {
             id: res.spaceId,
             name: res.space.name,
+            picture: JSON.parse(res.space.picture),
             usedStorage: res.space.usedStorage,
             role: res.role,
             membersCount,
@@ -367,6 +393,7 @@ class SpaceService {
                     id: true,
                     ownerId: true,
                     name: true,
+                    picture: true,
                     usedStorage: true
                 }
             }
@@ -374,6 +401,7 @@ class SpaceService {
         const spaces: SpaceView[] = res.map((m) => ({
             id: m.spaceId,
             name: m.space.name,
+            picture: JSON.parse(m.space.picture),
             usedStorage: m.space.usedStorage,
             role: m.role,
             membersCount: 0,

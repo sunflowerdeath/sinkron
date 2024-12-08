@@ -1,98 +1,113 @@
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
-import { Row, Flex } from "oriente"
+import { Row } from "oriente"
 import { useState } from "react"
 
-import { useStore } from "~/store"
+import { useStore, useSpace } from "~/store"
+import { Heading, Button } from "~/ui"
 import Container from "~/ui/Container"
-import { Heading, Button, LinkButton, Avatar } from "~/ui"
 import ButtonsGrid from "~/ui/ButtonsGrid"
-
 import emojis from "~/emojis"
+import { Picture, colors } from "~/components/picture"
 
-const colors = {
-    signal_yellow: "#F9A900",
-    bright_red_orange: "#d66c21",
-    carmine_red: "#8d1f24",
-    traffic_purple: "#852e6f",
-    signal_blue: "#005387",
-    cyan: "#0097a7",
-    bright_green: "#008B29",
-    grey: "var(--color-elem)",
-    traffic_black: "#262625",
-    cream: "#e5e1d4"
+import { ActionState } from "~/ui/ActionStateView"
+
+type ChangePictureViewProps = {
+    title: React.ReactNode
+    initialValue: Picture
+    onClose: () => void
+    onSave: (picture: Picture) => ActionState<void>
 }
 
-const ChangeImageView = observer(() => {
-    const [_location, navigate] = useLocation()
-    const store = useStore()
+const ChangePictureView = observer((props: ChangePictureViewProps) => {
+    const { title, initialValue, onClose, onSave } = props
 
     const [emoji, setEmoji] = useState<keyof typeof emojis>(
-        "slightly_smiling_face"
+        initialValue.emoji as keyof typeof emojis
     )
-    const [color, setColor] = useState<keyof typeof colors>("grey")
+    const [color, setColor] = useState<keyof typeof colors>(
+        initialValue.color as keyof typeof colors
+    )
 
     const colorElems = Object.entries(colors).map(([key, color]) => (
         <div
+            key={key}
             style={{ width: 45, height: 45, background: color }}
             onClick={() => setColor(key as keyof typeof colors)}
         />
     ))
 
-    const imageElems = Object.entries(emojis).map(([key, url]) => (
+    const pictureElems = Object.entries(emojis).map(([key, url]) => (
         <Button
+            key={key}
             size="s"
             style={{ width: 45, alignItems: "center" }}
             onClick={() => setEmoji(key as keyof typeof emojis)}
         >
             <img
                 src={url}
-                style={{ height: 32, imageRendering: "pixelated" }}
+                style={{ height: "72%", imageRendering: "pixelated" }}
             />
         </Button>
     ))
 
     return (
         <Container
-            title="Change image"
-            onClose={() => navigate("/")}
+            title={title}
+            onClose={onClose}
             style={{ height: "100dvh", overflow: "hidden" }}
             styles={{ content: { paddingBottom: 8 } }}
         >
-            <Row
-                style={{
-                    width: 100,
-                    height: 100,
-                    alignSelf: "center",
-                    background: colors[color]
-                }}
-                align="center"
-                justify="center"
-            >
-                <img
-                    src={emojis[emoji]}
-                    style={{ height: 64, imageRendering: "pixelated" }}
-                />
-            </Row>
+            <Picture
+                picture={{ color, emoji }}
+                size="l"
+                style={{ alignSelf: "center" }}
+            />
             <Heading>Color</Heading>
             <Row gap={8} wrap={true}>
                 {colorElems}
             </Row>
-            <Heading>Image</Heading>
+            <Heading>Picture</Heading>
             <Row
                 gap={8}
                 wrap={true}
                 className="scrollbar"
                 style={{ overflowY: "scroll", flexGrow: 1, flexBasis: 0 }}
             >
-                {imageElems}
+                {pictureElems}
             </Row>
             <ButtonsGrid>
-                <Button>Cancel</Button>
+                <Button onClick={onClose}>Cancel</Button>
                 <Button>Save</Button>
             </ButtonsGrid>
         </Container>
     )
 })
 
-export default ChangeImageView
+const ChangeUserPictureView = () => {
+    const [_location, navigate] = useLocation()
+    const store = useStore()
+    return (
+        <ChangePictureView
+            initialValue={store.user.picture}
+            title="Change user picture"
+            onClose={() => navigate("/")}
+            onSave={(picture) => store.changePicture(picture)}
+        />
+    )
+}
+
+const ChangeSpacePictureView = () => {
+    const [_location, navigate] = useLocation()
+    const spaceStore = useSpace()
+    return (
+        <ChangePictureView
+            title="Change space picture"
+            initialValue={spaceStore.space.picture}
+            onClose={() => navigate("/")}
+            onSave={(picture) => spaceStore.changePicture(picture)}
+        />
+    )
+}
+
+export { ChangeSpacePictureView, ChangeUserPictureView }

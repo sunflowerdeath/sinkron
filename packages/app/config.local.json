@@ -1,7 +1,7 @@
 {
     "db": {
         "host": "localhost",
-        "port": 5001,
+        "port": 5434,
         "username": "postgres",
         "password": "password",
         "database": "sinkron"

@@ -4,8 +4,9 @@ import { Row } from "oriente"
 
 import { useStore } from "~/store"
 import Container from "~/ui/Container"
-import { LinkButton, Avatar } from "~/ui"
+import { LinkButton } from "~/ui"
 import ButtonsGrid from "~/ui/ButtonsGrid"
+import { Picture } from "~/components/picture"
 
 const AccountSettingsView = observer(() => {
     const [_location, navigate] = useLocation()
@@ -13,7 +14,7 @@ const AccountSettingsView = observer(() => {
     return (
         <Container title="Account settings" onClose={() => navigate("/")}>
             <Row gap={8} align="center">
-                <Avatar name={store.user!.email} />
+                <Picture picture={store.user!.picture} />
                 <div>{store.user!.email}</div>
             </Row>
             <ButtonsGrid>

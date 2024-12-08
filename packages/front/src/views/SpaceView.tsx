@@ -15,7 +15,10 @@ import CategoriesView from "./CategoriesView"
 import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
 import AccountAndSpaceView from "./AccountAndSpaceView"
 import AccountSettingsView from "./AccountSettingsView"
-import ChangeImageView from "./ChangeImageView"
+import {
+    ChangeUserPictureView,
+    ChangeSpacePictureView
+} from "./ChangeImageView"
 import ActiveSessionsView from "./ActiveSessionsView"
 import NotificationsView from "./NotificationsView"
 import SpaceSettingsView from "./SpaceSettingsView"
@@ -31,7 +34,8 @@ const SpaceView = observer(() => {
     useFavicon(
         store.space!.collection.status === ConnectionStatus.Disconnected
             ? offFaviconUrl
-            : defaultFaviconUrl)
+            : defaultFaviconUrl
+    )
 
     const routes = (
         <>
@@ -48,7 +52,7 @@ const SpaceView = observer(() => {
             />
             <Route
                 path={"/account/image"}
-                children={() => <ChangeImageView />}
+                children={() => <ChangeUserPictureView />}
             />
             <Route
                 path={"/account/sessions"}
@@ -69,6 +73,10 @@ const SpaceView = observer(() => {
             <Route
                 path={"/space/settings"}
                 children={() => <SpaceSettingsView />}
+            />
+            <Route
+                path={"/space/picture"}
+                children={() => <ChangeSpacePictureView />}
             />
             <Route
                 path={"/space/members"}

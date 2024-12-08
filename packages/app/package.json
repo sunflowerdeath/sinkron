@@ -8,7 +8,8 @@
         "build": "NODE_ENV=production rspack --config=rspack.config.js",
         "migrate": "typeorm migration:run -d ./build/db.js",
         "start": "pnpm migrate && node ./build/main.js",
-        "test": "sh ./scripts/test.sh"
+        "test": "sh ./scripts/test.sh",
+        "migration:generate": "pnpm build && SINKRON_CONFIG=$(cat config.local.json) typeorm migration:generate -d ./build/db.js"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",

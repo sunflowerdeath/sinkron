@@ -4,11 +4,12 @@ import { Col, Row } from "oriente"
 
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
-import type { Space } from "../entities"
-import { useStore } from "../store"
-import { Button, LinkButton, Avatar, Menu, MenuItem, Icon } from "../ui"
-import Container from "../ui/Container"
-import numForm from "../utils/numForm"
+import type { Space } from "~/entities"
+import { useStore } from "~/store"
+import { Button, LinkButton, Menu, MenuItem, Icon } from "~/ui"
+import Container from "~/ui/Container"
+import numForm from "~/utils/numForm"
+import { Picture } from "~/components/picture"
 
 const SwitchSpaceView = observer(() => {
     const store = useStore()
@@ -37,7 +38,7 @@ const SwitchSpaceView = observer(() => {
                             style={{ justifyContent: "start", flexGrow: 1 }}
                         >
                             <Row gap={8} align="center">
-                                <Avatar name={s.name} />
+                                <Picture picture={s.picture} />
                                 <Col>
                                     <div>{s.name || "."}</div>
                                     <div style={{ opacity: 0.6 }}>

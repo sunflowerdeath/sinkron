@@ -9,9 +9,8 @@ import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
 import { useStore, useSpace, SpaceStore } from "~/store"
 import { FetchMembersResponse } from "~/store/SpaceStore"
-import { SpaceRole, spaceRoleMap, SpaceMember, Invite } from "../entities"
+import { SpaceRole, spaceRoleMap, SpaceMember, Invite } from "~/entities"
 import {
-    Avatar,
     Button,
     LinkButton,
     Icon,
@@ -25,9 +24,10 @@ import {
     useDialog,
     Heading,
     Select
-} from "../ui"
-import ButtonsGrid from "../ui/ButtonsGrid"
-import Container from "../ui/Container"
+} from "~/ui"
+import ButtonsGrid from "~/ui/ButtonsGrid"
+import Container from "~/ui/Container"
+import { Picture } from "~/components/picture"
 
 type SpaceMembersStoreProps = {
     space: SpaceStore
@@ -135,7 +135,7 @@ const UpdateRoleDialog = observer((props: UpdateRoleDialogProps) => {
         <Col gap={16}>
             <Heading>Change member role</Heading>
             <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
-                <Avatar name={member.email} />
+                <Picture picture={member.picture} />
                 <Col style={{ flexGrow: 1 }}>
                     <div>{member.email}</div>
                     <div style={{ color: "var(--color-secondary)" }}>
@@ -224,7 +224,7 @@ const SpaceMemberListItem = observer((props: SpaceMemberListItemProps) => {
 
     return (
         <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
-            <Avatar name={member.email} />
+            <Picture picture={member.picture} />
             <Col style={{ flexGrow: 1 }}>
                 <div>{member.email}</div>
                 <div style={{ color: "var(--color-secondary)" }}>
@@ -275,7 +275,7 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
 
     return (
         <Row gap={8} style={{ alignSelf: "stretch" }} align="center">
-            <Avatar name={invite.to.email} />
+            <Picture picture={{ emoji: "dotted_line_face", color: "grey" }} />
             <Col style={{ flexGrow: 1 }}>
                 <div>{invite.to.email}</div>
                 <div style={{ opacity: ".6" }}>

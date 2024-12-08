@@ -1,6 +1,12 @@
-export interface Space {
+export type Picture = {
+    color: string
+    emoji: string
+}
+
+export type Space = {
     id: string
     name: string
+    picture: Picture
     owner: User
     membersCount: number
     role: SpaceRole
@@ -37,6 +43,7 @@ export type Invite = {
 export type SpaceMember = {
     id: string
     email: string
+    picture: Picture
     role: SpaceRole 
 }
 
@@ -48,6 +55,7 @@ export type Credentials = {
 export type User = {
     id: string
     email: string
+    picture: Picture
     spaces: Space[]
     hasUnreadNotifications: boolean
 }

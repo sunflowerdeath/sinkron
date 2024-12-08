@@ -13,7 +13,8 @@ import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirecto
 
 import { useStore, useSpace } from "../store"
 import type { DocumentListItemData } from "../store/SpaceStore"
-import { Avatar, Button, LinkButton, Icon, ActionStateView } from "../ui"
+import { Button, LinkButton, Icon, ActionStateView } from "../ui"
+import { Picture } from "~/components/picture"
 import env from "~/env"
 
 interface DocumentListCategoryItemProps {
@@ -272,7 +273,7 @@ const DocumentListView = observer(() => {
                 to="/account"
             >
                 <Row gap={8} align="center">
-                    <Avatar name={space.space.name} />
+                    <Picture picture={space.space.picture} />
                     <div style={{ flexGrow: 1 }}>{space.space.name}</div>
                 </Row>
             </LinkButton>

@@ -1,3 +1,4 @@
+import dotted_line_face from "./dotted_line_face.png"
 import slightly_smiling_face from "./slightly_smiling_face.png"
 import grinning_squinting_face from "./grinning_squinting_face.png"
 import neutral_face from "./neutral_face.png"
@@ -47,6 +48,7 @@ import red_heart from "./red_heart.png"
 
 const emojis = {
     // faces
+    dotted_line_face,
     slightly_smiling_face,
     face_with_diagonal_mouth,
     grinning_squinting_face,

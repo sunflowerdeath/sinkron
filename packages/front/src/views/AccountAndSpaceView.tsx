@@ -9,7 +9,6 @@ import numForm from "~/utils/numForm"
 import {
     Modal,
     Heading,
-    Avatar,
     LinkButton,
     Button,
     useActionState,
@@ -17,6 +16,7 @@ import {
 } from "~/ui"
 import ButtonsGrid from "~/ui/ButtonsGrid"
 import Container from "~/ui/Container"
+import { Picture } from "~/components/picture"
 import { useStore, useSpace } from "~/store"
 
 const statusMap: { [key in ConnectionStatus]: string } = {
@@ -85,7 +85,7 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
-                    <Avatar name={store.user!.email} />
+                    <Picture picture={store.user!.picture} />
                     <div>{store.user!.email}</div>
                 </Row>
                 <ButtonsGrid>
@@ -98,7 +98,7 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Space</Heading>
                 <Row gap={8} align="center">
-                    <Avatar name={space.space.name} />
+                    <Picture picture={space.space.picture} />
                     <Col>
                         <div>{space.space.name}</div>
                         <div style={{ opacity: ".6" }}>
