@@ -12,8 +12,8 @@
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
-        "@rspack/cli": "^1.1.4",
-        "@rspack/core": "^1.1.4",
+        "@rspack/cli": "^1.1.5",
+        "@rspack/core": "^1.1.5",
         "@swc/core": "^1.9.3",
         "@types/js-cookie": "^3.0.6",
         "@types/lodash-es": "^4.17.12",

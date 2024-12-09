@@ -1,10 +1,10 @@
-import type { Picture } from "~/entities"
+import type { Picture as PictureEntity } from "~/entities"
 import emojis from "~/emojis"
 
 export type PictureSize = "s" | "m" | "l"
 
 export type PictureProps = {
-    picture?: Picture
+    picture?: PictureEntity
     size?: PictureSize
     style?: React.CSSProperties
 }

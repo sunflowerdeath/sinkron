@@ -1,4 +1,3 @@
-import "./styles.css"
 import "core-js/stable"
 
 import { useMemo } from "react"
