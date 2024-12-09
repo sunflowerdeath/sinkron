@@ -45,3 +45,4 @@
 ⚡ - high voltage - U+26A1.png
 🌎 - globe showing Americas - U+1F30E.png
 ❤ - red heart - U+2764.png
+🗄 - file cabinet - U+1F5C4.png

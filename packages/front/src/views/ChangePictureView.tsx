@@ -4,19 +4,19 @@ import { Row } from "oriente"
 import { useState } from "react"
 
 import { useStore, useSpace } from "~/store"
-import { Heading, Button } from "~/ui"
+import { Heading, Button, useStateToast } from "~/ui"
 import Container from "~/ui/Container"
 import ButtonsGrid from "~/ui/ButtonsGrid"
 import emojis from "~/emojis"
 import { Picture, colors } from "~/components/picture"
 
-import { ActionState } from "~/ui/ActionStateView"
+import { ActionState, useActionState } from "~/ui/ActionStateView"
 
 type ChangePictureViewProps = {
     title: React.ReactNode
     initialValue: Picture
     onClose: () => void
-    onSave: (picture: Picture) => ActionState<void>
+    onSave: (picture: Picture) => ActionState<any>
 }
 
 const ChangePictureView = observer((props: ChangePictureViewProps) => {
@@ -28,6 +28,24 @@ const ChangePictureView = observer((props: ChangePictureViewProps) => {
     const [color, setColor] = useState<keyof typeof colors>(
         initialValue.color as keyof typeof colors
     )
+
+    const toast = useStateToast()
+
+    const [actionState, setActionState] = useActionState<void>()
+    const save = () => {
+        const picture = { emoji, color }
+        const state = onSave(picture)
+        setActionState(state)
+        state.then(
+            () => {
+                onClose()
+                toast.success(<>Picture changed!</>)
+            },
+            (e) => {
+                toast.error(<>Couldn't change picture: {e.message}</>)
+            }
+        )
+    }
 
     const colorElems = Object.entries(colors).map(([key, color]) => (
         <div
@@ -77,8 +95,18 @@ const ChangePictureView = observer((props: ChangePictureViewProps) => {
                 {pictureElems}
             </Row>
             <ButtonsGrid>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button>Save</Button>
+                <Button
+                    isDisabled={actionState.state === "pending"}
+                    onClick={onClose}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    isDisabled={actionState.state === "pending"}
+                    onClick={save}
+                >
+                    Save
+                </Button>
             </ButtonsGrid>
         </Container>
     )

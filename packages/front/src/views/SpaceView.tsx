@@ -18,7 +18,7 @@ import AccountSettingsView from "./AccountSettingsView"
 import {
     ChangeUserPictureView,
     ChangeSpacePictureView
-} from "./ChangeImageView"
+} from "./ChangePictureView"
 import ActiveSessionsView from "./ActiveSessionsView"
 import NotificationsView from "./NotificationsView"
 import SpaceSettingsView from "./SpaceSettingsView"
@@ -51,7 +51,7 @@ const SpaceView = observer(() => {
                 children={() => <AccountSettingsView />}
             />
             <Route
-                path={"/account/image"}
+                path={"/account/picture"}
                 children={() => <ChangeUserPictureView />}
             />
             <Route

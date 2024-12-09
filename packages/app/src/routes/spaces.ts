@@ -3,6 +3,7 @@ import { Not, Equal } from "typeorm"
 
 import { SpaceRole } from "../entities"
 import { App } from "../app"
+import { Picture } from "../types"
 
 const uploadFileSizeLimit = 20 * 1024 * 1024 // 20Mb
 
@@ -62,6 +63,27 @@ const updateMemberBodySchema = {
     additionalProperties: false
 }
 
+type SetPictureBody = {
+    picture: Picture
+}
+
+const setPictureBodySchema = {
+    type: "object",
+    properties: {
+        picture: {
+            type: "object",
+            properties: {
+                emoji: { type: "string", minLength: 1, maxLength: 100 },
+                color: { type: "string", minLength: 1, maxLength: 100 }
+            },
+            required: ["emoji", "color"],
+            additionalProperties: false
+        }
+    },
+    required: ["picture"],
+    additionalProperties: false
+}
+
 const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Body: SpaceCreateBody }>(
         "/spaces/new",
@@ -102,6 +124,28 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             }
 
             await app.services.spaces.rename(app.models, spaceId, name)
+            reply.send({})
+        }
+    )
+
+    fastify.post<{ Params: { spaceId: string }; Body: SetPictureBody }>(
+        "/spaces/:spaceId/picture",
+        { schema: { body: setPictureBodySchema, params: spaceParamsSchema } },
+        async (request, reply) => {
+            const { spaceId } = request.params
+            const { picture } = request.body
+
+            const allowed = await app.services.spaces.checkMemberRole({
+                userId: request.token.userId,
+                spaceId,
+                roles: ["owner"]
+            })
+            if (!allowed) {
+                reply.code(500).send()
+                return
+            }
+
+            await app.services.spaces.setPicture(app.models, spaceId, picture)
             reply.send({})
         }
     )

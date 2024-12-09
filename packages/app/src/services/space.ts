@@ -84,7 +84,7 @@ class SpaceService {
             })
         }
 
-        const picture = { color: "grey", emoji: "factory" }
+        const picture = { color: "grey", emoji: "file_cabinet" }
         const insertRes = await models.spaces.insert({
             name,
             ownerId,
@@ -174,6 +174,25 @@ class SpaceService {
             })
         }
         await models.spaces.update(spaceId, { name })
+        return Result.ok(true)
+    }
+
+    async setPicture(
+        models: AppModels,
+        spaceId: string,
+        picture: Picture
+    ): Promise<ResultType<true, RequestError>> {
+        const res = await models.spaces.update(
+            { id: spaceId },
+            { picture: JSON.stringify(picture) }
+        )
+        if (res.affected === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "Space not found",
+                details: { spaceId }
+            })
+        }
         return Result.ok(true)
     }
 

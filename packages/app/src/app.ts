@@ -20,6 +20,7 @@ import {
     File,
     Post
 } from "./entities"
+import { Picture } from "./types"
 import { ChannelServer } from "./channels"
 
 import { EmailSender, FakeEmailSender, SmtpEmailSender } from "./email"
@@ -166,7 +167,43 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 }
 
+type SetPictureBody = {
+    picture: Picture
+}
+
+const setPictureBodySchema = {
+    type: "object",
+    properties: {
+        picture: {
+            type: "object",
+            properties: {
+                emoji: { type: "string", minLength: 1, maxLength: 100 },
+                color: { type: "string", minLength: 1, maxLength: 100 }
+            },
+            required: ["emoji", "color"],
+            additionalProperties: false
+        }
+    },
+    required: ["picture"],
+    additionalProperties: false
+}
+
 const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
+    fastify.post<{ Body: SetPictureBody }>(
+        "/account/picture",
+        { schema: { body: setPictureBodySchema } },
+        async (request, reply) => {
+            const { userId } = request.token
+            const { picture } = request.body
+            const sessions = await app.services.users.setPicture(
+                app.models,
+                userId,
+                picture
+            )
+            reply.send(sessions)
+        }
+    )
+
     fastify.get("/account/sessions", async (request, reply) => {
         const { userId, token } = request.token
         const sessions = await app.services.auth.getActiveSessions(app.models, {

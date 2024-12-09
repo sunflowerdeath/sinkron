@@ -4,7 +4,7 @@ import { Channel } from "@sinkron/client/lib/collection"
 import { pino, Logger } from "pino"
 
 import env from "~/env"
-import { User, Space, Invite } from "~/entities"
+import { User, Space, Invite, Picture } from "~/entities"
 import { Api } from "~/api"
 import { FetchError } from "~/utils/fetchJson"
 
@@ -166,6 +166,20 @@ class UserStore {
         if (this.spaceId !== spaceId) {
             this.spaceId = spaceId
         }
+    }
+
+    changePicture(picture: Picture) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/account/picture`,
+                data: { picture }
+            })
+        )
+        res.then(() => {
+            this.user.picture = picture
+        })
+        return res
     }
 
     async leaveSpace() {

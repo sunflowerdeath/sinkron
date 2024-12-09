@@ -18,7 +18,7 @@ const AccountSettingsView = observer(() => {
                 <div>{store.user!.email}</div>
             </Row>
             <ButtonsGrid>
-                <LinkButton to="/account/image">Change image</LinkButton>
+                <LinkButton to="/account/picture">Change picture</LinkButton>
                 <LinkButton to="/account/sessions">Active sessions</LinkButton>
             </ButtonsGrid>
         </Container>

@@ -28,7 +28,8 @@ import {
     Invite,
     SpaceRole,
     Metadata,
-    Category
+    Category,
+    Picture
 } from "~/entities"
 import { Api } from "~/api"
 import { TransformedMap } from "~/utils/transformedMap"
@@ -215,6 +216,7 @@ class SpaceStore {
         })
 
         makeObservable(this, {
+            space: observable,
             documents: computed,
             publishedDocuments: computed,
             sortedDocumentList: computed,
@@ -446,6 +448,24 @@ class SpaceStore {
     }
 
     // === Space settings
+
+    changePicture(picture: Picture) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/picture`,
+                data: { picture }
+            })
+        )
+        res.then(() => {
+            this.space.picture = picture
+            const space = this.store.user.spaces.find(
+                (s) => s.id === this.space.id
+            )
+            if (space) space.picture = picture
+        })
+        return res
+    }
 
     renameSpace(name: string) {
         const res = fromPromise(
