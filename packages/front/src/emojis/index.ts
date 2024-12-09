@@ -46,6 +46,7 @@ import high_voltage from "./high_voltage.png"
 import globe_showing_americas from "./globe_showing_americas.png"
 import red_heart from "./red_heart.png"
 import file_cabinet from "./file_cabinet.png"
+import cross_mark from "./cross_mark.png"
 
 const emojis = {
     // faces
@@ -81,6 +82,7 @@ const emojis = {
     star,
     globe_showing_americas,
     sun,
+    cross_mark,
 
     // objects
     file_cabinet,

@@ -4,7 +4,7 @@ import emojis from "~/emojis"
 export type PictureSize = "s" | "m" | "l"
 
 export type PictureProps = {
-    picture: Picture
+    picture?: Picture
     size?: PictureSize
     style?: React.CSSProperties
 }
@@ -32,10 +32,15 @@ const colors = {
     cream: "#e5e1d4"
 }
 
+const missingPicture = {
+    color: "grey",
+    emoji: "cross_mark"
+}
+
 const Picture = (inProps: PictureProps) => {
     const { picture, size, style } = { ...defaultProps, ...inProps }
     const sizeVal = sizes[size]
-    const { emoji, color } = picture
+    const { emoji, color } = picture || missingPicture
 
     const background =
         color in colors ? colors[color as keyof typeof colors] : colors.grey
