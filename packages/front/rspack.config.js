@@ -1,16 +1,13 @@
 const path = require("path")
-const fs = require("fs")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
-
-const styles = fs.readFileSync("./src/styles.css")
 
 const isProduction = process.env.NODE_ENV === "production"
 const isTauri = process.env.TAURI === "1"
 
 const src = path.resolve(__dirname, "src")
 
-const targets = "Chrome >= 91, iOS >= 15, Firefox >= 115"
+const targets = "Chrome >= 91, iOS >= 15, Firefox >= 115, Safari >= 15"
 const rules = [
     {
         test: /\.ts$/,
@@ -47,22 +44,24 @@ const rules = [
         type: "asset/source"
     },
     {
-        test: /\.(png|ico)/i,
+        test: /\.(png|ico)$/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
         type: "asset"
+    },
+    {
+        test: /\.css$/i,
+        type: "css"
     }
 ]
 
 const plugins = [
     new HtmlWebpackPlugin({
         template: "./src/index.html",
-        templateParameters: { styles },
         favicon: "src/favicon.ico",
         chunks: ["main"]
     }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
-        templateParameters: { styles },
         favicon: "src/favicon.ico",
         filename: "post.html",
         chunks: ["post"]
@@ -95,7 +94,7 @@ module.exports = {
         }
     },
     module: { rules },
-    devtool: "cheap-module-source-map",
+    devtool: false, // "cheap-module-source-map",
     experiments: {
         asyncWebAssembly: true,
         css: true

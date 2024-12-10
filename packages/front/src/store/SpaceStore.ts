@@ -285,12 +285,15 @@ class SpaceStore {
         const cmpBool = (
             a: boolean | null | undefined,
             b: boolean | null | undefined
-        ) => (a === b ? 0 : a ? -1 : 1)
-        return Array.from(this.documentList.map.values()).sort(
-            (a, b) =>
-                cmpBool(a.item.data?.isPinned, b.item.data?.isPinned) ||
-                compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
-        )
+        ) => (Boolean(a) === Boolean(b) ? 0 : a ? -1 : 1)
+        return Array.from(this.documentList.map.values()).sort((a, b) => {
+            const cmpPinned = cmpBool(
+                a.item.data?.isPinned,
+                b.item.data?.isPinned
+            )
+            if (cmpPinned !== 0) return cmpPinned
+            return compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
+        })
     }
 
     get metaItem(): Item<Metadata> | undefined {

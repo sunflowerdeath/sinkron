@@ -1,3 +1,4 @@
+import "./main.css"
 import "core-js/stable"
 
 import { useMemo } from "react"

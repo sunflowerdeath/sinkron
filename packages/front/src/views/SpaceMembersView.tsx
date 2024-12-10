@@ -257,7 +257,6 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
     const menu = () => {
         return (
             <>
-                <MenuItem>Change role</MenuItem>
                 <MenuItem onSelect={cancel}>Cancel invite</MenuItem>
             </>
         )

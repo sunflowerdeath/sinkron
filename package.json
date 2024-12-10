@@ -7,8 +7,8 @@
         "dev": "docker-compose -f local.docker-compose.yml up --detach --build --force-recreate --renew-anon-volumes",
         "app:build": "pnpm --F=@sinkron/app... build",
         "app:start": "pnpm --F=@sinkron/app start",
-        "front:build": "pnpm --F=sinkron-front... build",
-        "front:dev": "pnpm --F=sinkron-front dev",
+        "front:build": "pnpm --F=@sinkron/front... build",
+        "front:dev": "pnpm --F=@sinkron/front dev",
         "test": "pnpm -r run test"
     },
     "author": "sunflowerdeath",

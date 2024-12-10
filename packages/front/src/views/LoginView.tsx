@@ -3,12 +3,10 @@ import { observer } from "mobx-react-lite"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { Col } from "oriente"
 
-import logoSvg from "../logo.svg"
-import { AuthStore } from "../store"
-import { Button, Input, Icon } from "../ui"
-
-const validateEmail = (s: string) =>
-    s.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) !== null // a@a.a
+import logoSvg from "~/logo.svg"
+import { AuthStore } from "~/store"
+import { Button, Input, Icon } from "~/ui"
+import { validateEmail } from "~/utils/validations"
 
 interface EmailStepProps {
     store: AuthStore

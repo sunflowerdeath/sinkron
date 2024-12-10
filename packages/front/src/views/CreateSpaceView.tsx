@@ -4,53 +4,11 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col } from "oriente"
 
-import {
-    FormStore,
-    FieldStore,
-    useShowError,
-    ShowErrorMode
-} from "../utils/forms"
-import { useStore } from "../store"
-import { Button, Input, Heading, useStateToast, useActionState } from "../ui"
-import Container from "../ui/Container"
-
-interface FieldProps {
-    field: FieldStore<any, any>
-    showRequiredError?: ShowErrorMode
-    showValidationErrors?: ShowErrorMode | { [key: string]: ShowErrorMode }
-    children: ({
-        inputProps,
-        error
-    }: {
-        inputProps: any
-        error?: React.ReactNode
-    }) => React.ReactNode
-}
-
-const Field = observer((props: FieldProps) => {
-    const {
-        field,
-        showRequiredError = "onBlurTouched",
-        showValidationErrors = "onBlurTouched",
-        children
-    } = props
-    const { showError, onFocus, onBlur } = useShowError({
-        field,
-        showRequiredError,
-        showValidationErrors
-    })
-    const inputProps = {
-        value: field.value,
-        onChange: (value: string) => field.change(value),
-        onFocus,
-        onBlur,
-        // hasError: showError
-    }
-    return children({
-        inputProps,
-        error: showError ? field.error!.message : undefined
-    })
-})
+import { FormStore, FieldStore } from "~/utils/forms"
+import { useStore } from "~/store"
+import { Button, Input, Heading, useStateToast, useActionState } from "~/ui"
+import Container from "~/ui/Container"
+import { Field } from "~/components/field"
 
 type FormShape = { name: string }
 

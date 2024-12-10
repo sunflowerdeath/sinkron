@@ -10,7 +10,7 @@ import {
     createAtom,
     IAtom
 } from "mobx"
-import debounce from "lodash-es/debounce"
+import { debounce } from "lodash-es"
 import { parseISO } from "date-fns"
 import queryString from "query-string"
 
