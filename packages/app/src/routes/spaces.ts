@@ -3,6 +3,7 @@ import { Not, Equal } from "typeorm"
 
 import { SpaceRole } from "../entities"
 import { App } from "../app"
+import { Picture } from "../types"
 
 const uploadFileSizeLimit = 20 * 1024 * 1024 // 20Mb
 
@@ -11,7 +12,13 @@ type SpaceCreateBody = { name: string }
 const spaceCreateRenameSchema = {
     type: "object",
     properties: {
-        name: { type: "string", minLength: 1 } // TODO proper validdtion
+        name: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100,
+            // no leading or trailing spaces
+            allOf: [{ pattern: "^\\S" }, { pattern: "\\S$" }]
+        }
     },
     required: ["name"],
     additionalProperties: false
@@ -56,6 +63,37 @@ const updateMemberBodySchema = {
     additionalProperties: false
 }
 
+const copyDocumentBodySchema = {
+    type: "object",
+    properties: {
+        toSpaceId: { type: "string", format: "uuid" },
+        docId: { type: "string", format: "uuid" }
+    },
+    required: ["toSpaceId", "docId"],
+    additionalProperties: false
+}
+
+type SetPictureBody = {
+    picture: Picture
+}
+
+const setPictureBodySchema = {
+    type: "object",
+    properties: {
+        picture: {
+            type: "object",
+            properties: {
+                emoji: { type: "string", minLength: 1, maxLength: 100 },
+                color: { type: "string", minLength: 1, maxLength: 100 }
+            },
+            required: ["emoji", "color"],
+            additionalProperties: false
+        }
+    },
+    required: ["picture"],
+    additionalProperties: false
+}
+
 const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
     fastify.post<{ Body: SpaceCreateBody }>(
         "/spaces/new",
@@ -96,6 +134,28 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
             }
 
             await app.services.spaces.rename(app.models, spaceId, name)
+            reply.send({})
+        }
+    )
+
+    fastify.post<{ Params: { spaceId: string }; Body: SetPictureBody }>(
+        "/spaces/:spaceId/picture",
+        { schema: { body: setPictureBodySchema, params: spaceParamsSchema } },
+        async (request, reply) => {
+            const { spaceId } = request.params
+            const { picture } = request.body
+
+            const allowed = await app.services.spaces.checkMemberRole({
+                userId: request.token.userId,
+                spaceId,
+                roles: ["owner"]
+            })
+            if (!allowed) {
+                reply.code(500).send()
+                return
+            }
+
+            await app.services.spaces.setPicture(app.models, spaceId, picture)
             reply.send({})
         }
     )
@@ -376,6 +436,46 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 reply.code(500).send({ error: res.error })
                 return
             }
+            reply.send({})
+        }
+    )
+
+    fastify.post<{
+        Params: { spaceId: string }
+        Body: { toSpaceId: string; docId: string }
+    }>(
+        "/spaces/:spaceId/copy_document",
+        { schema: { params: spaceParamsSchema, body: copyDocumentBodySchema } },
+        async (request, reply) => {
+            const userId = request.token.userId
+            const { spaceId } = request.params
+            const { toSpaceId, docId } = request.body
+
+            const fromRole = await app.services.spaces.getMemberRole(
+                app.models,
+                { userId, spaceId }
+            )
+            const toRole = await app.services.spaces.getMemberRole(app.models, {
+                userId,
+                spaceId: toSpaceId
+            })
+            const allowed =
+                fromRole !== null && toRole !== null && toRole !== "readonly"
+            if (!allowed) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const res = await app.services.spaces.copyDocumentToAnotherSpace({
+                spaceId,
+                docId,
+                toSpaceId
+            })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+
             reply.send({})
         }
     )

@@ -1,8 +1,12 @@
+import { useState } from "react"
+
 import { Col, Row } from "oriente"
 import { without } from "lodash-es"
 
 import checkBoxSvg from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutlineSvg from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
+import keyboardArrowDownSvg from "@material-design-icons/svg/outlined/keyboard_arrow_down.svg"
+import keyboardArrowUpSvg from "@material-design-icons/svg/outlined/keyboard_arrow_up.svg"
 
 import { LinkButton, Button, Icon } from "../ui"
 import Container from "../ui/Container"
@@ -21,6 +25,13 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
 
     const hasChildren = category.children.length > 0
     const isSelected = value.includes(category.id)
+    const [isOpen, setIsOpen] = useState(false)
+
+    const openButton = hasChildren && (
+        <Button onClick={() => setIsOpen((v) => !v)}>
+            <Icon svg={isOpen ? keyboardArrowUpSvg : keyboardArrowDownSvg} />
+        </Button>
+    )
 
     return (
         <Col gap={8} style={{ alignSelf: "stretch" }}>
@@ -60,8 +71,9 @@ const CategoriesTreeItem = (props: CategoriesTreeItemProps) => {
                         {category.name}
                     </div>
                 </Button>
+                {openButton}
             </Row>
-            {hasChildren && (
+            {hasChildren && isOpen && (
                 <div style={{ marginLeft: 32, alignSelf: "stretch" }}>
                     <CategoriesTree
                         value={value}

@@ -1,8 +1,12 @@
 import { Transforms, Editor, Element } from "slate"
 import { ReactEditor } from "slate-react"
+import { LoroMap } from "loro-crdt"
+import { ObservableLoroDoc } from "@sinkron/client/lib/collection"
+import { fromLoro } from "@sinkron/loro-slate"
+import { makeObservable, computed } from "mobx"
 
 import SpaceStore from "~/store/SpaceStore"
-import { ImageElement } from "~/types"
+import { RootElement, ImageElement } from "~/types"
 import { useStateToast } from "~/ui"
 
 import { createSinkronEditor } from "./editor"
@@ -20,16 +24,22 @@ type DocumentViewStoreProps = {
     id: string
     spaceStore: SpaceStore
     toast: ReturnType<typeof useStateToast>
+    doc: ObservableLoroDoc
 }
 
 class DocumentViewStore {
     constructor(props: DocumentViewStoreProps) {
-        const { id, spaceStore, toast } = props
+        const { id, spaceStore, toast, doc } = props
         this.id = id
         this.spaceStore = spaceStore
         this.toast = toast
+        this.doc = doc
         this.editor = createSinkronEditor({
             uploadImage: (file) => this.uploadImage(file)
+        })
+
+        makeObservable(this, {
+            value: computed
         })
     }
 
@@ -37,6 +47,17 @@ class DocumentViewStore {
     spaceStore: SpaceStore
     toast: ReturnType<typeof useStateToast>
     editor: ReactEditor
+    doc: ObservableLoroDoc
+
+    get value() {
+        const content = this.doc.doc.getMap("root").get("content")
+        if (content instanceof LoroMap) {
+            const root = fromLoro(content) as RootElement
+            return root.children
+        } else {
+            return []
+        }
+    }
 
     uploadImage(file: File) {
         const { id, state } = this.spaceStore.upload(file)

@@ -4,11 +4,11 @@ import { observer, useLocalObservable } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col } from "oriente"
 
-import type { Invite } from "../entities"
-import { useStore } from "../store"
-import { Button, useStateToast, useActionState, ActionStateView } from "../ui"
-import ButtonsGrid from "../ui/ButtonsGrid"
-import Container from "../ui/Container"
+import type { Invite } from "~/entities"
+import { useStore } from "~/store"
+import { Button, useStateToast, useActionState, ActionStateView } from "~/ui"
+import ButtonsGrid from "~/ui/ButtonsGrid"
+import Container from "~/ui/Container"
 
 type InviteListItemProps = {
     invite: Invite

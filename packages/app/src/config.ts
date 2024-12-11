@@ -1,5 +1,12 @@
-import type { DbConfig } from "./db/dataSource"
 import type { S3Config } from "./files/s3"
+
+export type DbConfig = {
+    host: string
+    port: number
+    username: string
+    password: string
+    database: string
+}
 
 export type StorageConfig =
     | { type: "local"; path: string }
@@ -18,23 +25,30 @@ export type SmtpConfig = {
 export type MailConfig = { type: "console" } | SmtpConfig
 
 export type SinkronConfig = {
+    url: string
+    token: string
+}
+
+export type SinkronAppConfig = {
     db: DbConfig
     storage: StorageConfig
     mail: MailConfig
-    sinkron: { db: DbConfig }
+    sinkron: SinkronConfig
 }
 
-const configStr = process.env.SINKRON_CONFIG
+const configVarName = "SINKRON_APP_CONFIG"
+
+const configStr = process.env[configVarName]
 if (configStr === undefined || configStr.length === 0) {
-    console.error('Config not found. Set env variable "SINKRON_CONFIG"')
+    console.error(`Config not found. Set env variable "${configVarName}"`)
     process.exit(1)
 }
-let config: SinkronConfig
+let config: SinkronAppConfig
 try {
     config = JSON.parse(configStr)
 } catch {
     console.error("Couldn't parse config json:")
-    console.error(process.env.SINKRON_CONFIG)
+    console.error(configStr)
     process.exit(1)
 }
 

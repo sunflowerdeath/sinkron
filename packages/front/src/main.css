@@ -1,0 +1,81 @@
+@font-face {
+    font-family: "Manrope";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("./manrope.woff2") format("woff2");
+}
+
+html {
+    font-size: 17px;
+    line-height: 1.5rem;
+    font-family: Manrope, sans-serif;
+    font-variant-numeric: tabular-nums;
+    height: 100%;
+
+    --color-text: #f8f8f8;
+    --color-secondary: #999;
+    --color-error: #f55;
+    --color-background: #303030;
+    --color-elem: #555;
+    --color-hover: #666;
+    --color-link: #69f;
+}
+
+body {
+    color: var(--color-text);
+    background: var(--color-background);
+    font-weight: 400;
+    margin: 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fadeIn {
+    animation: fadeIn 250ms ease-out;
+}
+
+@keyframes fadeInDelay {
+    from {
+        opacity: 0;
+    }
+    33% {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fadeInDelay {
+    animation: fadeInDelay 400ms ease-out;
+}
+
+ul,
+ol {
+    list-style-position: inside;
+    padding-left: 0;
+}
+
+hr {
+    height: 2px;
+    background: var(--color-text);
+    border: none;
+    opacity: 0.33;
+    margin: 5px 0;
+}
+
+.scrollbar::-webkit-scrollbar {
+    background-color: #555;
+    width: 8px;
+}
+.scrollbar::-webkit-scrollbar-thumb {
+    background-color: #222;
+}

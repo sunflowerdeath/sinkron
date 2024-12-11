@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+    sinkron:
+        build: ./sinkron
+        environment:
+            SINKRON_CONFIG: ${SINKRON_CONFIG}
+    app:
+        build:
+            dockerfile: app.Dockerfile
+        environment:
+            SINKRON_APP_CONFIG: ${SINKRON_APP_CONFIG}
+    front:
+        build:
+            dockerfile: front.Dockerfile

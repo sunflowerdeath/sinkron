@@ -1,3 +1,4 @@
+export type { ActionState } from "./ActionStateView"
 export {
     useActionState,
     initialActionState,

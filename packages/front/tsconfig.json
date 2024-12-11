@@ -3,11 +3,13 @@
         "strict": true,
 
         "module": "esnext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "isolatedModules": true,
+        "skipLibCheck": true,
 
+        "noEmit": true,
         "target": "es2015",
         "lib": ["es6", "es7", "es2015", "dom", "esnext"],
         "jsx": "react-jsx",
@@ -15,10 +17,6 @@
         "paths": {
             "~/*": ["./src/*"]
         },
-
-        "outDir": "build",
-        "declaration": true,
-        "declarationDir": "./types",
 
         "noImplicitAny": true,
         "noImplicitReturns": true,

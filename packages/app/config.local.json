@@ -1,0 +1,20 @@
+{
+    "db": {
+        "host": "localhost",
+        "port": 5434,
+        "username": "postgres",
+        "password": "password",
+        "database": "sinkron"
+    },
+    "sinkron": {
+        "url": "http://localhost:3001",
+        "token": "SINKRON_API_TOKEN"
+    },
+    "mail": {
+        "type": "console"
+    },
+    "storage": {
+        "type": "local",
+        "path": "temp/files"
+    }
+}

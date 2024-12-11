@@ -1,7 +1,7 @@
 import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { fromPromise } from "mobx-utils"
-import { ConnectionStatus } from "sinkron-client"
+import { ConnectionStatus } from "@sinkron/client/lib/collection"
 import { Col, Row, useModal } from "oriente"
 
 import { spaceRoleMap } from "~/entities"
@@ -9,7 +9,6 @@ import numForm from "~/utils/numForm"
 import {
     Modal,
     Heading,
-    Avatar,
     LinkButton,
     Button,
     useActionState,
@@ -17,12 +16,12 @@ import {
 } from "~/ui"
 import ButtonsGrid from "~/ui/ButtonsGrid"
 import Container from "~/ui/Container"
+import { Picture } from "~/components/picture"
 import { useStore, useSpace } from "~/store"
 
 const statusMap: { [key in ConnectionStatus]: string } = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",
     [ConnectionStatus.Connected]: "Connecting...",
-    [ConnectionStatus.Sync]: "Receiving changes...",
     [ConnectionStatus.Ready]: "Connected to server",
     [ConnectionStatus.Error]: "Connection error"
 }
@@ -86,7 +85,7 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
-                    <Avatar name={store.user!.email} />
+                    <Picture picture={store.user!.picture} />
                     <div>{store.user!.email}</div>
                 </Row>
                 <ButtonsGrid>
@@ -99,7 +98,7 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Space</Heading>
                 <Row gap={8} align="center">
-                    <Avatar name={space.space.name} />
+                    <Picture picture={space.space.picture} />
                     <Col>
                         <div>{space.space.name}</div>
                         <div style={{ opacity: ".6" }}>

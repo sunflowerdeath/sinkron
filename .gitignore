@@ -2,6 +2,6 @@
 temp
 node_modules/
 packages/*/node_modules
-packages/*/build
 packages/*/types
-rust/
+packages/*/build
+packages/*/lib

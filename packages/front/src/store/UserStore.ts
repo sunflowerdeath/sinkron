@@ -1,9 +1,11 @@
-import { makeAutoObservable, reaction, autorun, toJS } from "mobx"
+import { makeObservable, computed, reaction, autorun, toJS } from "mobx"
 import { fromPromise } from "mobx-utils"
-import { ChannelClient } from "sinkron-client"
+import { Channel } from "@sinkron/client/lib/collection"
+import { pino, Logger } from "pino"
+import { sortBy } from "lodash-es"
 
 import env from "~/env"
-import { User, Space } from "~/entities"
+import { User, Space, Invite, Picture } from "~/entities"
 import { Api } from "~/api"
 import { FetchError } from "~/utils/fetchJson"
 
@@ -37,8 +39,9 @@ class UserStore {
     user: User
     spaceId?: string = undefined
     space?: SpaceStore = undefined
-    channel: ChannelClient
+    channel: Channel
     api: Api
+    logger: Logger<string>
 
     disposeReaction?: () => void
     stopFetchUser?: () => void
@@ -49,6 +52,8 @@ class UserStore {
         this.api = authStore.api
         this.user = user
 
+        this.logger = pino({ level: "debug" })
+
         if (
             spaceId !== undefined &&
             user.spaces.some((s) => s.id === spaceId)
@@ -58,7 +63,12 @@ class UserStore {
             this.spaceId = user.spaces[0]?.id
         }
 
-        makeAutoObservable(this)
+        makeObservable(this, {
+            user: true,
+            spaceId: true,
+            space: true,
+            spaces: computed
+        })
 
         this.disposeReaction = autorun(() => {
             const json = JSON.stringify(toJS(this.user))
@@ -75,14 +85,15 @@ class UserStore {
         )
 
         const token = this.api.getToken()
-        this.channel = new ChannelClient({
-            url: `${env.wsUrl}/channels/${token}`,
-            channel: `users/${user.id}`,
+        this.channel = new Channel({
+            logger: this.logger,
+            url: `${env.apiUrl}/channel/${token}`,
             handler: (msg) => {
-                if (msg === "notification") {
+                if (msg === "auth_failed") {
+                    this.logout()
+                } else if (msg === "notification") {
                     this.user.hasUnreadNotifications = true
-                }
-                if (msg === "profile") {
+                } else if (msg === "profile") {
                     this.fetchUser()
                 }
             }
@@ -108,10 +119,14 @@ class UserStore {
         this.channel.dispose()
     }
 
+    get spaces() {
+        return sortBy(this.user.spaces, (s) => s.name)
+    }
+
     fetchUser() {
         this.stopFetchUser?.()
         this.stopFetchUser = autoRetry(async (retry) => {
-            console.log("Fetching user...")
+            this.logger.debug("Fetching user...")
             let user
             try {
                 user = await this.api.fetch<User>({
@@ -120,16 +135,16 @@ class UserStore {
                 })
             } catch (e) {
                 if (e instanceof FetchError && e.kind === "http") {
-                    console.log("Fetch user error")
+                    this.logger.error("Fetch user received error response")
                     this.logout()
                 } else {
-                    console.log("Couldn't fetch user, will retry")
+                    this.logger.error("Couldn't fetch user, will retry")
                     retry()
                 }
                 return
             }
             this.updateUser(user)
-            console.log("Fetch user success")
+            this.logger.info("Fetch user success")
         })
     }
 
@@ -163,6 +178,20 @@ class UserStore {
         }
     }
 
+    changePicture(picture: Picture) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/account/picture`,
+                data: { picture }
+            })
+        )
+        res.then(() => {
+            this.user.picture = picture
+        })
+        return res
+    }
+
     async leaveSpace() {
         if (!this.spaceId) return
         await this.api.fetch({
@@ -189,13 +218,16 @@ class UserStore {
     fetchNotifications() {
         this.user.hasUnreadNotifications = false
         return fromPromise(
-            this.api.fetch({ method: "GET", url: "/notifications" })
+            this.api.fetch<{ invites: Invite[] }>({
+                method: "GET",
+                url: "/notifications"
+            })
         )
     }
 
     inviteAction(id: string, action: "accept" | "decline" | "cancel" | "hide") {
         return fromPromise(
-            this.api.fetch({
+            this.api.fetch<Invite>({
                 method: "POST",
                 url: `/invites/${id}/${action}`
             })

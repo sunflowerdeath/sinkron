@@ -86,6 +86,21 @@ export type SinkronElement =
     | LinkElement
     | ImageElement
 
+export type TopLevelElement =
+    | TitleElement
+    | HeadingElement
+    | ParagraphElement
+    | ListItemElement
+    | ListElement
+    | CheckListElement
+    | OrderedListElement
+    | CodeBlockElement
+    | ImageElement
+
+export type RootElement = {
+    children: TopLevelElement[]
+}
+
 declare module "slate" {
     interface CustomTypes {
         Element: SinkronElement

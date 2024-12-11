@@ -61,10 +61,10 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 return
             }
 
-            const updateRes = await app.services.posts.update(
-                app.models,
-                postId
-            )
+            const updateRes = await app.services.posts.update(app.models, {
+                docId: postId,
+                spaceId: post.spaceId
+            })
             if (!updateRes.isOk) {
                 reply
                     .code(500)
@@ -98,7 +98,10 @@ const postsRoutes = (app: App) => async (fastify: FastifyInstance) => {
 
             const unpublishRes = await app.services.posts.unpublish(
                 app.models,
-                postId
+                {
+                    docId: postId,
+                    spaceId: post.spaceId
+                }
             )
             if (!unpublishRes.isOk) {
                 reply

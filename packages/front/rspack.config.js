@@ -1,6 +1,4 @@
 const path = require("path")
-// const { DefinePlugin } = require("webpack")
-const { DefinePlugin } = require("@rspack/core")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer")
 
@@ -9,14 +7,14 @@ const isTauri = process.env.TAURI === "1"
 
 const src = path.resolve(__dirname, "src")
 
-const targets = "Chrome >= 91, iOS >= 15, Firefox >= 115"
+const targets = "Chrome >= 91, iOS >= 15, Firefox >= 115, Safari >= 15"
 const rules = [
     {
         test: /\.ts$/,
         include: [src],
         use: [
             {
-                loader: "builtin:swc-loader",
+                loader: "swc-loader",
                 options: {
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: { parser: { syntax: "typescript" } }
@@ -29,7 +27,7 @@ const rules = [
         include: [src],
         use: [
             {
-                loader: "builtin:swc-loader",
+                loader: "swc-loader",
                 options: {
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: {
@@ -46,18 +44,17 @@ const rules = [
         type: "asset/source"
     },
     {
-        test: /\.(png|ico)/i,
+        test: /\.(png|ico)$/i,
         issuer: /\.(js|jsx|ts|tsx)$/,
-        type: "asset/resource"
+        type: "asset"
+    },
+    {
+        test: /\.css$/i,
+        type: "css"
     }
 ]
 
 const plugins = [
-    new DefinePlugin({
-        // bug in rspack@1.0.0 mode=production not working
-        // set mode to "none" and define manually
-        "process.env.NODE_ENV": isProduction ? '"production"' : '"development"'
-    }),
     new HtmlWebpackPlugin({
         template: "./src/index.html",
         favicon: "src/favicon.ico",
@@ -86,7 +83,6 @@ module.exports = {
         publicPath: isTauri ? "/" : isProduction ? "/static/" : "/",
         filename: "[name].[fullhash].js"
     },
-    mode: "none", //isProduction ? "production" : "development", // "none",
     optimization: {
         minimize: false // isProduction
     },
@@ -98,8 +94,11 @@ module.exports = {
         }
     },
     module: { rules },
-    devtool: "cheap-module-source-map",
-    experiments: { asyncWebAssembly: true },
+    devtool: false, // "cheap-module-source-map",
+    experiments: {
+        asyncWebAssembly: true,
+        css: true
+    },
     plugins,
     devServer: {
         host: "0.0.0.0",

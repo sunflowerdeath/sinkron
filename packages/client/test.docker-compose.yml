@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+    postgres:
+        image: postgres:17-alpine
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_DB=sinkron
+        command: postgres -c log_statement=all
+        healthcheck:
+            test: pg_isready -U postgres
+            interval: 3s
+            retries: 3
+            start_period: 3s
+            timeout: 3s
+
+    auth:
+        build: ./test_auth
+
+    sinkron:
+        build: ../../sinkron
+        environment:
+            SINKRON_CONFIG: >
+                {
+                    "host": "0.0.0.0",
+                    "port": 80,
+                    "apiToken": "SINKRON_API_TOKEN",
+                    "syncAuthUrl": "http://auth/",
+                    "db": {
+                        "host": "postgres",
+                        "port": 5432,
+                        "user": "postgres",
+                        "password": "password",
+                        "database": "sinkron"
+                    }
+                }
+            RUST_LOG: sinkron=trace
+        depends_on:
+            postgres:
+                condition: service_healthy
+        ports:
+            - 3000:80

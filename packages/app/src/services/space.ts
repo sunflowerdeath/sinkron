@@ -1,13 +1,13 @@
 import { In } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
-import * as Automerge from "@automerge/automerge"
-import { Permissions, Action, Role } from "sinkron"
+import { LoroDoc, LoroMap } from "loro-crdt"
+import { sortBy } from "lodash"
+import { Permissions, Action, role } from "@sinkron/client/lib/client"
 
 import { App, AppModels } from "../app"
 import { User, SpaceRole } from "../entities"
-
+import { Picture } from "../types"
 import { ajv } from "../ajv"
-
 import { Result, ResultType } from "../utils/result"
 import { ErrorCode, RequestError } from "../error"
 
@@ -26,6 +26,7 @@ export type SpaceView = {
     id: string
     name: string
     role: SpaceRole
+    picture: Picture
     usedStorage: number
     membersCount: number
     owner: { id: string }
@@ -34,6 +35,7 @@ export type SpaceView = {
 export type SpaceMemberView = {
     id: string
     email: string
+    picture: Picture
     role: string
 }
 
@@ -43,11 +45,25 @@ export type LockDocumentProps = {
     lock: boolean
 }
 
+export type CopyDocumentProps = {
+    docId: string
+    spaceId: string
+    toSpaceId: string
+}
+
 const spaceNameSchema = ajv.compile({
     type: "string",
     minLength: 1,
     maxLength: 100
 })
+
+const createMetaDoc = () => {
+    const doc = new LoroDoc()
+    const root = doc.getMap("root")
+    root.set("isMeta", true)
+    root.setContainer("categories", new LoroMap())
+    return doc
+}
 
 class SpaceService {
     app: App
@@ -75,11 +91,17 @@ class SpaceService {
             })
         }
 
-        const insertRes = await models.spaces.insert({ name, ownerId })
+        const picture = { color: "grey", emoji: "file_cabinet" }
+        const insertRes = await models.spaces.insert({
+            name,
+            ownerId,
+            picture: JSON.stringify(picture)
+        })
         const { id } = insertRes.generatedMaps[0]
         const space: SpaceView = {
             id,
             name,
+            picture,
             owner: { id: ownerId } as User,
             role: "owner",
             membersCount: 1,
@@ -91,33 +113,33 @@ class SpaceService {
         await this.app.sinkron.createGroup(`${col}/readonly`)
         await this.app.sinkron.createGroup(`${col}/members`)
 
-        const p = new Permissions()
-        const members = Role.group(`${col}/members`)
+        const p = Permissions.empty()
+        const members = role.group(`${col}/members`)
         p.add(Action.read, members)
         p.add(Action.create, members)
         p.add(Action.update, members)
         p.add(Action.delete, members)
-        const readonly = Role.group(`${col}/readonly`)
+        const readonly = role.group(`${col}/readonly`)
         p.add(Action.read, readonly)
         await this.app.sinkron.createCollection({
             id: col,
-            permissions: p.table
+            permissions: p
         })
 
-        const meta = Automerge.from({ meta: true, categories: {} })
-        await this.app.sinkron.createDocument(
-            uuidv4(),
+        const meta = createMetaDoc()
+        await this.app.sinkron.createDocument({
+            id: uuidv4(),
             col,
-            Automerge.save(meta)
-        )
-
-        // TODO create in transaction, throw if sinkron failed
+            data: meta.export({ mode: "snapshot" })
+        })
 
         await this.addMember(models, {
             userId: ownerId,
             spaceId: space.id,
             role: "owner"
         })
+
+        // TODO create in transaction, throw if failed
 
         return Result.ok(space)
     }
@@ -162,6 +184,25 @@ class SpaceService {
         return Result.ok(true)
     }
 
+    async setPicture(
+        models: AppModels,
+        spaceId: string,
+        picture: Picture
+    ): Promise<ResultType<true, RequestError>> {
+        const res = await models.spaces.update(
+            { id: spaceId },
+            { picture: JSON.stringify(picture) }
+        )
+        if (res.affected === 0) {
+            return Result.err({
+                code: ErrorCode.NotFound,
+                message: "Space not found",
+                details: { spaceId }
+            })
+        }
+        return Result.ok(true)
+    }
+
     async getMembers(
         models: AppModels,
         spaceId: string
@@ -169,9 +210,17 @@ class SpaceService {
         const res = await models.members.find({
             where: { spaceId },
             relations: { user: true },
-            select: { user: { id: true, email: true }, role: true }
+            select: {
+                user: { id: true, email: true, picture: true },
+                role: true
+            }
         })
-        return res.map((m) => ({ role: m.role, ...m.user }))
+        return res.map((m) => ({
+            id: m.user.id,
+            email: m.user.email,
+            picture: JSON.parse(m.user.picture),
+            role: m.role
+        }))
     }
 
     async addMember(models: AppModels, props: AddMemberProps) {
@@ -180,7 +229,10 @@ class SpaceService {
         const group =
             `spaces/${spaceId}/` +
             (role === "readonly" ? "readonly" : "members")
-        await this.app.sinkron.addMemberToGroup(userId, group)
+        await this.app.sinkron.addUserToGroup({
+            user: userId,
+            group
+        })
     }
 
     async getMemberRole(
@@ -214,10 +266,19 @@ class SpaceService {
         const member = await this.app.models.members.findOne({
             where: { userId, spaceId },
             relations: { user: true },
-            select: { id: true, role: true, user: { id: true, email: true } }
+            select: {
+                id: true,
+                role: true,
+                user: { id: true, email: true, picture: true }
+            }
         })
         if (member === null) return null
-        return { role: member.role, id: userId, email: member.user.email }
+        return {
+            role: member.role,
+            id: userId,
+            email: member.user.email,
+            picture: JSON.parse(member.user.picture)
+        }
     }
 
     async changeMemberRole(props: {
@@ -244,12 +305,24 @@ class SpaceService {
         const membersGroup = `spaces/${spaceId}/members`
         if (member.role !== "readonly" && role === "readonly") {
             // become readonly
-            await this.app.sinkron.addMemberToGroup(userId, readonlyGroup)
-            await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
+            await this.app.sinkron.addUserToGroup({
+                user: userId,
+                group: readonlyGroup
+            })
+            await this.app.sinkron.removeUserFromGroup({
+                user: userId,
+                group: membersGroup
+            })
         } else if (member.role === "readonly" && role !== "readonly") {
             // become not readony
-            await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
-            await this.app.sinkron.addMemberToGroup(userId, membersGroup)
+            await this.app.sinkron.removeUserFromGroup({
+                user: userId,
+                group: readonlyGroup
+            })
+            await this.app.sinkron.addUserToGroup({
+                user: userId,
+                group: membersGroup
+            })
         }
         await this.app.models.members.update({ spaceId, userId }, { role })
 
@@ -277,8 +350,14 @@ class SpaceService {
 
         const readonlyGroup = `spaces/${spaceId}/readonly`
         const membersGroup = `spaces/${spaceId}/members`
-        await this.app.sinkron.removeMemberFromGroup(userId, membersGroup)
-        await this.app.sinkron.removeMemberFromGroup(userId, readonlyGroup)
+        await this.app.sinkron.removeUserFromGroup({
+            user: userId,
+            group: membersGroup
+        })
+        await this.app.sinkron.removeUserFromGroup({
+            user: userId,
+            group: readonlyGroup
+        })
 
         this.app.channels.send(`users/${userId}`, "profile")
 
@@ -299,6 +378,7 @@ class SpaceService {
                 role: true,
                 space: {
                     id: true,
+                    picture: true,
                     ownerId: true,
                     name: true,
                     usedStorage: true
@@ -316,6 +396,7 @@ class SpaceService {
         const space = {
             id: res.spaceId,
             name: res.space.name,
+            picture: JSON.parse(res.space.picture),
             usedStorage: res.space.usedStorage,
             role: res.role,
             membersCount,
@@ -338,6 +419,7 @@ class SpaceService {
                     id: true,
                     ownerId: true,
                     name: true,
+                    picture: true,
                     usedStorage: true
                 }
             }
@@ -345,6 +427,7 @@ class SpaceService {
         const spaces: SpaceView[] = res.map((m) => ({
             id: m.spaceId,
             name: m.space.name,
+            picture: JSON.parse(m.space.picture),
             usedStorage: m.space.usedStorage,
             role: m.role,
             membersCount: 0,
@@ -368,38 +451,95 @@ class SpaceService {
         docId,
         lock
     }: LockDocumentProps): Promise<ResultType<true, RequestError>> {
-        const res = await this.app.sinkron.updateDocumentPermissions(
-            docId,
-            (p) => {
-                const group = Role.group(`spaces/${spaceId}/members`)
-                if (lock) {
-                    p.remove(Action.update, group)
-                    p.remove(Action.delete, group)
-                } else {
-                    p.add(Action.update, group)
-                    p.add(Action.delete, group)
+        const col = `spaces/${spaceId}`
+        const res =
+            await this.app.sinkron.updateDocumentPermissionsWithCallback({
+                id: docId,
+                col,
+                cb: (p) => {
+                    const group = role.group(`spaces/${spaceId}/members`)
+                    if (lock) {
+                        p.remove(Action.update, group)
+                        p.remove(Action.delete, group)
+                    } else {
+                        p.add(Action.update, group)
+                        p.add(Action.delete, group)
+                    }
                 }
-            }
-        )
+            })
         if (!res.isOk) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
-                message: "Couldn't set permissions"
+                code: ErrorCode.InternalServerError,
+                message: "Couldn't update permissions"
             })
         }
 
-        const updateRes =
-            await this.app.sinkronServer.updateDocumentWithCallback(
-                docId,
-                (doc) => {
-                    // @ts-expect-error doc untyped
-                    doc.isLocked = lock
-                }
-            )
+        const updateRes = await this.app.sinkron.updateDocumentWithCallback({
+            id: docId,
+            col,
+            cb: (doc) => {
+                doc.getMap("root").set("isLocked", lock)
+            }
+        })
         if (!updateRes.isOk) {
             return Result.err({
-                code: ErrorCode.InvalidRequest,
+                code: ErrorCode.InternalServerError,
                 message: "Couldn't update document"
+            })
+        }
+
+        return Result.ok(true)
+    }
+
+    async copyDocumentToAnotherSpace(
+        props: CopyDocumentProps
+    ): Promise<ResultType<true, RequestError>> {
+        const { docId, spaceId, toSpaceId } = props
+
+        const fromCol = `spaces/${spaceId}`
+        const getRes = await this.app.sinkron.getDocument({
+            id: docId,
+            col: fromCol
+        })
+        if (!getRes.isOk) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Couldn't get document"
+            })
+        }
+
+        const doc = getRes.value
+        if (doc.data === null) {
+            return Result.err({
+                code: ErrorCode.UnprocessableRequest,
+                message: "Document is deleted"
+            })
+        }
+
+        // TODO copy images
+
+        const loroDoc = new LoroDoc()
+        loroDoc.import(doc.data)
+        const root = loroDoc.getMap("root")
+        root.set("isPublished", false)
+        root.set("isLocked", false)
+        root.set("isPinned", false)
+        root.set("categories", [])
+        const snapshot = loroDoc.export({
+            mode: "shallow-snapshot",
+            frontiers: loroDoc.frontiers()
+        })
+
+        const toCol = `spaces/${toSpaceId}`
+        const createRes = await this.app.sinkron.createDocument({
+            id: uuidv4(),
+            col: toCol,
+            data: snapshot
+        })
+        if (!createRes.isOk) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Couldn't copy"
             })
         }
 

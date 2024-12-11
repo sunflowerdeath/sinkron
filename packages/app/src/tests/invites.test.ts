@@ -1,7 +1,8 @@
 import assert from "node:assert"
 
 import { App } from "../app"
-import { Profile } from "../services/user"
+
+import { fakeMail } from "./utils"
 
 const createUser = async (app: App, email: string) => {
     const res = await app.services.users.create(app.models, email)
@@ -18,27 +19,25 @@ const getAuthHeaders = async (app: App, userId: string) => {
 }
 
 describe("Invites", () => {
-    let app: App
-    let owner: Profile
-    let user: Profile
+    const app = new App()
 
-    const ownerEmail = "owner@sinkron.xyz" 
-    const userEmail = "user@sinkron.xyz"
-
-    beforeEach(async () => {
-        app = new App()
+    before(async () => {
         await app.init()
-        owner = await createUser(app, ownerEmail)
-        user = await createUser(app, userEmail)
     })
 
-    afterEach(async () => {
+    after(async () => {
         await app.destroy()
     })
 
     it("send invite", async () => {
+        const ownerEmail = fakeMail()
+        const owner = await createUser(app, ownerEmail)
         const ownerHeaders = await getAuthHeaders(app, owner.id)
+
+        const userEmail = fakeMail()
+        const user = await createUser(app, userEmail)
         const userHeaders = await getAuthHeaders(app, user.id)
+
         const spaceId = owner.spaces[0].id
 
         const res1 = await app.fastify.inject({
@@ -86,7 +85,13 @@ describe("Invites", () => {
     })
 
     it("cancel", async () => {
+        const ownerEmail = fakeMail()
+        const owner = await createUser(app, ownerEmail)
         const ownerHeaders = await getAuthHeaders(app, owner.id)
+
+        const userEmail = fakeMail()
+        await createUser(app, userEmail)
+
         const spaceId = owner.spaces[0].id
 
         const res = await app.fastify.inject({
@@ -109,8 +114,14 @@ describe("Invites", () => {
     })
 
     it("decline", async () => {
+        const ownerEmail = fakeMail()
+        const owner = await createUser(app, ownerEmail)
         const ownerHeaders = await getAuthHeaders(app, owner.id)
+
+        const userEmail = fakeMail()
+        const user = await createUser(app, userEmail)
         const userHeaders = await getAuthHeaders(app, user.id)
+
         const spaceId = owner.spaces[0].id
 
         const res = await app.fastify.inject({
@@ -133,8 +144,14 @@ describe("Invites", () => {
     })
 
     it("accept", async () => {
+        const ownerEmail = fakeMail()
+        const owner = await createUser(app, ownerEmail)
         const ownerHeaders = await getAuthHeaders(app, owner.id)
+
+        const userEmail = fakeMail()
+        const user = await createUser(app, userEmail)
         const userHeaders = await getAuthHeaders(app, user.id)
+
         const spaceId = owner.spaces[0].id
 
         const res = await app.fastify.inject({

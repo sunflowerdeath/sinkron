@@ -10,7 +10,7 @@
         "skipLibCheck": true,
 
         "declaration": true,
-        "declarationDir": "./types",
+        "declarationDir": "./lib",
         "emitDeclarationOnly": true,
         "target": "es2015",
         "outDir": "build",
@@ -18,5 +18,6 @@
         "noImplicitAny": true,
         "noImplicitReturns": true,
         "noImplicitThis": true
-    }
+    },
+    "include": ["src/**/*.ts*"]
 }

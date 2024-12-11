@@ -1,48 +1,44 @@
 import assert from "node:assert"
 
-import * as Automerge from "@automerge/automerge"
+import { LoroDoc } from "loro-crdt"
 import { v4 as uuidv4 } from "uuid"
-import { Action } from "sinkron"
 
-// import { Sinkron } from "sinkron"
+import { Action } from "@sinkron/client"
 import { App } from "../app"
 import { User } from "../entities"
 
+import { fakeMail } from "./utils"
+
+const createDoc = () => {
+    const doc = new LoroDoc()
+    const root = doc.getMap("root")
+    root.set("isLocked", false)
+    return doc
+}
+
 describe("Spaces", () => {
-    let app: App
+    let app = new App()
     let user: User | undefined
-    // let user2
     let headers: { [key: string]: string }
 
-    beforeEach(async () => {
-        app = new App()
+    before(async () => {
         await app.init()
+    })
 
-        const res = await app.services.users.create(
-            app.models,
-            "test@sinkron.xyz"
-        )
+    after(async () => {
+        await app.destroy()
+    })
+
+    beforeEach(async () => {
+        // create random user & login
+        const res = await app.services.users.create(app.models, fakeMail())
         assert(res.isOk, "user")
         user = res.value
-
-        /*
-        const res2 = await app.services.users.create(app.models, {
-            name: "user2",
-            password: "password"
-        })
-        assert(res2.isOk)
-        user2 = res2.value
-        */
-
         const tokenRes = await app.services.auth.issueAuthToken(app.models, {
             userId: user.id
         })
         assert(tokenRes.isOk, "token")
         headers = { "x-sinkron-auth-token": tokenRes.value.token }
-    })
-
-    afterEach(async () => {
-        await app.destroy()
     })
 
     it("create, delete", async () => {
@@ -85,82 +81,97 @@ describe("Spaces", () => {
 
     it("lock, unlock", async () => {
         // create space
-        const res = await app.fastify.inject({
+        const createSpaceRes = await app.fastify.inject({
             method: "POST",
             url: "/spaces/new",
             headers,
             payload: { name: "test" }
         })
-        assert.strictEqual(res.statusCode, 200, "create space")
-        const space = JSON.parse(res.payload)
+        assert.strictEqual(createSpaceRes.statusCode, 200, "create space")
+        const space = JSON.parse(createSpaceRes.payload)
 
         // create doc
         const docId = uuidv4()
-        const doc = Automerge.from({
-            content: [],
-            isLocked: false
+        const col = `spaces/${space.id}`
+        const doc = createDoc()
+        const createDocRes = await app.sinkron.createDocument({
+            id: docId,
+            col,
+            data: doc.export({ mode: "snapshot" })
         })
-        const res2 = await app.sinkron.createDocument(
-            docId,
-            `spaces/${space.id}`,
-            Automerge.save(doc)
-        )
-        assert(res2.isOk, "create doc")
+        assert(createDocRes.isOk, "create doc")
 
         // lock
-        const res3 = await app.fastify.inject({
+        const lockRes = await app.fastify.inject({
             method: "POST",
             url: `/spaces/${space.id}/lock/${docId}`,
             headers
         })
-        assert.strictEqual(res3.statusCode, 200, "locked")
+        assert.strictEqual(lockRes.statusCode, 200, "lock")
 
-        // check is locked
-        const res4 = await app.sinkron.checkDocumentPermission({
+        const getUserRes = await app.sinkron.getUser(user!.id)
+        assert(getUserRes.isOk, "get user object")
+        const userObject = getUserRes.value
+
+        // check locked
+        const getLockedDocRes = await app.sinkron.getDocument({
             id: docId,
-            user: user!.id,
-            action: Action.update
+            col
         })
-        assert(res4.isOk, "check permissions")
-        assert(!res4.value, "update not permitted")
+        assert(getLockedDocRes.isOk)
+        const lockedDoc = getLockedDocRes.value
+        assert(lockedDoc !== null, "get locked doc")
 
-        const res5 = await app.sinkron.checkDocumentPermission({
-            id: docId,
-            user: user!.id,
-            action: Action.delete
-        })
-        assert(res5.isOk, "check permissions")
-        assert(!res5.value, "delete not permitted")
+        // isLocked is set
+        const lockedDocContent = LoroDoc.fromSnapshot(lockedDoc.data!)
+        assert(
+            lockedDocContent.getMap("root").get("isLocked"),
+            "isLocked is set"
+        )
 
-        const res6 = await app.sinkron.getDocument(docId)
-        assert(res6 !== null, "doc")
-        const lockedDoc = Automerge.load(res6.data!)
-        assert("isLocked" in lockedDoc && lockedDoc.isLocked, "is locked")
+        // read is permitted
+        const readIsPermitted = lockedDoc.permissions.check(
+            userObject,
+            Action.read
+        )
+        assert(readIsPermitted, "read is permitted")
+
+        // update is not permitted
+        const updateIsPermitted = lockedDoc.permissions.check(
+            userObject,
+            Action.update
+        )
+        assert(!updateIsPermitted, "update is not permitted")
 
         // unlock
-        const res7 = await app.fastify.inject({
+        const unlockRes = await app.fastify.inject({
             method: "POST",
             url: `/spaces/${space.id}/unlock/${docId}`,
             headers
         })
-        assert.strictEqual(res7.statusCode, 200, "unlocked")
+        assert.strictEqual(unlockRes.statusCode, 200, "unlock")
 
-        // check is unlocked
-        const res8 = await app.sinkron.checkDocumentPermission({
+        // check unlocked
+        const getUnlockedDocRes = await app.sinkron.getDocument({
             id: docId,
-            user: user!.id,
-            action: Action.update
+            col
         })
-        assert(res8.isOk, "check permissions")
-        assert(res8.value, "permitted")
+        assert(getUnlockedDocRes.isOk)
+        assert(getUnlockedDocRes.value !== null, "get unlocked doc")
+        const unlockedDoc = getUnlockedDocRes.value
 
-        const res9 = await app.sinkron.getDocument(docId)
-        assert(res9 !== null, "doc")
-        const unlockedDoc = Automerge.load(res9.data!)
+        // isLocked not set
+        const unlockedDocContent = LoroDoc.fromSnapshot(unlockedDoc.data!)
         assert(
-            "isLocked" in unlockedDoc && !unlockedDoc.isLocked,
-            "is unlocked"
+            !unlockedDocContent.getMap("root").get("isLocked"),
+            "isLocked not set"
         )
+        // update is permitted
+        const updateIsPermittedUnlocked = unlockedDoc.permissions.check(
+            userObject,
+            Action.update
+        )
+        assert(updateIsPermittedUnlocked, "update is permitted")
     })
 
     it("members update / remove", async () => {
@@ -176,7 +187,7 @@ describe("Spaces", () => {
 
         const createUserRes = await app.services.users.create(
             app.models,
-            "user@sinkron.xyz"
+            fakeMail()
         )
         assert(createUserRes.isOk, "create user")
         const memberUser = createUserRes.value

@@ -1,18 +1,20 @@
 import { observer } from "mobx-react-lite"
 import { useLocation, useRoute } from "wouter"
 import { Col, Row } from "oriente"
-import { ItemState } from "sinkron-client"
+import { ItemState } from "@sinkron/client/lib/collection"
 
-import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
+import notificationsSvg from "~/exclamation.svg"
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
 import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
 import lockSvg from "@material-design-icons/svg/outlined/lock.svg"
+import pinSvg from "@material-design-icons/svg/outlined/push_pin.svg"
 import folderSvg from "@material-design-icons/svg/outlined/folder.svg"
 import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
 import { useStore, useSpace } from "../store"
 import type { DocumentListItemData } from "../store/SpaceStore"
-import { Avatar, Button, LinkButton, Icon, ActionStateView } from "../ui"
+import { Button, LinkButton, Icon, ActionStateView } from "../ui"
+import { Picture } from "~/components/picture"
 import env from "~/env"
 
 interface DocumentListCategoryItemProps {
@@ -110,15 +112,21 @@ const DocumentListItem = observer((props: DocumentListItemProps) => {
                 {subtitle}
             </Col>
             <Row gap={4}>
-                {data.item.local?.isLocked && (
-                    <Icon
-                        svg={lockSvg}
-                        style={{ fill: "var(--color-secondary)" }}
-                    />
-                )}
                 {data.item.state !== ItemState.Synchronized && (
                     <Icon
                         svg={syncSvg}
+                        style={{ fill: "var(--color-secondary)" }}
+                    />
+                )}
+                {data.item.data?.isPinned && (
+                    <Icon
+                        svg={pinSvg}
+                        style={{ fill: "var(--color-secondary)" }}
+                    />
+                )}
+                {data.item.data?.isLocked && (
+                    <Icon
+                        svg={lockSvg}
                         style={{ fill: "var(--color-secondary)" }}
                     />
                 )}
@@ -265,7 +273,7 @@ const DocumentListView = observer(() => {
                 to="/account"
             >
                 <Row gap={8} align="center">
-                    <Avatar name={space.space.name} />
+                    <Picture picture={space.space.picture} />
                     <div style={{ flexGrow: 1 }}>{space.space.name}</div>
                 </Row>
             </LinkButton>

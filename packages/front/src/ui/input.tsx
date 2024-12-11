@@ -12,7 +12,12 @@ import {
 
 type InputHeight = "s" | "m"
 
-interface InputProps extends StyleProps<[InputProps, boolean]> {
+interface InputProps
+    extends StyleProps<[InputProps, boolean]>,
+        Omit<
+            React.InputHTMLAttributes<HTMLInputElement>,
+            "value" | "onChange"
+        > {
     value: string
     stretch?: boolean
     onChange?: (value: string) => void
@@ -55,6 +60,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
             ref={mergeRefs(ref, autofocusRef)}
             type="text"
             {...rest}
+            disabled={isDisabled}
             value={value}
             onChange={(e) => onChange?.(e.target.value)}
             style={styles.root}
@@ -87,9 +93,10 @@ const MaskedInput = forwardRef<HTMLInputElement, MaskedInputProps>(
         const styles = useStyles(inputStyles, [props, isFocused])
         return (
             <input
-                ref={mergeRefs(maskitoRef, ref)}
+                ref={mergeRefs<HTMLInputElement>(maskitoRef, ref)}
                 type="text"
                 {...rest}
+                disabled={isDisabled}
                 value={value}
                 // onChange={(e) => onChange?.(e.target.value)}
                 onInput={(e) => onChange?.(e.currentTarget.value)}

@@ -6,6 +6,7 @@ export type User = {
     email: string
     isDisabled: boolean
     hasUnreadNotifications: boolean
+    picture: string // json
 }
 
 export type Otp = {
@@ -33,6 +34,7 @@ export type Space = {
     ownerId: string // uuid
     createdAt: Date
     usedStorage: number
+    picture: string // json
 }
 
 export type SpaceRole = "readonly" | "editor" | "admin" | "owner"
@@ -92,7 +94,8 @@ const UserEntity = new EntitySchema<User>({
         createdAt: { type: types.date, createDate: true },
         email: { type: String, unique: true },
         isDisabled: { type: Boolean },
-        hasUnreadNotifications: { type: Boolean }
+        hasUnreadNotifications: { type: Boolean },
+        picture: { type: String }
     },
     indices: [{ columns: ["email"] }]
 })
@@ -132,7 +135,8 @@ const SpaceEntity = new EntitySchema<Space>({
         name: { type: String },
         ownerId: { type: types.uuid },
         createdAt: { type: types.date, createDate: true },
-        usedStorage: { type: Number, default: 0 }
+        usedStorage: { type: Number, default: 0 },
+        picture: { type: String }
     },
     relations: {
         owner: { type: "many-to-one", target: "user" }

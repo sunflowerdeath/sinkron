@@ -5,7 +5,7 @@
     "identifier": "xyz.sinkon.app",
     "build": {
         "beforeDevCommand": "cd ../front && TAURI=1 pnpm dev",
-        "devUrl": "http://10.0.2.2:1337",
+        "devUrl": "http://localhost:1337",
         "beforeBuildCommand": "cd ../front && TAURI=1 pnpm build",
         "frontendDist": "../../front/build"
     },

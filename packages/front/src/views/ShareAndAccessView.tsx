@@ -35,6 +35,9 @@ const AccessListItem = (props: AccessListItem) => {
                 {email}
             </div>
             <Select
+                onChange={() => {
+                    /* todo */
+                }}
                 value={"readonly"}
                 options={accessOptions}
                 style={{ minWidth: 135 }}
@@ -52,7 +55,7 @@ const ShareAndAccessView = (props: ShareAndAccessViewProps) => {
             <Col gap={8}>
                 <div>Email of the person to share:</div>
                 <Row gap={8} style={{ alignSelf: "stretch" }}>
-                    <Input style={{ flexGrow: 1 }} autoFocus />
+                    <Input style={{ flexGrow: 1 }} autoFocus value="" />
                     <Select
                         value={role}
                         onChange={(v) => setRole(v as ShareAccess)}

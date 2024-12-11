@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+    postgres_sinkron:
+        image: postgres:17-alpine
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_DB=sinkron
+        command: postgres -c log_statement=all
+        healthcheck:
+            test: pg_isready -U postgres
+            interval: 3s
+            retries: 3
+            start_period: 3s
+            timeout: 3s
+        ports:
+            - 5433:5432
+
+    postgres_app:
+        image: postgres:17-alpine
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=password
+            - POSTGRES_DB=sinkron
+        command: postgres -c log_statement=all
+        healthcheck:
+            test: pg_isready -U postgres
+            interval: 3s
+            retries: 3
+            start_period: 3s
+            timeout: 3s
+        ports:
+            - 5434:5432
+
+    sinkron:
+        build: ./sinkron
+        environment:
+            SINKRON_CONFIG: >
+                {
+                    "host": "0.0.0.0",
+                    "port": 80,
+                    "apiToken": "SINKRON_API_TOKEN",
+                    "syncAuthUrl": "http://app/sinkron_auth/",
+                    "db": {
+                        "host": "postgres_sinkron",
+                        "port": 5432,
+                        "user": "postgres",
+                        "password": "password",
+                        "database": "sinkron"
+                    }
+                }
+            RUST_LOG: sinkron=trace
+        depends_on:
+            postgres_sinkron:
+                condition: service_healthy
+        ports:
+            - 3333:80
+
+    app:
+        build:
+            dockerfile: app.Dockerfile
+        environment:
+            SINKRON_APP_CONFIG: >
+                {
+                    "db": {
+                        "host": "postgres_app",
+                        "port": 5432,
+                        "username": "postgres",
+                        "password": "password",
+                        "database": "sinkron"
+                    },
+                    "sinkron": {
+                        "url": "http://sinkron",
+                        "token": "SINKRON_API_TOKEN"
+                    },
+                    "mail": {
+                        "type": "console"
+                    },
+                    "storage": {
+                        "type": "local",
+                        "path": "temp/files"
+                    }
+                }
+        depends_on:
+            postgres_app:
+                condition: service_healthy
+        ports:
+            - 80:80

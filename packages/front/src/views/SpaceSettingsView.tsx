@@ -5,10 +5,18 @@ import { Row, Col } from "oriente"
 import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
 import { ceil } from "lodash-es"
 
-import { useStore, UserStore, SpaceStore } from "../store"
-import { Button, Avatar, Input, Heading, useDialog, useStateToast } from "../ui"
-import ButtonsGrid from "../ui/ButtonsGrid"
-import Container from "../ui/Container"
+import { useStore, UserStore, SpaceStore } from "~/store"
+import {
+    Button,
+    LinkButton,
+    Input,
+    Heading,
+    useDialog,
+    useStateToast
+} from "~/ui"
+import ButtonsGrid from "~/ui/ButtonsGrid"
+import Container from "~/ui/Container"
+import { Picture } from "~/components/picture"
 
 interface RenameSpaceViewProps {
     spaceStore: SpaceStore
@@ -157,11 +165,11 @@ const SpaceSettingsView = observer(() => {
     return (
         <Container title="Space settings" onClose={() => navigate("/")}>
             <Row gap={8} align="center">
-                <Avatar name={space.name} />
+                <Picture picture={space.picture} />
                 <div>{space.name}</div>
             </Row>
             <ButtonsGrid>
-                <Button>Change image</Button>
+                <LinkButton to="/space/picture">Change picture</LinkButton>
                 <Button onClick={() => renameDialog.open()}>
                     Rename space
                 </Button>

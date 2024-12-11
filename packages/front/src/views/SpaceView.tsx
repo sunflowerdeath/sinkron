@@ -2,7 +2,7 @@ import { observer } from "mobx-react-lite"
 import { useMedia } from "react-use"
 import { Route, Switch, Redirect } from "wouter"
 import { useFavicon } from "react-use"
-import { ConnectionStatus } from "sinkron-client"
+import { ConnectionStatus } from "@sinkron/client/lib/collection"
 
 import defaultFaviconUrl from "../favicon.ico"
 import offFaviconUrl from "../favicon_off.ico"
@@ -15,6 +15,10 @@ import CategoriesView from "./CategoriesView"
 import { CreateCategoryView, EditCategoryView } from "./CreateCategoryView"
 import AccountAndSpaceView from "./AccountAndSpaceView"
 import AccountSettingsView from "./AccountSettingsView"
+import {
+    ChangeUserPictureView,
+    ChangeSpacePictureView
+} from "./ChangePictureView"
 import ActiveSessionsView from "./ActiveSessionsView"
 import NotificationsView from "./NotificationsView"
 import SpaceSettingsView from "./SpaceSettingsView"
@@ -30,7 +34,8 @@ const SpaceView = observer(() => {
     useFavicon(
         store.space!.collection.status === ConnectionStatus.Disconnected
             ? offFaviconUrl
-            : defaultFaviconUrl)
+            : defaultFaviconUrl
+    )
 
     const routes = (
         <>
@@ -44,6 +49,10 @@ const SpaceView = observer(() => {
             <Route
                 path={"/account/settings"}
                 children={() => <AccountSettingsView />}
+            />
+            <Route
+                path={"/account/picture"}
+                children={() => <ChangeUserPictureView />}
             />
             <Route
                 path={"/account/sessions"}
@@ -64,6 +73,10 @@ const SpaceView = observer(() => {
             <Route
                 path={"/space/settings"}
                 children={() => <SpaceSettingsView />}
+            />
+            <Route
+                path={"/space/picture"}
+                children={() => <ChangeSpacePictureView />}
             />
             <Route
                 path={"/space/members"}

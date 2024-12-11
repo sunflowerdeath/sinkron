@@ -40,6 +40,7 @@ export const toggleBlock = (editor: Editor, type: BlockType) => {
             // @ts-expect-error wrap doesn't need "children"
             Transforms.wrapNodes(editor, { type })
         } else {
+            // @ts-expect-error
             Transforms.setNodes(editor, { type })
         }
     }

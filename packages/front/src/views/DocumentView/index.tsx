@@ -7,33 +7,42 @@ import {
     ReactEditor,
     Slate,
     Editable,
-    // useReadOnly,
     RenderElementProps,
     RenderLeafProps
 } from "slate-react"
 import { Col, Row } from "oriente"
-import { without, isEqual } from "lodash-es"
-import * as Automerge from "@automerge/automerge"
+import { isEqual, without } from "lodash-es"
 import { Transforms } from "slate"
+import { LoroMap } from "loro-crdt"
+import { ObservableLoroDoc } from "@sinkron/client/lib/collection"
+import { applySlateOps } from "@sinkron/loro-slate"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import env from "~/env"
-import { useSpace } from "~/store"
-import type { Document } from "~/entities"
-import { fromAutomerge, applySlateOps } from "~/slate"
+import { useSpace, useStore } from "~/store"
+import { DocumentData } from "~/store/SpaceStore"
 import SelectCategoriesView from "~/views/SelectCategoriesView"
 import ShareAndAccessView from "~/views/ShareAndAccessView"
 import PublishView from "~/views/PublishView"
 import CategoriesList from "~/components/CategoriesList"
-import { Button, LinkButton, Icon, Menu, MenuItem, useStateToast } from "~/ui"
+import {
+    Button,
+    LinkButton,
+    Icon,
+    Menu,
+    MenuItem,
+    useStateToast,
+    useDialog
+} from "~/ui"
 
 import { DocumentViewStore } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
 import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
-import { Toolbar } from "./toolbar"
+import Toolbar from "./Toolbar"
+import CopyView from "./CopyView"
 
 const useForceUpdate = () => {
     const [_state, setState] = useState({})
@@ -45,29 +54,28 @@ const useForceUpdate = () => {
 
 type EditorViewProps = {
     id: string
-    doc: Automerge.Doc<Document>
+    doc: ObservableLoroDoc
+    data: DocumentData
     onChange: (editor: ReactEditor) => void
     onDelete: () => void
 }
 
 const EditorView = observer((props: EditorViewProps) => {
-    const { id, doc, onChange, onDelete } = props
+    const { id, doc, data, onChange, onDelete } = props
 
+    const isMobile = useMedia("(max-width: 1023px)")
+    const userStore = useStore()
     const spaceStore = useSpace()
-
     const toast = useStateToast()
     const documentViewStore = useMemo(
-        () => new DocumentViewStore({ spaceStore, toast, id }),
+        () => new DocumentViewStore({ spaceStore, toast, id, doc }),
         []
     )
     const editor = documentViewStore.editor
-
-    const readOnly = spaceStore.space.role === "readonly" || doc.isLocked
+    const value = documentViewStore.value
+    const readOnly = spaceStore.space.role === "readonly" || data.isLocked
 
     const forceUpdate = useForceUpdate()
-    const value = useMemo(() => {
-        return (fromAutomerge(doc.content) as any).children
-    }, [doc])
     useMemo(() => {
         if (!isEqual(editor.children, value)) {
             editor.children = value
@@ -94,38 +102,29 @@ const EditorView = observer((props: EditorViewProps) => {
         []
     )
 
-    const isMobile = useMedia("(max-width: 1023px)")
+    const onRemoveCategory = (cat: string) => {
+        spaceStore.changeDoc(id, (doc) => {
+            const root = doc.getMap("root")
+            const categories = root.get("categories") as string[]
+            root.set("categories", without(categories, cat))
+        })
+    }
 
     const [showToolbar, setShowToolbar] = useState(false)
     let bottomElem
     if (showToolbar) {
-        bottomElem = (
-            <div
-                style={{
-                    padding: isMobile ? 8 : "8px 40px",
-                    boxSizing: "border-box",
-                    background: "var(--color-background)",
-                    borderTop: "2px solid var(--color-elem)"
-                }}
-            >
-                <Toolbar document={documentViewStore} />
-            </div>
-        )
+        bottomElem = <Toolbar document={documentViewStore} />
     } else {
         let categoriesList
-        if (doc.categories.length > 0) {
+        if (data.categories.length > 0) {
             categoriesList = (
                 <Row gap={8} align="center" style={{ width: "100%" }}>
                     <div style={{ overflow: "scroll" }}>
                         <CategoriesList
-                            items={doc.categories.map(
+                            items={data.categories.map(
                                 (id) => spaceStore.meta.categories[id]!
                             )}
-                            onRemove={(c) => {
-                                spaceStore.changeDoc(id, (doc) => {
-                                    doc.categories = without(doc.categories, c)
-                                })
-                            }}
+                            onRemove={onRemoveCategory}
                             readOnly={readOnly}
                         />
                     </div>
@@ -151,7 +150,7 @@ const EditorView = observer((props: EditorViewProps) => {
                 style={{
                     background: "var(--color-background)",
                     height: 60,
-                    padding: isMobile ? "0 10px" : "0 40px",
+                    padding: isMobile ? "0 8px" : "0 40px",
                     boxSizing: "border-box",
                     overflowX: "auto",
                     flexShrink: 0
@@ -163,9 +162,28 @@ const EditorView = observer((props: EditorViewProps) => {
         )
     }
 
+    const setIsPinned = (value: boolean) => {
+        spaceStore.collection.change(id, (doc) => {
+            const root = doc.getMap("root")
+            root.set("isPinned", value)
+        })
+    }
+
+    const hasAnotherSpaces = userStore.user.spaces.length > 1
+    const copyDialog = useDialog((close) => (
+        <CopyView
+            docId={id}
+            spaceStore={spaceStore}
+            spaces={userStore.spaces}
+            toast={toast}
+            onClose={close}
+        />
+    ))
+
     const menu = () => {
-        const isLocked = doc.isLocked
-        const canDelete = spaceStore.space.role !== "readonly"
+        const isLocked = data.isLocked
+        const isPinned = data.isPinned
+        const isReadonly = spaceStore.space.role === "readonly"
 
         const canLock = ["admin", "owner"].includes(spaceStore.space.role)
         const lockItems = (
@@ -210,7 +228,7 @@ const EditorView = observer((props: EditorViewProps) => {
                         Publish
                     </MenuItem>
                 )}
-                {doc.isPublished && (
+                {data.isPublished && (
                     <MenuItem onSelect={open}>Open published version</MenuItem>
                 )}
             </>
@@ -219,15 +237,25 @@ const EditorView = observer((props: EditorViewProps) => {
         return (
             <>
                 {lockItems}
+                <MenuItem
+                    onSelect={() => setIsPinned(!isPinned)}
+                    isDisabled={isReadonly || isLocked}
+                >
+                    {isPinned ? "Unpin" : "Pin to top"}
+                </MenuItem>
                 {publishItems}
                 {/*<MenuItem onSelect={() => setView("share")}>
                     Share & Access
                 </MenuItem>*/}
-                {/*<MenuItem isDisabled={true}>Copy link to document</MenuItem>*/}
-                {/*<MenuItem isDisabled={true}>Copy to another space</MenuItem>*/}
+                <MenuItem>Copy internal link</MenuItem>
+                {hasAnotherSpaces && (
+                    <MenuItem onSelect={() => copyDialog.open()}>
+                        Copy to another space
+                    </MenuItem>
+                )}
                 <MenuItem
                     onSelect={onDelete}
-                    isDisabled={!canDelete || isLocked}
+                    isDisabled={isReadonly || isLocked}
                 >
                     Delete
                 </MenuItem>
@@ -296,7 +324,6 @@ const EditorView = observer((props: EditorViewProps) => {
                     boxSizing: "border-box",
                     overflow: "auto"
                 }}
-                autoFocus={!isMobile}
             />
         </ErrorBoundary>
     )
@@ -310,11 +337,12 @@ const EditorView = observer((props: EditorViewProps) => {
         if (view === "categories") {
             content = (
                 <SelectCategoriesView
-                    value={doc.categories}
+                    value={data.categories}
                     readOnly={readOnly}
                     onChange={(value) => {
                         spaceStore.collection.change(id, (doc) => {
-                            doc.categories = value
+                            const root = doc.getMap("root")
+                            root.set("categories", value)
                         })
                     }}
                     categoryTree={spaceStore.categoryTree}
@@ -388,6 +416,7 @@ const EditorView = observer((props: EditorViewProps) => {
             </div>
             {bottomElem}
             {viewElem}
+            {copyDialog.render()}
         </Col>
     )
 
@@ -422,7 +451,12 @@ const DocumentView = observer((props: DocumentViewProps) => {
     const [_location, navigate] = useLocation()
 
     const item = space.collection.items.get(id)
-    if (item === undefined || item.local === null || "meta" in item.local) {
+    if (
+        item === undefined ||
+        item.local === null ||
+        item.data === undefined ||
+        item.data.isMeta
+    ) {
         return <Redirect to="/" />
     }
 
@@ -432,7 +466,10 @@ const DocumentView = observer((props: DocumentViewProps) => {
         )
         if (ops.length > 0) {
             space.changeDoc(id, (doc) => {
-                applySlateOps(doc.content, ops)
+                const content = doc.getMap("root").get("content")
+                if (content instanceof LoroMap) {
+                    applySlateOps(content, ops)
+                }
             })
         }
     }
@@ -445,6 +482,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
     return (
         <EditorView
             id={id}
+            data={item.data}
             doc={item.local}
             onChange={onChange}
             onDelete={onDelete}

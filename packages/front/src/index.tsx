@@ -1,4 +1,5 @@
-import 'core-js/stable'
+import "./main.css"
+import "core-js/stable"
 
 import { useMemo } from "react"
 import { createRoot } from "react-dom/client"

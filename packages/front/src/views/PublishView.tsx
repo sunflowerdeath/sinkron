@@ -135,6 +135,7 @@ const PublishForm = observer((props: PublishFormProps) => {
                 <a
                     href={url}
                     target="_blank"
+                    rel="noreferrer"
                     style={{ color: "var(--color-link)" }}
                 >
                     {url}

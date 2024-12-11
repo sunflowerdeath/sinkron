@@ -3,19 +3,19 @@
     "private": true,
     "description": "",
     "scripts": {
-        "lint": "pnpm -r lint",
-        "app:build": "pnpm --F=sinkron-app... build",
-        "app:start": "pnpm --F=sinkron-app start",
-        "app:dev": "pnpm app:build && pnpm --F=sinkron-app dev",
-        "front:build": "pnpm --F=sinkron-front... build",
-        "front:dev": "pnpm --F=sinkron-front dev",
+        "lint": "pnpm -r --aggregate-output lint",
+        "dev": "docker-compose -f local.docker-compose.yml up --detach --build --force-recreate --renew-anon-volumes",
+        "app:build": "pnpm --F=@sinkron/app... build",
+        "app:start": "pnpm --F=@sinkron/app start",
+        "front:build": "pnpm --F=@sinkron/front... build",
+        "front:dev": "pnpm --F=@sinkron/front dev",
         "test": "pnpm -r run test"
     },
     "author": "sunflowerdeath",
     "license": "Unlicense",
-    "packageManager": "pnpm@9.9.0+sha512.60c18acd138bff695d339be6ad13f7e936eea6745660d4cc4a776d5247c540d0edee1a563695c183a66eb917ef88f2b4feb1fc25f32a7adcadc7aaf3438e99c1",
+    "packageManager": "pnpm@9.14.3+sha512.c0f53ee99477ed969b82b289ad011a5d16bf1623c957e7f29eabe8d0c00b574c29b8c7f54f6c67ee710c73f285c8154d07ce44b46fe2c0eeb476a90441bac371",
     "devDependencies": {
-        "oxlint": "^0.9.10",
+        "oxlint": "^0.14.1",
         "prettier": "^2.8.8",
         "typescript": "^5.6.3"
     }

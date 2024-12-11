@@ -2,32 +2,35 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col, Row } from "oriente"
 
-import type { Space } from "../entities"
-import { useStore } from "../store"
-import { Button, LinkButton, Avatar } from "../ui"
-import Container from "../ui/Container"
-import numForm from "../utils/numForm"
+import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
+
+import type { Space } from "~/entities"
+import { useStore } from "~/store"
+import { Button, LinkButton, Icon } from "~/ui"
+import Container from "~/ui/Container"
+import numForm from "~/utils/numForm"
+import { Picture } from "~/components/picture"
 
 const SwitchSpaceView = observer(() => {
-    const store = useStore()
+    const userStore = useStore()
     const [_location, navigate] = useLocation()
 
     const select = (s: Space) => {
-        store.changeSpace(s.id)
+        userStore.changeSpace(s.id)
         navigate("/")
     }
 
     return (
         <Container title="Switch space" onClose={() => navigate("/")}>
             <Col gap={10} align="normal">
-                {store.user.spaces.map((s) => (
+                {userStore.spaces.map((s) => (
                     <Button
-                        onClick={() => select(s)}
-                        style={{ justifyContent: "start" }}
                         key={s.id}
+                        onClick={() => select(s)}
+                        style={{ justifyContent: "start", flexGrow: 1 }}
                     >
                         <Row gap={8} align="center">
-                            <Avatar name={s.name} />
+                            <Picture picture={s.picture} />
                             <Col>
                                 <div>{s.name || "."}</div>
                                 <div style={{ opacity: 0.6 }}>

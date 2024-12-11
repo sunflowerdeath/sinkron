@@ -1,16 +1,15 @@
-import { createServer } from "http"
-import type { IncomingMessage } from "http"
-import { Duplex } from "stream"
 import path from "path"
 
+import { pino, Logger } from "pino"
 import Fastify, { FastifyInstance, FastifyRequest } from "fastify"
+import fastifyWebsocket from "@fastify/websocket"
 import { DataSource, Repository } from "typeorm"
 import Bowser from "bowser"
 import cors from "@fastify/cors"
-import { Sinkron, SinkronServer, ChannelServer } from "sinkron"
+import { SinkronClient } from "@sinkron/client/lib/client"
 
-import dataSource from "./db/app"
-import { config, SinkronConfig } from "./config"
+import dataSource from "./db"
+import { config, SinkronAppConfig } from "./config"
 import {
     User,
     Otp,
@@ -21,6 +20,8 @@ import {
     File,
     Post
 } from "./entities"
+import { Picture } from "./types"
+import { ChannelServer } from "./channels"
 
 import { EmailSender, FakeEmailSender, SmtpEmailSender } from "./email"
 import { LocalObjectStorage } from "./files/local"
@@ -166,7 +167,43 @@ const loginRoutes = (app: App) => async (fastify: FastifyInstance) => {
     })
 }
 
+type SetPictureBody = {
+    picture: Picture
+}
+
+const setPictureBodySchema = {
+    type: "object",
+    properties: {
+        picture: {
+            type: "object",
+            properties: {
+                emoji: { type: "string", minLength: 1, maxLength: 100 },
+                color: { type: "string", minLength: 1, maxLength: 100 }
+            },
+            required: ["emoji", "color"],
+            additionalProperties: false
+        }
+    },
+    required: ["picture"],
+    additionalProperties: false
+}
+
 const accountRoutes = (app: App) => async (fastify: FastifyInstance) => {
+    fastify.post<{ Body: SetPictureBody }>(
+        "/account/picture",
+        { schema: { body: setPictureBodySchema } },
+        async (request, reply) => {
+            const { userId } = request.token
+            const { picture } = request.body
+            const sessions = await app.services.users.setPicture(
+                app.models,
+                userId,
+                picture
+            )
+            reply.send(sessions)
+        }
+    )
+
     fastify.get("/account/sessions", async (request, reply) => {
         const { userId, token } = request.token
         const sessions = await app.services.auth.getActiveSessions(app.models, {
@@ -243,9 +280,9 @@ type Services = {
 }
 
 class App {
-    config: SinkronConfig
-    sinkron: Sinkron
-    sinkronServer: SinkronServer
+    config: SinkronAppConfig
+    logger: Logger<string>
+    sinkron: SinkronClient
     storage: ObjectStorage
     emailSender: EmailSender
     channels: ChannelServer
@@ -256,6 +293,10 @@ class App {
 
     constructor() {
         this.config = config
+        this.logger = pino({
+            transport: { target: "pino-pretty" },
+            level: "debug"
+        })
         this.db = dataSource
         this.emailSender =
             config.mail.type === "console"
@@ -285,9 +326,8 @@ class App {
             files: this.db.getRepository<File>("file"),
             posts: this.db.getRepository<Post>("post")
         }
-        this.sinkron = new Sinkron({ db: config.sinkron.db })
-        this.sinkronServer = new SinkronServer({ sinkron: this.sinkron })
-        this.channels = new ChannelServer({})
+        this.sinkron = new SinkronClient(config.sinkron)
+        this.channels = new ChannelServer({ logger: this.logger })
         this.fastify = this.createFastify()
     }
 
@@ -308,69 +348,16 @@ class App {
     }
 
     async init() {
-        await this.sinkron.init()
         await this.db.initialize()
     }
 
     async destroy() {
         await this.db.destroy()
         this.channels.dispose()
-        this.sinkronServer.dispose()
-    }
-
-    async handleUpgrade(
-        request: IncomingMessage,
-        socket: Duplex,
-        head: Buffer
-    ) {
-        const matchSinkron = request.url!.match(/^\/sinkron\/(.+)$/)
-        if (matchSinkron) {
-            const token = matchSinkron[1]
-            const res = await this.services.auth.verifyAuthToken(
-                this.models,
-                token
-            )
-            if (res.isOk && res.value !== null) {
-                this.sinkronServer.upgrade(request, socket, head, {
-                    id: res.value.userId
-                })
-            } else {
-                socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
-                socket.destroy()
-            }
-            return
-        }
-
-        const matchChannels = request.url!.match(/^\/channels\/(.+)$/)
-        if (matchChannels) {
-            const token = matchChannels[1]
-            const res = await this.services.auth.verifyAuthToken(
-                this.models,
-                token
-            )
-            if (res.isOk && res.value !== null) {
-                this.channels.ws.handleUpgrade(request, socket, head, (ws) => {
-                    this.channels.ws.emit("connection", ws, request)
-                })
-            } else {
-                socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
-                socket.destroy()
-            }
-            return
-        }
-
-        socket.write("HTTP/1.1 404 Not Found\r\n\r\n")
-        socket.destroy()
     }
 
     createFastify() {
-        const fastify = Fastify({
-            serverFactory: (handler) => {
-                const server = createServer(handler)
-                server.on("upgrade", this.handleUpgrade.bind(this))
-                return server
-            }
-        })
+        const fastify = Fastify()
 
         fastify.addContentTypeParser(
             "application/octet-stream",
@@ -392,12 +379,50 @@ class App {
                 reply.status(500).send({
                     error: { message: "Internal server error" }
                 })
-                console.log(error)
+                this.logger.error("Internal server error: %o", error)
             }
         })
 
         fastify.get("/", (_request, reply) => {
-            reply.send("Sinkron API")
+            reply.send("Sinkron Api")
+        })
+
+        fastify.post<{ Params: { token: string } }>(
+            "/sinkron_auth/:token",
+            async (request, reply) => {
+                const { token } = request.params
+                const res = await this.services.auth.verifyAuthToken(
+                    this.models,
+                    token
+                )
+                if (res.isOk && res.value !== null) {
+                    reply.send(res.value.userId)
+                } else {
+                    reply.code(401).send("Couldn't authorize")
+                }
+            }
+        )
+
+        fastify.register(fastifyWebsocket)
+        fastify.register((fastify) => {
+            fastify.get<{ Params: { token: string } }>(
+                "/channel/:token",
+                { websocket: true },
+                async (ws, request) => {
+                    const { token } = request.params
+                    const res = await this.services.auth.verifyAuthToken(
+                        this.models,
+                        token
+                    )
+                    if (res.isOk && res.value !== null) {
+                        const token = res.value
+                        this.channels.onConnect(ws, `users/${token.userId}`)
+                    } else {
+                        ws.send("auth_failed")
+                        ws.close()
+                    }
+                }
+            )
         })
 
         fastify.get<{ Params: { postId: string } }>(
@@ -440,10 +465,14 @@ class App {
         fastify.register(appRoutes(this))
         fastify.register(cors, {
             origin: [
+                // localhost dev-server
+                "http://localhost:1337",
+                // tauri app
                 "tauri://localhost",
                 "http://tauri.localhost",
+                // production
                 "https://sinkron.xyz",
-                "http://localhost:1337"
+                "https://new.sinkron.xyz"
             ],
             credentials: true
         })
@@ -451,7 +480,7 @@ class App {
         return fastify
     }
 
-    start(props: AppProps) {
+    start(props: AppProps = {}) {
         const { host, port } = { ...defaultAppProps, ...props }
         this.fastify.listen({ host, port }, (err) => {
             if (err) {

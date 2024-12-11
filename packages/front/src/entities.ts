@@ -1,8 +1,12 @@
-import { AutomergeNode } from "./slate"
+export type Picture = {
+    color: string
+    emoji: string
+}
 
-export interface Space {
+export type Space = {
     id: string
     name: string
+    picture: Picture
     owner: User
     membersCount: number
     role: SpaceRole
@@ -39,6 +43,7 @@ export type Invite = {
 export type SpaceMember = {
     id: string
     email: string
+    picture: Picture
     role: SpaceRole 
 }
 
@@ -50,6 +55,7 @@ export type Credentials = {
 export type User = {
     id: string
     email: string
+    picture: Picture
     spaces: Space[]
     hasUnreadNotifications: boolean
 }
@@ -61,15 +67,8 @@ export type Category = {
 }
 
 export type Metadata = {
-    meta: true
+    isMeta: true
     categories: { [key: string]: Category }
-}
-
-export type Document = {
-    content: AutomergeNode
-    categories: string[]
-    isPublished: boolean
-    isLocked: boolean
 }
 
 export type Post = {

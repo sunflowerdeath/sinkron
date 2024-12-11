@@ -1,20 +1,36 @@
-import { reaction, makeObservable, computed, observable, autorun } from "mobx"
+import {
+    reaction,
+    makeObservable,
+    computed,
+    observable,
+    autorun,
+    ObservableMap
+} from "mobx"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { v4 as uuidv4 } from "uuid"
-import { without } from "lodash-es"
 import {
-    Collection,
+    SinkronCollection,
     Item,
-    WebSocketTransport,
     IndexedDbCollectionStore,
     ItemState
-} from "sinkron-client"
+} from "@sinkron/client/lib/collection"
+import { toLoro } from "@sinkron/loro-slate"
 import { compareDesc } from "date-fns"
-import { Node, Path } from "slate"
+import { LoroDoc, LoroList, LoroMap } from "loro-crdt"
+import { Node } from "slate"
+import { without } from "lodash-es"
 
+import { TitleElement, RootElement } from "~/types"
 import env from "~/env"
-import { Space, SpaceRole, Document, Category, Metadata } from "~/entities"
-import { toAutomerge, AutomergeNode } from "~/slate"
+import {
+    Space,
+    SpaceMember,
+    Invite,
+    SpaceRole,
+    Metadata,
+    Category,
+    Picture
+} from "~/entities"
 import { Api } from "~/api"
 import { TransformedMap } from "~/utils/transformedMap"
 
@@ -30,10 +46,39 @@ export type CategoryTree = {
     nodes: CategoryTreeNode[]
 }
 
+export type FetchMembersResponse = {
+    members: SpaceMember[]
+    invites: Invite[]
+}
+
+export type DocumentData = {
+    isMeta: false
+    categories: string[]
+    isPublished: boolean
+    isLocked: boolean
+    isPinned: boolean
+}
+
+export type ExtractedData = Metadata | DocumentData
+
+const extractDocumentData = (doc: LoroDoc): ExtractedData => {
+    const root = doc.getMap("root")
+    if (root.get("isMeta")) {
+        return root.toJSON() as Metadata
+    } else {
+        return {
+            isMeta: false,
+            categories: root.get("categories") as string[],
+            isPublished: root.get("isPublished") as boolean,
+            isLocked: root.get("isLocked") as boolean,
+            isPinned: root.get("isPinned") as boolean
+        }
+    }
+}
+
 export type DocumentListItemData = {
     id: string
-    item: Item<Document>
-    categories: string[]
+    item: Item<DocumentData>
     title: string
     subtitle: string | null
 }
@@ -44,105 +89,65 @@ export type UploadState = {
     state: IPromiseBasedObservable<object>
 }
 
-// Implementation of Node.nodes that works with Automerge doc
-const nodes = function* (root: AutomergeNode, from?: Path) {
-    let n = root
-    let p: Path = []
-    const visited = new Set()
-    while (true) {
-        yield n
+const getTextPreview = (doc: LoroDoc) => {
+    const result = { title: "", subtitle: "" }
 
-        // go down
-        if (!visited.has(n) && "children" in n && n.children.length >= 0) {
-            visited.add(n)
-            const nextIndex =
-                from && Path.isAncestor(p, from) ? from[p.length] : 0
-            p = [...p, nextIndex]
-            n = Node.get(root as Node, p) as AutomergeNode
-            continue
+    const content = doc.getMap("root").get("content")
+    if (!(content instanceof LoroMap)) return result
+    const children = content.get("children")
+    if (!(children instanceof LoroList)) return result
+
+    if (children.length > 0) {
+        const firstChild = children.get(0).toJSON()
+        for (const item of Node.texts(firstChild)) {
+            const [text] = item
+            result.title += text.text
+            if (result.title.length >= 75) break
         }
+    }
 
-        if (p.length === 0) break
-
-        // go right
-        const nextPath = Path.next(p)
-        if (Node.has(root as Node, nextPath)) {
-            p = nextPath
-            n = Node.get(root as Node, p) as AutomergeNode
-            continue
+    if (children.length > 1) {
+        outer: for (let i = 1; i < children.length; i++) {
+            const child = children.get(i).toJSON()
+            for (const item of Node.texts(child)) {
+                const [text] = item
+                result.subtitle += text.text + " "
+                if (result.subtitle.length >= 75) break outer
+            }
         }
-
-        // go up
-        p = Path.parent(p)
-        n = Node.get(root as Node, p) as AutomergeNode
     }
-}
 
-// Implementation of Node.texts that works with Automerge doc
-const texts = function* (root: AutomergeNode, from?: Path) {
-    const gen = nodes(root, from)
-    for (const node of gen) {
-        if ("text" in node) yield node.text
-    }
+    return result
 }
 
 const getDocumentListItemData = (
-    item: Item<Document>
+    item: Item<DocumentData>
 ): DocumentListItemData => {
-    const { content, categories } = item.local!
-
-    let title = ""
-    let subtitle = ""
-
-    try {
-        if (content.children.length > 0) {
-            const gen = texts(content.children[0])
-            for (const text of gen) {
-                title += text
-                if (title.length >= 75) break
-            }
-        }
-
-        if (content.children.length > 1) {
-            const gen = texts(content, [1])
-            for (const text of gen) {
-                subtitle += text + " "
-                if (subtitle.length >= 75) break
-            }
-        }
-    } catch {
-        // just in case
-    }
-
-    return { id: item.id, item, title, subtitle, categories }
+    const { title, subtitle } = getTextPreview(item.local!.doc)
+    return { id: item.id, item, title, subtitle }
 }
 
-const getUpdatedAt = <T>(item: Item<T>) =>
+const getUpdatedAt = (item: Item<any>) =>
     item.state === ItemState.Synchronized
         ? item.updatedAt!
         : item.localUpdatedAt!
 
-const makeInitialDocument = (): Document => ({
-    content: toAutomerge({
-        children: [
-            {
-                // @ts-expect-error valid TitleElement
-                type: "title",
-                children: [{ text: "" }]
-            }
-        ]
-    }),
-    categories: [],
-    isPublished: false,
-    isLocked: false
-})
+const createInitialDocument = (initialCategory: string | undefined) => {
+    const doc = new LoroDoc()
+    const root = doc.getMap("root")
 
-const isMeta = (item: Document | Metadata): item is Metadata => {
-    return "meta" in item && item.meta == true
-}
+    const title: TitleElement = { type: "title", children: [{ text: "" }] }
+    const rootElem: RootElement = { children: [title] }
+    root.setContainer("content", toLoro(rootElem as Node))
 
-const isDocument = (item: Document | Metadata): item is Document => {
-    return !isMeta(item)
+    const categories = initialCategory !== undefined ? [initialCategory] : []
+    root.set("categories", categories)
+
+    root.set("isPublished", false)
+    root.set("isLocked", false)
+    root.set("isPinned", false)
+
+    return doc
 }
 
 export type SpaceView =
@@ -157,13 +162,10 @@ export type SpaceViewProps =
 class SpaceStore {
     space: Space
     store: UserStore
-    collection: Collection<Document | Metadata>
+    collection: SinkronCollection<ExtractedData>
     loadedState: IPromiseBasedObservable<void>
     view: SpaceView = { kind: "all" }
-    documentList: TransformedMap<
-        Item<Document | Metadata>,
-        DocumentListItemData
-    >
+    documentList: TransformedMap<Item<ExtractedData>, DocumentListItemData>
     api: Api
     dispose: () => void
 
@@ -173,20 +175,17 @@ class SpaceStore {
         this.store = store
 
         const col = `spaces/${space.id}`
-        const collectionStore = new IndexedDbCollectionStore<
-            Document | Metadata
-        >(col)
-        const token = this.api.getToken()
-        const transport = new WebSocketTransport({
-            url: `${env.wsUrl}/sinkron/${token}`
-        })
-        this.collection = new Collection<Document | Metadata>({
-            transport,
+        const collectionStore = new IndexedDbCollectionStore(col)
+        const token = this.api.getToken() ?? ""
+        this.collection = new SinkronCollection({
+            url: env.wsUrl,
+            token,
             col,
             store: collectionStore,
             errorHandler: () => {
                 this.store.logout()
-            }
+            },
+            extractData: extractDocumentData
         })
         this.loadedState = fromPromise(
             new Promise<void>((resolve) => {
@@ -200,23 +199,24 @@ class SpaceStore {
         )
 
         this.documentList = new TransformedMap({
-            // @ts-expect-error "this.collection.items" is ObservableMap
-            source: this.collection.items,
+            source: this.collection.items as ObservableMap,
             filter: (item) => {
-                if (item.local === null) return false
-                if (!isDocument(item.local)) return false
+                if (item.data === undefined) return false
+                if (item.data.isMeta) return false
+
                 if (this.view.kind === "all") {
                     return true
                 } else if (this.view.kind === "published") {
-                    return item.local.isPublished
+                    return item.data.isPublished
                 } /* this.view.kind === "category" */ else {
-                    return item.local.categories.includes(this.view.id)
+                    return item.data.categories.includes(this.view.id)
                 }
             },
             transform: getDocumentListItemData
         })
 
         makeObservable(this, {
+            space: observable,
             documents: computed,
             publishedDocuments: computed,
             sortedDocumentList: computed,
@@ -227,7 +227,7 @@ class SpaceStore {
             categoryTree: computed
         })
 
-        // React if current category being deleted
+        // Reset view if current category being deleted
         const disposeAutorun = autorun(() => {
             if (this.view.kind === "category") {
                 const list = Object.keys(this.meta.categories)
@@ -267,72 +267,66 @@ class SpaceStore {
         }
     }
 
-    get documents() {
-        const documents = Array.from(this.collection.items.values()).filter(
-            (item) => item.local !== null && !isMeta(item.local)
-        )
-        return documents as Item<Document>[]
+    get documents(): Item<DocumentData>[] {
+        return Array.from(this.collection.items.values()).filter(
+            (item) => item.data !== undefined && !item.data.isMeta
+        ) as Item<DocumentData>[]
     }
 
     get publishedDocuments() {
         const published = []
         for (const item of this.documents) {
-            if (item.local?.isPublished) published.push(item)
+            if (item.data?.isPublished) published.push(item)
         }
         return published
     }
 
     get sortedDocumentList() {
-        return Array.from(this.documentList.map.values()).sort((a, b) =>
-            compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
-        )
+        const cmpBool = (
+            a: boolean | null | undefined,
+            b: boolean | null | undefined
+        ) => (Boolean(a) === Boolean(b) ? 0 : a ? -1 : 1)
+        return Array.from(this.documentList.map.values()).sort((a, b) => {
+            const cmpPinned = cmpBool(
+                a.item.data?.isPinned,
+                b.item.data?.isPinned
+            )
+            if (cmpPinned !== 0) return cmpPinned
+            return compareDesc(getUpdatedAt(a.item), getUpdatedAt(b.item))
+        })
     }
 
-    get metaItem() {
+    get metaItem(): Item<Metadata> | undefined {
         for (const item of this.collection.items.values()) {
-            if (item.local && isMeta(item.local)) return item
+            if (item.data?.isMeta) return item as Item<Metadata>
         }
         return undefined
     }
 
-    get meta() {
+    get meta(): Metadata {
         if (!this.metaItem || this.metaItem.local === null) {
             throw new Error("Metadata document not found!")
         }
-        return this.metaItem.local as any as Metadata
+        return this.metaItem.data!
     }
 
-    changeMeta(cb: (m: Metadata) => void) {
+    changeMeta(cb: (m: LoroDoc) => void) {
         if (!this.metaItem || this.metaItem.local === null) {
             throw new Error("Metadata document not found!")
         }
         this.collection.change(this.metaItem.id, (doc) => {
-            cb(doc as Metadata)
+            cb(doc)
         })
     }
 
-    changeDoc(id: string, cb: (doc: Document) => void) {
-        this.collection.change(id, (doc) => {
-            if (!isMeta(doc)) cb(doc)
-        })
+    changeDoc(id: string, cb: (doc: LoroDoc) => void) {
+        this.collection.change(id, cb)
     }
 
     createDocument() {
-        const doc = makeInitialDocument()
-        if (this.view.kind === "category") {
-            doc.categories.push(this.view.id)
-        }
-        const id = this.collection.create(doc)
-        return id
-    }
-
-    importDocument(content: Node) {
-        const doc = {
-            content: toAutomerge(content),
-            categories: [],
-            isPublished: false,
-            isLocked: false
-        }
+        const initialCategory =
+            this.view.kind === "category" ? this.view.id : undefined
+        const doc = createInitialDocument(initialCategory)
         const id = this.collection.create(doc)
         return id
     }
@@ -348,9 +342,9 @@ class SpaceStore {
         })
 
         for (const item of this.documents) {
-            const doc = item.local as Document
-            for (const i in doc.categories) {
-                map[doc.categories[i]].count++
+            const categories = item.data!.categories
+            for (const i in categories) {
+                map[categories[i]].count++
             }
         }
 
@@ -368,37 +362,36 @@ class SpaceStore {
         return { map, nodes }
     }
 
-    createCategory(values: { name: string; parent: string | null }) {
+    createCategory(data: { name: string; parent: string | null }) {
         const id = uuidv4()
-        this.changeMeta((meta) => {
-            meta.categories[id] = { id, ...values }
-        })
+        this.updateCategory(id, data)
         return id
     }
 
     updateCategory(id: string, data: { name: string; parent: string | null }) {
         this.changeMeta((meta) => {
-            const cat = meta.categories[id]
-            if (cat === undefined) return
-            cat.name = data.name
-            cat.parent = data.parent
+            const root = meta.getMap("root")
+            const categories = root.get("categories") as LoroMap
+            categories.set(id, { id, ...data })
         })
     }
 
     deleteCategory(id: string) {
         this.changeMeta((meta) => {
             // TODO if deleted category has subcategories, change their parents
-            delete meta.categories[id]
+            const root = meta.getMap("root")
+            const categories = root.get("categories") as LoroMap
+            categories.delete(id)
         })
 
         this.collection.items.forEach((item) => {
-            if (item.local === null) return
-            const data = item.local
-            if (!isDocument(data)) return
-            if (data.categories.includes(id)) {
-                this.collection.change(item.id, (d) => {
-                    // @ts-expect-error item is not meta
-                    d.categories = without(d.categories, id)
+            if (!item.data) return
+            if (item.data.isMeta) return
+            if (item.data.categories.includes(id)) {
+                this.collection.change(item.id, (doc) => {
+                    const root = doc.getMap("root")
+                    const categories = root.get("categories") as string[]
+                    root.set("categories", without(categories, id))
                 })
             }
         })
@@ -412,7 +405,7 @@ class SpaceStore {
 
     fetchMembers() {
         return fromPromise(
-            this.api.fetch({
+            this.api.fetch<FetchMembersResponse>({
                 method: "GET",
                 url: `/spaces/${this.space.id}/members`
             })
@@ -458,6 +451,24 @@ class SpaceStore {
     }
 
     // === Space settings
+
+    changePicture(picture: Picture) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/picture`,
+                data: { picture }
+            })
+        )
+        res.then(() => {
+            this.space.picture = picture
+            const space = this.store.user.spaces.find(
+                (s) => s.id === this.space.id
+            )
+            if (space) space.picture = picture
+        })
+        return res
+    }
 
     renameSpace(name: string) {
         const res = fromPromise(
@@ -526,6 +537,23 @@ class SpaceStore {
             this.api.fetch({
                 method: "POST",
                 url: `/spaces/${this.space.id}/unlock/${docId}`
+            })
+        )
+        return res
+    }
+
+    copyDocumentToAnotherSpace({
+        docId,
+        toSpaceId
+    }: {
+        docId: string
+        toSpaceId: string
+    }) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/copy_document`,
+                data: { docId, toSpaceId }
             })
         )
         return res

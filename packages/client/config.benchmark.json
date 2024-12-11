@@ -1,0 +1,13 @@
+{
+    "host": "0.0.0.0",
+    "port": 3337,
+    "syncAuthUrl": null,
+    "apiToken": "SINKRON_API_TOKEN",
+    "db": {
+        "host": "localhost",
+        "port": 5432,
+        "user": "postgres",
+        "password": "password",
+        "database": "sinkron_benchmark"
+    }
+}

@@ -1,8 +1,7 @@
 // import { v4 as uuidv4 } from "uuid"
 import sharp from "sharp"
-import { union, difference, sum } from "lodash"
 import { In } from "typeorm"
-import * as Automerge from "@automerge/automerge"
+import { sum } from "lodash"
 
 import { App, AppModels } from "../app"
 import { Result, ResultType } from "../utils/result"
@@ -187,6 +186,8 @@ class FileService {
 
         if (uploadedFileIds.length === 0) return
 
+        /*
+        TODO
         const col = `spaces/${spaceId}`
         const res = await this.app.sinkron.syncCollection(col)
         if (!res.isOk) return
@@ -204,6 +205,7 @@ class FileService {
         if (orphanIds.length > 0) {
             await this.batchDeleteFiles(models, { spaceId, fileIds: orphanIds })
         }
+        */
     }
 }
 
