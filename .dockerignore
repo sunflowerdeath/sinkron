@@ -4,4 +4,5 @@ temp
 node_modules
 packages/*/node_modules
 packages/*/(build|lib|temp)
+packages/tauri
 sinkron

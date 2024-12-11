@@ -1,6 +1,7 @@
 import { In } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc, LoroMap } from "loro-crdt"
+import { sortBy } from "lodash"
 import { Permissions, Action, role } from "@sinkron/client/lib/client"
 
 import { App, AppModels } from "../app"
@@ -42,6 +43,12 @@ export type LockDocumentProps = {
     spaceId: string
     docId: string
     lock: boolean
+}
+
+export type CopyDocumentProps = {
+    docId: string
+    spaceId: string
+    toSpaceId: string
 }
 
 const spaceNameSchema = ajv.compile({
@@ -478,6 +485,61 @@ class SpaceService {
             return Result.err({
                 code: ErrorCode.InternalServerError,
                 message: "Couldn't update document"
+            })
+        }
+
+        return Result.ok(true)
+    }
+
+    async copyDocumentToAnotherSpace(
+        props: CopyDocumentProps
+    ): Promise<ResultType<true, RequestError>> {
+        const { docId, spaceId, toSpaceId } = props
+
+        const fromCol = `spaces/${spaceId}`
+        const getRes = await this.app.sinkron.getDocument({
+            id: docId,
+            col: fromCol
+        })
+        if (!getRes.isOk) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Couldn't get document"
+            })
+        }
+
+        const doc = getRes.value
+        if (doc.data === null) {
+            return Result.err({
+                code: ErrorCode.UnprocessableRequest,
+                message: "Document is deleted"
+            })
+        }
+
+        // TODO copy images
+
+        const loroDoc = new LoroDoc()
+        loroDoc.import(doc.data)
+        const root = loroDoc.getMap("root")
+        root.set("isPublished", false)
+        root.set("isLocked", false)
+        root.set("isPinned", false)
+        root.set("categories", [])
+        const snapshot = loroDoc.export({
+            mode: "shallow-snapshot",
+            frontiers: loroDoc.frontiers()
+        })
+
+        const toCol = `spaces/${toSpaceId}`
+        const createRes = await this.app.sinkron.createDocument({
+            id: uuidv4(),
+            col: toCol,
+            data: snapshot
+        })
+        if (!createRes.isOk) {
+            return Result.err({
+                code: ErrorCode.InternalServerError,
+                message: "Couldn't copy"
             })
         }
 

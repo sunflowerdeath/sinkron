@@ -1,7 +1,8 @@
-import { makeAutoObservable, reaction, autorun, toJS } from "mobx"
+import { makeObservable, computed, reaction, autorun, toJS } from "mobx"
 import { fromPromise } from "mobx-utils"
 import { Channel } from "@sinkron/client/lib/collection"
 import { pino, Logger } from "pino"
+import { sortBy } from "lodash-es"
 
 import env from "~/env"
 import { User, Space, Invite, Picture } from "~/entities"
@@ -62,7 +63,12 @@ class UserStore {
             this.spaceId = user.spaces[0]?.id
         }
 
-        makeAutoObservable(this)
+        makeObservable(this, {
+            user: true,
+            spaceId: true,
+            space: true,
+            spaces: computed
+        })
 
         this.disposeReaction = autorun(() => {
             const json = JSON.stringify(toJS(this.user))
@@ -111,6 +117,10 @@ class UserStore {
         this.stopFetchUser?.()
         this.space?.dispose()
         this.channel.dispose()
+    }
+
+    get spaces() {
+        return sortBy(this.user.spaces, (s) => s.name)
     }
 
     fetchUser() {

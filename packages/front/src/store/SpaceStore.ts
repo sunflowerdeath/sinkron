@@ -541,6 +541,23 @@ class SpaceStore {
         )
         return res
     }
+
+    copyDocumentToAnotherSpace({
+        docId,
+        toSpaceId
+    }: {
+        docId: string
+        toSpaceId: string
+    }) {
+        const res = fromPromise(
+            this.api.fetch({
+                method: "POST",
+                url: `/spaces/${this.space.id}/copy_document`,
+                data: { docId, toSpaceId }
+            })
+        )
+        return res
+    }
 }
 
 export default SpaceStore

@@ -3,7 +3,7 @@ import { useLocation, useRoute } from "wouter"
 import { Col, Row } from "oriente"
 import { ItemState } from "@sinkron/client/lib/collection"
 
-import notificationsSvg from "@material-design-icons/svg/outlined/notifications.svg"
+import notificationsSvg from "~/exclamation.svg"
 import addSvg from "@material-design-icons/svg/outlined/add.svg"
 import syncSvg from "@material-design-icons/svg/outlined/sync.svg"
 import lockSvg from "@material-design-icons/svg/outlined/lock.svg"

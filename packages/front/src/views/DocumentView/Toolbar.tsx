@@ -490,4 +490,4 @@ const Toolbar = observer((props: ToolbarProps) => {
     )
 })
 
-export { Toolbar }
+export default Toolbar

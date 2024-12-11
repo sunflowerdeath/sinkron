@@ -63,6 +63,16 @@ const updateMemberBodySchema = {
     additionalProperties: false
 }
 
+const copyDocumentBodySchema = {
+    type: "object",
+    properties: {
+        toSpaceId: { type: "string", format: "uuid" },
+        docId: { type: "string", format: "uuid" }
+    },
+    required: ["toSpaceId", "docId"],
+    additionalProperties: false
+}
+
 type SetPictureBody = {
     picture: Picture
 }
@@ -426,6 +436,46 @@ const spacesRoutes = (app: App) => async (fastify: FastifyInstance) => {
                 reply.code(500).send({ error: res.error })
                 return
             }
+            reply.send({})
+        }
+    )
+
+    fastify.post<{
+        Params: { spaceId: string }
+        Body: { toSpaceId: string; docId: string }
+    }>(
+        "/spaces/:spaceId/copy_document",
+        { schema: { params: spaceParamsSchema, body: copyDocumentBodySchema } },
+        async (request, reply) => {
+            const userId = request.token.userId
+            const { spaceId } = request.params
+            const { toSpaceId, docId } = request.body
+
+            const fromRole = await app.services.spaces.getMemberRole(
+                app.models,
+                { userId, spaceId }
+            )
+            const toRole = await app.services.spaces.getMemberRole(app.models, {
+                userId,
+                spaceId: toSpaceId
+            })
+            const allowed =
+                fromRole !== null && toRole !== null && toRole !== "readonly"
+            if (!allowed) {
+                reply.code(500).send({ error: { message: "Not permitted" } })
+                return
+            }
+
+            const res = await app.services.spaces.copyDocumentToAnotherSpace({
+                spaceId,
+                docId,
+                toSpaceId
+            })
+            if (!res.isOk) {
+                reply.code(500).send({ error: res.error })
+                return
+            }
+
             reply.send({})
         }
     )

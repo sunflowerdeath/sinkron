@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from "react"
 import { ErrorBoundary } from "react-error-boundary"
-import { computed } from "mobx"
 import { observer } from "mobx-react-lite"
 import { useLocation, Redirect } from "wouter"
 import { useMedia } from "react-use"
@@ -8,35 +7,42 @@ import {
     ReactEditor,
     Slate,
     Editable,
-    // useReadOnly,
     RenderElementProps,
     RenderLeafProps
 } from "slate-react"
 import { Col, Row } from "oriente"
 import { isEqual, without } from "lodash-es"
-import { Transforms, Descendant } from "slate"
+import { Transforms } from "slate"
 import { LoroMap } from "loro-crdt"
 import { ObservableLoroDoc } from "@sinkron/client/lib/collection"
-import { fromLoro, applySlateOps } from "@sinkron/loro-slate"
+import { applySlateOps } from "@sinkron/loro-slate"
 
 import expandLessSvg from "@material-design-icons/svg/outlined/expand_less.svg"
 import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import env from "~/env"
-import { RootElement } from "~/types"
-import { useSpace } from "~/store"
+import { useSpace, useStore } from "~/store"
 import { DocumentData } from "~/store/SpaceStore"
 import SelectCategoriesView from "~/views/SelectCategoriesView"
 import ShareAndAccessView from "~/views/ShareAndAccessView"
 import PublishView from "~/views/PublishView"
 import CategoriesList from "~/components/CategoriesList"
-import { Button, LinkButton, Icon, Menu, MenuItem, useStateToast } from "~/ui"
+import {
+    Button,
+    LinkButton,
+    Icon,
+    Menu,
+    MenuItem,
+    useStateToast,
+    useDialog
+} from "~/ui"
 
 import { DocumentViewStore } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
 import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
-import { Toolbar } from "./toolbar"
+import Toolbar from "./Toolbar"
+import CopyView from "./CopyView"
 
 const useForceUpdate = () => {
     const [_state, setState] = useState({})
@@ -57,30 +63,17 @@ type EditorViewProps = {
 const EditorView = observer((props: EditorViewProps) => {
     const { id, doc, data, onChange, onDelete } = props
 
+    const isMobile = useMedia("(max-width: 1023px)")
+    const userStore = useStore()
     const spaceStore = useSpace()
-
     const toast = useStateToast()
     const documentViewStore = useMemo(
-        () => new DocumentViewStore({ spaceStore, toast, id }),
+        () => new DocumentViewStore({ spaceStore, toast, id, doc }),
         []
     )
     const editor = documentViewStore.editor
-
+    const value = documentViewStore.value
     const readOnly = spaceStore.space.role === "readonly" || data.isLocked
-
-    // XXX move computed to DocumentViewStore
-    const valueCell = useMemo(() => {
-        return computed((): Descendant[] => {
-            const content = doc.doc.getMap("root").get("content")
-            if (content instanceof LoroMap) {
-                const root = fromLoro(content) as RootElement
-                return root.children
-            } else {
-                return []
-            }
-        })
-    }, [doc])
-    const value = valueCell.get()
 
     const forceUpdate = useForceUpdate()
     useMemo(() => {
@@ -108,8 +101,6 @@ const EditorView = observer((props: EditorViewProps) => {
         (props: RenderLeafProps) => <EditorLeaf {...props} />,
         []
     )
-
-    const isMobile = useMedia("(max-width: 1023px)")
 
     const onRemoveCategory = (cat: string) => {
         spaceStore.changeDoc(id, (doc) => {
@@ -178,6 +169,17 @@ const EditorView = observer((props: EditorViewProps) => {
         })
     }
 
+    const hasAnotherSpaces = userStore.user.spaces.length > 1
+    const copyDialog = useDialog((close) => (
+        <CopyView
+            docId={id}
+            spaceStore={spaceStore}
+            spaces={userStore.spaces}
+            toast={toast}
+            onClose={close}
+        />
+    ))
+
     const menu = () => {
         const isLocked = data.isLocked
         const isPinned = data.isPinned
@@ -245,8 +247,12 @@ const EditorView = observer((props: EditorViewProps) => {
                 {/*<MenuItem onSelect={() => setView("share")}>
                     Share & Access
                 </MenuItem>*/}
-                {/*<MenuItem isDisabled={true}>Copy link to document</MenuItem>*/}
-                {/*<MenuItem isDisabled={true}>Copy to another space</MenuItem>*/}
+                <MenuItem>Copy internal link</MenuItem>
+                {hasAnotherSpaces && (
+                    <MenuItem onSelect={() => copyDialog.open()}>
+                        Copy to another space
+                    </MenuItem>
+                )}
                 <MenuItem
                     onSelect={onDelete}
                     isDisabled={isReadonly || isLocked}
@@ -410,6 +416,7 @@ const EditorView = observer((props: EditorViewProps) => {
             </div>
             {bottomElem}
             {viewElem}
+            {copyDialog.render()}
         </Col>
     )
 
