@@ -2,11 +2,9 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col, Row } from "oriente"
 
-import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
-
 import type { Space } from "~/entities"
 import { useStore } from "~/store"
-import { Button, LinkButton, Icon } from "~/ui"
+import { Button, LinkButton } from "~/ui"
 import Container from "~/ui/Container"
 import numForm from "~/utils/numForm"
 import { Picture } from "~/components/picture"

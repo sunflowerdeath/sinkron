@@ -1,7 +1,6 @@
 import { In } from "typeorm"
 import { v4 as uuidv4 } from "uuid"
 import { LoroDoc, LoroMap } from "loro-crdt"
-import { sortBy } from "lodash"
 import { Permissions, Action, role } from "@sinkron/client/lib/client"
 
 import { App, AppModels } from "../app"

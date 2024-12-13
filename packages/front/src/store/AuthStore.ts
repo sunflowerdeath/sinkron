@@ -1,4 +1,4 @@
-import { makeAutoObservable } from "mobx"
+import { makeObservable, action } from "mobx"
 import { IndexedDbCollectionStore } from "@sinkron/client/lib/collection"
 
 import env from "~/env"
@@ -8,6 +8,20 @@ import { Api } from "~/api"
 import UserStore from "./UserStore"
 
 type AuthResponse = { user: User; token: string }
+
+/*
+type DocumentDeepLink = {
+    kind: "document"
+    spaceId: string
+    docId: string
+}
+
+type DeepLink = DocumentDeepLink
+
+type AuthStoreProps = {
+    deepLink?: DeepLink
+}
+*/
 
 class AuthStore {
     store?: UserStore = undefined
@@ -35,7 +49,12 @@ class AuthStore {
             }
         }
 
-        makeAutoObservable(this)
+        makeObservable(this, {
+            store: true,
+            login: action,
+            code: action,
+            logout: action
+        })
     }
 
     async login(email: string) {

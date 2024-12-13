@@ -77,4 +77,10 @@ const useActionState = <T = object,>(initialValue: T = null as T) => {
 }
 
 export default ActionStateView
-export { makeInitialActionState, initialActionState, useActionState }
+export {
+    makeInitialActionState,
+    initialActionState,
+    useActionState,
+    PendingComponent,
+    ErrorComponent
+}

@@ -169,7 +169,6 @@ const EditorView = observer((props: EditorViewProps) => {
         })
     }
 
-    const hasAnotherSpaces = userStore.user.spaces.length > 1
     const copyDialog = useDialog((close) => (
         <CopyView
             docId={id}
@@ -234,6 +233,13 @@ const EditorView = observer((props: EditorViewProps) => {
             </>
         )
 
+        const copyLink = () => {
+            const link =
+                `${location.origin}/link/` +
+                `space/${spaceStore.space.id}/document/${id}`
+            navigator.clipboard?.writeText(link)
+        }
+
         return (
             <>
                 {lockItems}
@@ -247,12 +253,10 @@ const EditorView = observer((props: EditorViewProps) => {
                 {/*<MenuItem onSelect={() => setView("share")}>
                     Share & Access
                 </MenuItem>*/}
-                <MenuItem>Copy internal link</MenuItem>
-                {hasAnotherSpaces && (
-                    <MenuItem onSelect={() => copyDialog.open()}>
-                        Copy to another space
-                    </MenuItem>
-                )}
+                <MenuItem onSelect={copyLink}>Copy internal link</MenuItem>
+                <MenuItem onSelect={() => copyDialog.open()}>
+                    Make a copy
+                </MenuItem>
                 <MenuItem
                     onSelect={onDelete}
                     isDisabled={isReadonly || isLocked}

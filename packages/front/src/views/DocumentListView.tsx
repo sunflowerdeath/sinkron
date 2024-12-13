@@ -256,13 +256,7 @@ const DocumentListView = observer(() => {
 
     const list = (
         <div style={{ flexGrow: 1, overflow: "auto" }}>
-            <ActionStateView state={space.loadedState}>
-                {() => {
-                    return space.collection.isLoaded ? (
-                        <DocumentList selectedDocId={selectedDocId} />
-                    ) : null
-                }}
-            </ActionStateView>
+            <DocumentList selectedDocId={selectedDocId} />
         </div>
     )
 

@@ -62,7 +62,7 @@ const CopyView = (props: CopyDialogProps) => {
     })
     return (
         <Col gap={20} align="stretch">
-            <Heading>Copy to another space</Heading>
+            <Heading>Choose the space to copy</Heading>
             <Col gap={8} align="stretch">
                 {buttonsList}
             </Col>

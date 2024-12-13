@@ -28,7 +28,7 @@ const autoRetry = (cb: (retry: () => void) => void) => {
     return stop
 }
 
-interface StoreProps {
+export type UserStoreProps = {
     user: User
     spaceId?: string
     authStore: AuthStore
@@ -42,11 +42,9 @@ class UserStore {
     channel: Channel
     api: Api
     logger: Logger<string>
-
-    disposeReaction?: () => void
     stopFetchUser?: () => void
 
-    constructor(props: StoreProps) {
+    constructor(props: UserStoreProps) {
         const { user, authStore, spaceId } = props
         this.authStore = authStore
         this.api = authStore.api
@@ -54,14 +52,12 @@ class UserStore {
 
         this.logger = pino({ level: "debug" })
 
-        if (
-            spaceId !== undefined &&
-            user.spaces.some((s) => s.id === spaceId)
-        ) {
+        if (spaceId !== undefined && this.hasSpace(spaceId)) {
             this.spaceId = spaceId
         } else {
             this.spaceId = user.spaces[0]?.id
         }
+        this.setSpace()
 
         makeObservable(this, {
             user: true,
@@ -69,13 +65,10 @@ class UserStore {
             space: true,
             spaces: computed
         })
-
-        this.disposeReaction = autorun(() => {
+        autorun(() => {
             const json = JSON.stringify(toJS(this.user))
             localStorage.setItem("user", json)
         })
-
-        this.setSpace()
         reaction(
             () => this.spaceId,
             () => {
@@ -100,6 +93,10 @@ class UserStore {
         })
     }
 
+    hasSpace(id: string) {
+        return this.user.spaces.some((s) => s.id === id)
+    }
+
     setSpace() {
         this.space?.dispose()
         const space = this.user.spaces.find((s) => s.id === this.spaceId)!
@@ -113,7 +110,6 @@ class UserStore {
     }
 
     dispose() {
-        this.disposeReaction?.()
         this.stopFetchUser?.()
         this.space?.dispose()
         this.channel.dispose()

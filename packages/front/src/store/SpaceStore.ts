@@ -1,5 +1,4 @@
 import {
-    reaction,
     makeObservable,
     computed,
     observable,
@@ -163,7 +162,6 @@ class SpaceStore {
     space: Space
     store: UserStore
     collection: SinkronCollection<ExtractedData>
-    loadedState: IPromiseBasedObservable<void>
     view: SpaceView = { kind: "all" }
     documentList: TransformedMap<Item<ExtractedData>, DocumentListItemData>
     api: Api
@@ -176,7 +174,7 @@ class SpaceStore {
 
         const col = `spaces/${space.id}`
         const collectionStore = new IndexedDbCollectionStore(col)
-        const token = this.api.getToken() ?? ""
+        const token = this.api.getToken()!
         this.collection = new SinkronCollection({
             url: env.wsUrl,
             token,
@@ -187,16 +185,6 @@ class SpaceStore {
             },
             extractData: extractDocumentData
         })
-        this.loadedState = fromPromise(
-            new Promise<void>((resolve) => {
-                reaction(
-                    () => this.collection.isLoaded,
-                    (value) => {
-                        if (value) resolve()
-                    }
-                )
-            })
-        )
 
         this.documentList = new TransformedMap({
             source: this.collection.items as ObservableMap,
@@ -480,6 +468,10 @@ class SpaceStore {
         )
         res.then(() => {
             this.space.name = name
+            const space = this.store.user.spaces.find(
+                (s) => s.id === this.space.id
+            )
+            if (space) space.name = name
         })
         return res
     }
