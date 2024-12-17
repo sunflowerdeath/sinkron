@@ -1,4 +1,4 @@
-import { makeObservable, action } from "mobx"
+import { makeObservable, action, computed } from "mobx"
 import { IndexedDbCollectionStore } from "@sinkron/client/lib/collection"
 
 import env from "~/env"
@@ -9,32 +9,66 @@ import UserStore from "./UserStore"
 
 type AuthResponse = { user: User; token: string }
 
-/*
-type DocumentDeepLink = {
+export type DocumentDeepLink = {
     kind: "document"
     spaceId: string
     docId: string
 }
 
-type DeepLink = DocumentDeepLink
+export type DeepLink = DocumentDeepLink
+
+export type DeepLinkState = "pending" | "error" | "ok"
+
+export class DeepLinkStore {
+    link: DeepLink
+    state?: DeepLinkState = "pending"
+
+    constructor(link: DeepLink) {
+        this.link = link
+        makeObservable(this, {
+            state: true,
+            isResolved: computed
+        })
+    }
+
+    get isResolved() {
+        return this.state !== "pending"
+    }
+
+    resolve(ok: boolean) {
+        if (!this.isResolved) {
+            this.state = ok ? "ok" : "error"
+        }
+    }
+
+    dispose() {
+        // TODO
+    }
+}
 
 type AuthStoreProps = {
     deepLink?: DeepLink
 }
-*/
 
 class AuthStore {
     store?: UserStore = undefined
     token?: string = undefined
     api: Api
+    deepLink?: DeepLinkStore
 
-    constructor() {
+    constructor(props: AuthStoreProps) {
+        const { deepLink } = props
+
         this.token = localStorage.getItem("token") || undefined
 
         this.api = new Api({
             baseUrl: env.apiUrl,
             getToken: () => this.token
         })
+
+        if (deepLink) {
+            this.deepLink = new DeepLinkStore(deepLink)
+        }
 
         if (this.token !== undefined) {
             const user = localStorage.getItem("user")
@@ -43,7 +77,8 @@ class AuthStore {
                 this.store = new UserStore({
                     authStore: this,
                     user: JSON.parse(user),
-                    spaceId: spaceId || undefined
+                    spaceId: spaceId || undefined,
+                    deepLink: this.deepLink
                 })
                 this.store.fetchUser()
             }

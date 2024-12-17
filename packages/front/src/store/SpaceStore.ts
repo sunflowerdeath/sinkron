@@ -3,7 +3,8 @@ import {
     computed,
     observable,
     autorun,
-    ObservableMap
+    ObservableMap,
+    when
 } from "mobx"
 import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import { v4 as uuidv4 } from "uuid"
@@ -33,6 +34,7 @@ import {
 import { Api } from "~/api"
 import { TransformedMap } from "~/utils/transformedMap"
 
+import { DeepLinkStore } from "./AuthStore"
 import UserStore from "./UserStore"
 
 export type CategoryTreeNode = Category & {
@@ -158,19 +160,26 @@ export type SpaceViewProps =
     | { kind: "published" | "all"; count: number; name: string }
     | ({ kind: "category" } & CategoryTreeNode)
 
-class SpaceStore {
+type SpaceStoreProps = {
+    userStore: UserStore
     space: Space
-    store: UserStore
+    deepLink?: DeepLinkStore
+}
+
+class SpaceStore {
+    userStore: UserStore
+    space: Space
     collection: SinkronCollection<ExtractedData>
     view: SpaceView = { kind: "all" }
     documentList: TransformedMap<Item<ExtractedData>, DocumentListItemData>
     api: Api
     dispose: () => void
 
-    constructor(space: Space, store: UserStore) {
-        this.api = store.api
+    constructor(props: SpaceStoreProps) {
+        const { userStore, space, deepLink } = props
+        this.api = userStore.api
         this.space = space
-        this.store = store
+        this.userStore = userStore
 
         const col = `spaces/${space.id}`
         const collectionStore = new IndexedDbCollectionStore(col)
@@ -181,7 +190,7 @@ class SpaceStore {
             col,
             store: collectionStore,
             errorHandler: () => {
-                this.store.logout()
+                this.userStore.logout()
             },
             extractData: extractDocumentData
         })
@@ -225,9 +234,30 @@ class SpaceStore {
             }
         })
 
+        if (deepLink) this.handleDeepLink(deepLink)
+
         this.dispose = () => {
             disposeAutorun()
             this.collection.destroy()
+        }
+    }
+    
+    async handleDeepLink(deepLink: DeepLinkStore) {
+        const docId = deepLink.link.docId
+
+        await when(() => this.collection.isLoaded)
+        if (this.collection.items.has(docId)) {
+            history.pushState({}, "", `/documents/${docId}`)
+            deepLink.resolve(true)
+            return
+        }
+
+        await when(() => this.collection.initialSyncCompleted)
+        if (this.collection.items.has(docId)) {
+            history.pushState({}, "", `/documents/${docId}`)
+            deepLink.resolve(true)
+        } else {
+            deepLink.resolve(false)
         }
     }
 
@@ -450,7 +480,7 @@ class SpaceStore {
         )
         res.then(() => {
             this.space.picture = picture
-            const space = this.store.user.spaces.find(
+            const space = this.userStore.user.spaces.find(
                 (s) => s.id === this.space.id
             )
             if (space) space.picture = picture
@@ -468,7 +498,7 @@ class SpaceStore {
         )
         res.then(() => {
             this.space.name = name
-            const space = this.store.user.spaces.find(
+            const space = this.userStore.user.spaces.find(
                 (s) => s.id === this.space.id
             )
             if (space) space.name = name

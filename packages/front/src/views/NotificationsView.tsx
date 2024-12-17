@@ -4,7 +4,7 @@ import { observer, useLocalObservable } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col } from "oriente"
 
-import type { Invite } from "~/entities"
+import type { Invite, Space } from "~/entities"
 import { useStore } from "~/store"
 import { Button, useStateToast, useActionState, ActionStateView } from "~/ui"
 import ButtonsGrid from "~/ui/ButtonsGrid"
@@ -39,7 +39,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
                     store.user.spaces.push({
                         ...invite.space,
                         role: invite.role
-                    })
+                    } as Space)
                     store.changeSpace(invite.space.id)
                     navigate("/")
                 }

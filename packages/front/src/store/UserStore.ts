@@ -1,4 +1,4 @@
-import { makeObservable, computed, reaction, autorun, toJS } from "mobx"
+import { makeObservable, computed, reaction, autorun, toJS, when } from "mobx"
 import { fromPromise } from "mobx-utils"
 import { Channel } from "@sinkron/client/lib/collection"
 import { pino, Logger } from "pino"
@@ -9,7 +9,7 @@ import { User, Space, Invite, Picture } from "~/entities"
 import { Api } from "~/api"
 import { FetchError } from "~/utils/fetchJson"
 
-import AuthStore from "./AuthStore"
+import AuthStore, { DeepLinkStore } from "./AuthStore"
 import SpaceStore from "./SpaceStore"
 
 const initialRetryTimeout = 555
@@ -32,6 +32,7 @@ export type UserStoreProps = {
     user: User
     spaceId?: string
     authStore: AuthStore
+    deepLink?: DeepLinkStore
 }
 
 class UserStore {
@@ -43,26 +44,31 @@ class UserStore {
     api: Api
     logger: Logger<string>
     stopFetchUser?: () => void
+    userIsFetched: boolean = false
+    deepLink?: DeepLinkStore
 
     constructor(props: UserStoreProps) {
-        const { user, authStore, spaceId } = props
+        const { user, authStore, spaceId, deepLink } = props
         this.authStore = authStore
         this.api = authStore.api
         this.user = user
+        this.deepLink = deepLink
 
         this.logger = pino({ level: "debug" })
 
+        this.spaceId = user.spaces[0]?.id
         if (spaceId !== undefined && this.hasSpace(spaceId)) {
             this.spaceId = spaceId
-        } else {
-            this.spaceId = user.spaces[0]?.id
         }
+        if (deepLink) this.handleDeepLink(deepLink)
+
         this.setSpace()
 
         makeObservable(this, {
             user: true,
             spaceId: true,
             space: true,
+            userIsFetched: true,
             spaces: computed
         })
         autorun(() => {
@@ -93,6 +99,20 @@ class UserStore {
         })
     }
 
+    async handleDeepLink(deepLink: DeepLinkStore) {
+        const spaceId = deepLink.link.spaceId
+        if (this.hasSpace(spaceId)) {
+            this.spaceId = spaceId
+        } else {
+            await when(() => this.userIsFetched)
+            if (!this.hasSpace(spaceId)) {
+                deepLink.resolve(false)
+            } else {
+                this.spaceId = spaceId
+            }
+        }
+    }
+
     hasSpace(id: string) {
         return this.user.spaces.some((s) => s.id === id)
     }
@@ -101,7 +121,11 @@ class UserStore {
         this.space?.dispose()
         const space = this.user.spaces.find((s) => s.id === this.spaceId)!
         if (space !== undefined) {
-            this.space = new SpaceStore(space, this)
+            this.space = new SpaceStore({
+                space,
+                userStore: this,
+                deepLink: this.deepLink
+            })
             localStorage.setItem("space", space.id)
         } else {
             this.space = undefined
@@ -140,6 +164,7 @@ class UserStore {
                 return
             }
             this.updateUser(user)
+            this.userIsFetched = true
             this.logger.info("Fetch user success")
         })
     }

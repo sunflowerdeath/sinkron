@@ -9,14 +9,15 @@ import Container from "~/ui/Container"
 import ButtonsGrid from "~/ui/ButtonsGrid"
 import emojis from "~/emojis"
 import { Picture, colors } from "~/components/picture"
+import { Picture as PictureEntity } from "~/entities"
 
 import { ActionState, useActionState } from "~/ui/ActionStateView"
 
 type ChangePictureViewProps = {
     title: React.ReactNode
-    initialValue: Picture
+    initialValue: PictureEntity
     onClose: () => void
-    onSave: (picture: Picture) => ActionState<any>
+    onSave: (picture: PictureEntity) => ActionState<any>
 }
 
 const ChangePictureView = observer((props: ChangePictureViewProps) => {
