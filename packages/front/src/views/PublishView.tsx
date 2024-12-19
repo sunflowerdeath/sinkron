@@ -17,6 +17,7 @@ import {
     ActionState,
     makeInitialActionState
 } from "~/ui"
+import { copyToClipboard } from "~/utils/copyToClipboard"
 
 type PublishStoreProps = {
     api: Api
@@ -144,7 +145,7 @@ const PublishForm = observer((props: PublishFormProps) => {
                 <ButtonsGrid>
                     <Button
                         onClick={() => {
-                            navigator.clipboard?.writeText(url)
+                            copyToClipboard(url)
                         }}
                         style={{ gridColumn: "span 2" }}
                     >

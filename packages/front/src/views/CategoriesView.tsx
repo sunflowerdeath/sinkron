@@ -156,79 +156,78 @@ const CategoriesView = observer(() => {
         navigate("/")
     }
 
-    let content
-    if (spaceStore.collection.initialSyncCompleted) {
-        const readOnly = spaceStore.space.role === "readonly"
-
-        const createButton = !readOnly && (
-            <LinkButton style={{ alignSelf: "normal" }} to="/categories/new">
-                Create category
-            </LinkButton>
+    if (spaceStore.metaItem === undefined) {
+        return (
+            <Container title="Categories" onClose={() => navigate("/")}>
+                Loading...
+            </Container>
         )
+    }
 
-        const allDocumentsButton = (
-            <Button
-                style={{
-                    alignSelf: "normal",
-                    justifyContent: "start"
-                }}
-                kind="transparent"
-                onClick={() => setView({ kind: "all" })}
-            >
-                <Row gap={16} align="center" style={{ flexGrow: 1 }}>
-                    <div>All documents</div>
-                    <div style={{ color: "var(--color-secondary)" }}>
-                        {spaceStore.documents.length}
-                    </div>
-                </Row>
-            </Button>
-        )
+    const readOnly = spaceStore.space.role === "readonly"
 
-        const publishedCount = spaceStore.publishedDocuments.length
-        const publishedButton = publishedCount > 0 && (
-            <Button
-                style={{
-                    alignSelf: "normal",
-                    justifyContent: "start"
-                }}
-                kind="transparent"
-                onClick={() => setView({ kind: "published" })}
-            >
-                <Row gap={16} align="center" style={{ flexGrow: 1 }}>
-                    <div>Published</div>
-                    <div style={{ color: "var(--color-secondary)" }}>
-                        {publishedCount}
-                    </div>
-                </Row>
-            </Button>
-        )
+    const createButton = !readOnly && (
+        <LinkButton style={{ alignSelf: "normal" }} to="/categories/new">
+            Create category
+        </LinkButton>
+    )
 
-        const list = (
-            <Col gap={8} style={{ alignSelf: "stretch" }}>
-                {allDocumentsButton}
-                {publishedButton}
-                <CategoryList
-                    readOnly={readOnly}
-                    categories={spaceStore.categoryTree.nodes}
-                    onDelete={onDelete}
-                    onSelect={(id) => setView({ kind: "category", id })}
-                />
-            </Col>
-        )
+    const allDocumentsButton = (
+        <Button
+            style={{
+                alignSelf: "normal",
+                justifyContent: "start"
+            }}
+            kind="transparent"
+            onClick={() => setView({ kind: "all" })}
+        >
+            <Row gap={16} align="center" style={{ flexGrow: 1 }}>
+                <div>All documents</div>
+                <div style={{ color: "var(--color-secondary)" }}>
+                    {spaceStore.documents.length}
+                </div>
+            </Row>
+        </Button>
+    )
 
-        content = (
+    const publishedCount = spaceStore.publishedDocuments.length
+    const publishedButton = publishedCount > 0 && (
+        <Button
+            style={{
+                alignSelf: "normal",
+                justifyContent: "start"
+            }}
+            kind="transparent"
+            onClick={() => setView({ kind: "published" })}
+        >
+            <Row gap={16} align="center" style={{ flexGrow: 1 }}>
+                <div>Published</div>
+                <div style={{ color: "var(--color-secondary)" }}>
+                    {publishedCount}
+                </div>
+            </Row>
+        </Button>
+    )
+
+    const list = (
+        <Col gap={8} style={{ alignSelf: "stretch" }}>
+            {allDocumentsButton}
+            {publishedButton}
+            <CategoryList
+                readOnly={readOnly}
+                categories={spaceStore.categoryTree.nodes}
+                onDelete={onDelete}
+                onSelect={(id) => setView({ kind: "category", id })}
+            />
+        </Col>
+    )
+
+    return (
+        <Container title="Categories" onClose={() => navigate("/")}>
             <Col gap={8}>
                 {createButton}
                 {list}
             </Col>
-        )
-    } else {
-        content = "Loading..."
-    }
-
-    return (
-        <Container title="Categories" onClose={() => navigate("/")}>
-            {content}
         </Container>
     )
 })

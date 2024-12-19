@@ -169,8 +169,12 @@ const CreateCategoryView = observer(() => {
         navigate("/")
     }
 
-    if (!spaceStore.collection.initialSyncCompleted) {
-        return "Loading..."
+    if (spaceStore.metaItem === undefined) {
+        return (
+            <Container title="Create category" onClose={() => navigate("/")}>
+                Loading...
+            </Container>
+        )
     }
 
     return (
@@ -196,8 +200,12 @@ const EditCategoryView = observer((props: EditCategoryViewProps) => {
     const spaceStore = useSpace()
     const [_location, navigate] = useLocation()
 
-    if (!spaceStore.collection.initialSyncCompleted) {
-        return "Loading..."
+    if (spaceStore.metaItem === undefined) {
+        return (
+            <Container title="Edit category" onClose={() => navigate("/")}>
+                Loading...
+            </Container>
+        )
     }
 
     const category = spaceStore.meta.categories[id]

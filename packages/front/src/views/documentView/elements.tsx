@@ -17,6 +17,7 @@ import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
 import env from "~/env"
+import { parseDeepLink } from "~/store/deepLink"
 import { Button, Icon } from "~/ui"
 import {
     SinkronTextElement,
@@ -26,6 +27,9 @@ import {
     ImageElement,
     LinkElement
 } from "~/types"
+import { copyToClipboard } from "~/utils/copyToClipboard"
+
+import { useDocumentStore } from "./store"
 
 export type CustomRenderElementProps<T> = Omit<
     RenderElementProps,
@@ -91,8 +95,16 @@ const Heading = (props: CustomRenderElementProps<HeadingElement>) => {
 
 const Link = (props: CustomRenderElementProps<LinkElement>) => {
     const { element, attributes, children } = props
+
+    const documentStore = useDocumentStore()
     const isFocused = useFocused()
     const isSelected = useSelected()
+
+    const parsedUrl = URL.parse(element.url)
+    const isDeepLink =
+        parsedUrl !== null &&
+        parsedUrl.origin === window.location.origin &&
+        parseDeepLink(parsedUrl.pathname) !== undefined
 
     const popup = useCallback(
         (ref: React.RefObject<HTMLDivElement>) => (
@@ -124,12 +136,26 @@ const Link = (props: CustomRenderElementProps<LinkElement>) => {
                         whiteSpace: "nowrap",
                         paddingLeft: 8
                     }}
-                    target="_blank"
+                    target={isDeepLink ? "" : "_blank"}
                 >
                     {element.url}
                 </a>
-                <Button style={{ minWidth: 0 }}>Copy</Button>
-                <Button style={{ minWidth: 0 }}>Edit</Button>
+                <Button
+                    style={{ minWidth: 0 }}
+                    onClick={() => {
+                        copyToClipboard(element.url)
+                    }}
+                >
+                    Copy
+                </Button>
+                <Button
+                    style={{ minWidth: 0 }}
+                    onClick={() => {
+                        documentStore.openToolbar("edit_link")
+                    }}
+                >
+                    Edit
+                </Button>
             </div>
         ),
         [element.url]

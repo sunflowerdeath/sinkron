@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react"
 import { Transforms, Editor, Element } from "slate"
 import { ReactEditor } from "slate-react"
 import { LoroMap } from "loro-crdt"
@@ -10,6 +11,7 @@ import { RootElement, ImageElement } from "~/types"
 import { useStateToast } from "~/ui"
 
 import { createSinkronEditor } from "./editor"
+import { ToolbarStore, ToolbarView } from "./toolbar"
 
 const openFileDialog = (cb: (files: FileList) => void) => {
     const input = document.createElement("input")
@@ -37,9 +39,14 @@ class DocumentViewStore {
         this.editor = createSinkronEditor({
             uploadImage: (file) => this.uploadImage(file)
         })
+        this.toolbarStore = new ToolbarStore({
+            editor: this.editor,
+            documentStore: this
+        })
 
         makeObservable(this, {
-            value: computed
+            value: computed,
+            showToolbar: true
         })
     }
 
@@ -48,6 +55,21 @@ class DocumentViewStore {
     toast: ReturnType<typeof useStateToast>
     editor: ReactEditor
     doc: ObservableLoroDoc
+    toolbarStore: ToolbarStore
+    showToolbar: boolean = false
+
+    openToolbar(view: ToolbarView) {
+        this.showToolbar = true
+        this.toolbarStore.view = view
+    }
+
+    toggleToolbar() {
+        if (this.showToolbar) {
+            this.showToolbar = false
+        } else {
+            this.openToolbar("toolbar")
+        }
+    }
 
     get value() {
         const content = this.doc.doc.getMap("root").get("content")
@@ -121,4 +143,12 @@ class DocumentViewStore {
     }
 }
 
-export { DocumentViewStore }
+const DocumentStoreContext = createContext<DocumentViewStore | null>(null)
+
+const useDocumentStore = () => {
+    const space = useContext(DocumentStoreContext)
+    if (space === null) throw new Error("Store not provided")
+    return space
+}
+
+export { DocumentViewStore, DocumentStoreContext, useDocumentStore }

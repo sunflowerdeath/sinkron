@@ -38,7 +38,7 @@ import {
     useDialog
 } from "~/ui"
 
-import { DocumentViewStore } from "./store"
+import { DocumentViewStore, DocumentStoreContext } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
 import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
 import { Toolbar } from "./toolbar"
@@ -110,10 +110,9 @@ const EditorView = observer((props: EditorViewProps) => {
         })
     }
 
-    const [showToolbar, setShowToolbar] = useState(false)
     let bottomElem
-    if (showToolbar) {
-        bottomElem = <Toolbar document={documentViewStore} />
+    if (documentViewStore.showToolbar) {
+        bottomElem = <Toolbar toolbarStore={documentViewStore.toolbarStore} />
     } else {
         let categoriesList
         if (data.categories.length > 0) {
@@ -375,18 +374,23 @@ const EditorView = observer((props: EditorViewProps) => {
         )
     }
 
+    const toggleToolbarButton = !readOnly && (
+        <Button
+            onClick={() => {
+                documentViewStore.toggleToolbar()
+            }}
+        >
+            A
+        </Button>
+    )
+
     const topBar = isMobile ? (
         <Row justify="space-between">
             <LinkButton to="/">
                 <Icon svg={arrowBackSvg} />
             </LinkButton>
             <Row gap={8}>
-                <Button
-                    onClick={() => setShowToolbar((v) => !v)}
-                    preventFocusSteal
-                >
-                    A
-                </Button>
+                {toggleToolbarButton}
                 {menuButton}
             </Row>
         </Row>
@@ -396,9 +400,7 @@ const EditorView = observer((props: EditorViewProps) => {
             justify="end"
             style={{ position: "absolute", top: 0, right: 0, zIndex: 1 }}
         >
-            {!readOnly && (
-                <Button onClick={() => setShowToolbar((v) => !v)}>A</Button>
-            )}
+            {toggleToolbarButton}
             {menuButton}
         </Row>
     )
@@ -423,22 +425,24 @@ const EditorView = observer((props: EditorViewProps) => {
     )
 
     return (
-        <Slate
-            initialValue={value}
-            editor={editor}
-            onChange={() => {
-                // Prevent bug firing twice on Android
-                if (editor.operations.length === 0) return
-                // @ts-expect-error fired
-                if (!editor.operations.fired) {
-                    onChange?.(editor)
+        <DocumentStoreContext.Provider value={documentViewStore}>
+            <Slate
+                initialValue={value}
+                editor={editor}
+                onChange={() => {
+                    // Prevent bug firing twice on Android
+                    if (editor.operations.length === 0) return
                     // @ts-expect-error fired
-                    editor.operations.fired = true
-                }
-            }}
-        >
-            {content}
-        </Slate>
+                    if (!editor.operations.fired) {
+                        onChange?.(editor)
+                        // @ts-expect-error fired
+                        editor.operations.fired = true
+                    }
+                }}
+            >
+                {content}
+            </Slate>
+        </DocumentStoreContext.Provider>
     )
 })
 

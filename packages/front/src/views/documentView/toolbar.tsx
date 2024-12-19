@@ -76,7 +76,7 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
         }
     }
     const onClickImage = () => {
-        store.document.openImageDialog()
+        store.documentStore.openImageDialog()
     }
     const onClickLink = () => {
         if (isNodeActive(editor, "link")) {
@@ -370,22 +370,22 @@ const ToolbarEditLinkView = observer((props: ToolbarViewProps) => {
     )
 })
 
-type ToolbarView = "toolbar" | "create_link" | "edit_link"
+export type ToolbarView = "toolbar" | "create_link" | "edit_link"
 
-type ToolbarStoreProps = {
+export type ToolbarStoreProps = {
     editor: ReactEditor
-    document: DocumentViewStore
+    documentStore: DocumentViewStore
 }
 
 class ToolbarStore {
     editor: ReactEditor
-    document: DocumentViewStore
+    documentStore: DocumentViewStore
 
     view: ToolbarView = "toolbar"
 
     constructor(props: ToolbarStoreProps) {
         this.editor = props.editor
-        this.document = props.document
+        this.documentStore = props.documentStore
         makeObservable(this, { view: true })
     }
 
@@ -447,23 +447,13 @@ class ToolbarStore {
 }
 
 type ToolbarProps = {
-    document: DocumentViewStore
+    toolbarStore: ToolbarStore
 }
 
 const Toolbar = observer((props: ToolbarProps) => {
+    const { toolbarStore } = props
+
     const isMobile = useMedia("(max-width: 1023px)")
-
-    const { document } = props
-
-    const editor = useSlate() as ReactEditor
-    const toolbarStore = useMemo(
-        () =>
-            new ToolbarStore({
-                editor,
-                document
-            }),
-        []
-    )
 
     let elem
     if (toolbarStore.view === "toolbar") {
@@ -489,4 +479,4 @@ const Toolbar = observer((props: ToolbarProps) => {
     )
 })
 
-export { Toolbar }
+export { Toolbar, ToolbarStore }
