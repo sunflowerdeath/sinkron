@@ -1,12 +1,12 @@
 export { Flex, Col, Row } from "oriente"
 
-export type { ActionState } from "./ActionStateView"
+export type { ActionState } from "./actionStateView"
 export {
     useActionState,
     initialActionState,
     makeInitialActionState,
     ActionStateView
-} from "./ActionStateView"
+} from "./actionStateView"
 export { Button, LinkButton } from "./button"
 export { ButtonsGrid } from "./buttonsGrid"
 export { Container } from "./container"
