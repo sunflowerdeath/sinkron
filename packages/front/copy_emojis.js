@@ -26,7 +26,7 @@ const module = `${imports}
 const emojis = {
 ${exports}}
 
-export default emojis
+export { emojis }
 `
 
 fs.writeFileSync(

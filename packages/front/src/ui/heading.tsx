@@ -1,5 +1,4 @@
 import { forwardRef } from 'react'
-
 import { useStyles, StyleProps, StyleMap, omitStyleProps } from 'oriente'
 
 interface HeadingProps extends StyleProps<[HeadingProps]> {

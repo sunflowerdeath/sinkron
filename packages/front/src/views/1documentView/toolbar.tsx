@@ -13,7 +13,6 @@ import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_s
 
 import { LinkElement } from "~/types"
 import { Button, Icon, Input } from "~/ui"
-
 import { DocumentViewStore } from "./store"
 import type { TextMarkType } from "./helpers"
 import { isNodeActive, isMarkActive, toggleMark } from "./helpers"
@@ -490,4 +489,4 @@ const Toolbar = observer((props: ToolbarProps) => {
     )
 })
 
-export default Toolbar
+export { Toolbar }

@@ -12,4 +12,4 @@ const numForm = (num: number, forms: NumFormProps) => {
     return `${num} ${form}`
 }
 
-export default numForm
+export { numForm }

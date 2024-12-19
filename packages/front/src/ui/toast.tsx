@@ -1,5 +1,4 @@
-import { useToast } from "oriente"
-import { useStyles, StyleProps, StyleMap } from "oriente"
+import { useToast, useStyles, StyleProps, StyleMap } from "oriente"
 
 interface ToastProps extends StyleProps<[ToastProps]> {
     children: React.ReactNode

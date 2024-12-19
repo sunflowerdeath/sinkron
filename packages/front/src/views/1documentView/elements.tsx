@@ -102,11 +102,11 @@ const Link = (props: CustomRenderElementProps<LinkElement>) => {
                     display: "flex",
                     alignItems: "center",
                     height: 45,
-                    padding: "0 8px",
+                    padding: 0,
                     background: "var(--color-elem)",
                     willChange: "transform",
                     minWidth: 60,
-                    maxWidth: 200,
+                    maxWidth: 300,
                     overflow: "hidden",
                     fontSize: ".85rem"
                 }}
@@ -121,12 +121,15 @@ const Link = (props: CustomRenderElementProps<LinkElement>) => {
                         color: "var(--color-link)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        whiteSpace: "nowrap"
+                        whiteSpace: "nowrap",
+                        paddingLeft: 8
                     }}
                     target="_blank"
                 >
                     {element.url}
                 </a>
+                <Button style={{ minWidth: 0 }}>Copy</Button>
+                <Button style={{ minWidth: 0 }}>Edit</Button>
             </div>
         ),
         [element.url]
@@ -138,7 +141,7 @@ const Link = (props: CustomRenderElementProps<LinkElement>) => {
             isActive={isFocused && isSelected}
             placement={{
                 side: "bottom",
-                align: "center",
+                align: "start",
                 offset: 4,
                 padding: 4,
                 constrain: true

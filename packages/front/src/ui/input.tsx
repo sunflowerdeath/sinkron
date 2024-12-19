@@ -1,7 +1,6 @@
 import { forwardRef, useState, useRef, useEffect } from "react"
 import type { MaskitoOptions } from "@maskito/core"
 import { useMaskito } from "@maskito/react"
-
 import {
     useStyles,
     StyleProps,

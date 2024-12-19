@@ -23,11 +23,11 @@ import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import env from "~/env"
 import { useSpace, useStore } from "~/store"
-import { DocumentData } from "~/store/SpaceStore"
-import SelectCategoriesView from "~/views/SelectCategoriesView"
-import ShareAndAccessView from "~/views/ShareAndAccessView"
-import PublishView from "~/views/PublishView"
-import CategoriesList from "~/components/CategoriesList"
+import { DocumentData } from "~/store/spaceStore"
+import { SelectCategoriesView } from "~/views/selectCategoriesView"
+import { ShareAndAccessView } from "~/views/shareAndAccessView"
+import { PublishView } from "~/views/publishView"
+import { CategoriesList } from "~/components/categoriesList"
 import {
     Button,
     LinkButton,
@@ -41,8 +41,8 @@ import {
 import { DocumentViewStore } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
 import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
-import Toolbar from "./Toolbar"
-import CopyView from "./CopyView"
+import { Toolbar } from "./toolbar"
+import { CopyView } from "./copyView"
 
 const useForceUpdate = () => {
     const [_state, setState] = useState({})
@@ -234,9 +234,7 @@ const EditorView = observer((props: EditorViewProps) => {
         )
 
         const copyLink = () => {
-            const link =
-                `${location.origin}/link/` +
-                `space/${spaceStore.space.id}/document/${id}`
+            const link = `${location.origin}/link/${spaceStore.space.id}/${id}`
             navigator.clipboard?.writeText(link)
         }
 
@@ -249,11 +247,11 @@ const EditorView = observer((props: EditorViewProps) => {
                 >
                     {isPinned ? "Unpin" : "Pin to top"}
                 </MenuItem>
+                <MenuItem onSelect={copyLink}>Copy link</MenuItem>
                 {publishItems}
                 {/*<MenuItem onSelect={() => setView("share")}>
                     Share & Access
                 </MenuItem>*/}
-                <MenuItem onSelect={copyLink}>Copy internal link</MenuItem>
                 <MenuItem onSelect={() => copyDialog.open()}>
                     Make a copy
                 </MenuItem>
@@ -494,4 +492,4 @@ const DocumentView = observer((props: DocumentViewProps) => {
     )
 })
 
-export default DocumentView
+export { DocumentView }

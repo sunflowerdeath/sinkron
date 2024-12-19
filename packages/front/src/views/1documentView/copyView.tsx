@@ -1,10 +1,9 @@
 import { Col, Row } from "oriente"
 
 import { SpaceStore } from "~/store"
-import { Picture } from "~/components/picture"
-import { useActionState } from "~/ui/ActionStateView"
 import { Space } from "~/entities"
-import { Button, useStateToast, Heading } from "~/ui"
+import { Button, useStateToast, Heading, useActionState } from "~/ui"
+import { Picture } from "~/components/picture"
 
 type CopyDialogProps = {
     docId: string
@@ -71,4 +70,4 @@ const CopyView = (props: CopyDialogProps) => {
     )
 }
 
-export default CopyView
+export { CopyView }

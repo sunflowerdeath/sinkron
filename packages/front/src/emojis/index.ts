@@ -117,4 +117,4 @@ const emojis = {
     factory
 }
 
-export default emojis
+export { emojis }

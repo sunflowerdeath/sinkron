@@ -1,5 +1,5 @@
 import type { Picture as PictureEntity } from "~/entities"
-import emojis from "~/emojis"
+import { emojis } from "~/emojis"
 
 export type PictureSize = "s" | "m" | "l"
 

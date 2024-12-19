@@ -1,8 +1,8 @@
 import { createContext, useContext } from "react"
 
-import AuthStore from "./AuthStore"
-import UserStore from "./UserStore"
-import SpaceStore from "./SpaceStore"
+import { AuthStore } from "./authStore"
+import { UserStore } from "./userStore"
+import { SpaceStore } from "./spaceStore"
 
 const StoreContext = createContext<UserStore | null>(null)
 const useStore = () => {

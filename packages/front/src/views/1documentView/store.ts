@@ -5,7 +5,7 @@ import { ObservableLoroDoc } from "@sinkron/client/lib/collection"
 import { fromLoro } from "@sinkron/loro-slate"
 import { makeObservable, computed } from "mobx"
 
-import SpaceStore from "~/store/SpaceStore"
+import { SpaceStore } from "~/store/spaceStore"
 import { RootElement, ImageElement } from "~/types"
 import { useStateToast } from "~/ui"
 
