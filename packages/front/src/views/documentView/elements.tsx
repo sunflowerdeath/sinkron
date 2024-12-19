@@ -355,7 +355,8 @@ const EditorElement = (props: RenderElementProps) => {
                 <pre
                     style={{
                         padding: 8,
-                        border: "2px solid var(--color-elem)"
+                        border: "2px solid var(--color-elem)",
+                        whiteSpace: "pre-wrap"
                     }}
                     {...props.attributes}
                 >
