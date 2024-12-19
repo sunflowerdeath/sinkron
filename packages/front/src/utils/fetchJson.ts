@@ -21,7 +21,7 @@ export type FetchErrorKind =
     | "application"
 
 const fetchErrorMessages: { [key: string]: string } = {
-    fetch_error: "Check your internet connection and try again",
+    fetch_error: "Couldn't connect to server",
     abort: "Request was aborted",
     http: "Server error",
     json: "Server error"
