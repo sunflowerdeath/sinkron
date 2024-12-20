@@ -32,7 +32,12 @@ const AppView = observer((props: AppViewProps) => {
             ) : (
                 <CreateSpaceView container={false} />
             )}
-            {store.deepLink && <DeepLinkView deepLink={store.deepLink} />}
+            {store.deepLink && (
+                <DeepLinkView
+                    key={store.deepLink.key}
+                    deepLink={store.deepLink}
+                />
+            )}
         </>
     )
 })

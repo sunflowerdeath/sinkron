@@ -34,11 +34,16 @@ export type DeepLinkState =
     | { status: "cancelled" }
     | { status: "resolved" }
 
+// Unique key for each link to distinguish DeepLinkViews in React
+let key = 0
+
 class DeepLinkController {
+    key: string
     link: DeepLink
     state: DeepLinkState = { status: "pending" }
 
     constructor(link: DeepLink) {
+        this.key = `${key++}`
         this.link = link
 
         makeObservable(this, {
