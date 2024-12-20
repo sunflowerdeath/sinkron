@@ -8,7 +8,7 @@ import keyboardArrowDownSvg from "@material-design-icons/svg/outlined/keyboard_a
 import keyboardArrowUpSvg from "@material-design-icons/svg/outlined/keyboard_arrow_up.svg"
 
 import { Container, Menu, MenuItem, Button, LinkButton, Icon } from "~/ui"
-import { useSpace } from "~/store"
+import { useSpaceStore } from "~/store"
 import type { CategoryTreeNode, SpaceView } from "~/store/spaceStore"
 
 type CategoriesListItemProps = {
@@ -144,7 +144,7 @@ const CategoryList = (props: CategoryListProps) => {
 }
 
 const CategoriesView = observer(() => {
-    const spaceStore = useSpace()
+    const spaceStore = useSpaceStore()
     const [_location, navigate] = useLocation()
 
     const onDelete = (id: string) => {

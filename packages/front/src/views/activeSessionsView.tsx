@@ -4,7 +4,7 @@ import { Col } from "oriente"
 import { useLocation } from "wouter"
 import { format, parseISO } from "date-fns"
 
-import { useStore } from "~/store"
+import { useUserStore } from "~/store"
 import { Button, Container, ActionStateView, useActionState } from "~/ui"
 
 interface Session {
@@ -41,11 +41,11 @@ const SessionListItem = observer((props: SessionListItemProps) => {
 
 const ActiveSessionsView = observer(() => {
     const [_location, navigate] = useLocation()
-    const store = useStore()
+    const userStore = useUserStore()
 
     const [sessions, setSessions] = useState<Session[]>([])
     const fetchState = useMemo(() => {
-        const state = store.fetchActiveSessions()
+        const state = userStore.fetchActiveSessions()
         state.then(
             (value) => setSessions(value as Session[]),
             () => {}
@@ -55,7 +55,7 @@ const ActiveSessionsView = observer(() => {
 
     const [terminateState, setTerminateState] = useActionState()
     const terminate = () => {
-        const state = store.terminateSessions()
+        const state = userStore.terminateSessions()
         state.then(
             (value) => setSessions(value as Session[]),
             () => {}

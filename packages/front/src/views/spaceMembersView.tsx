@@ -7,7 +7,7 @@ import {} from "oriente"
 
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useStore, useSpace, SpaceStore } from "~/store"
+import { useUserStore, useSpaceStore, SpaceStore } from "~/store"
 import { FetchMembersResponse } from "~/store/spaceStore"
 import { SpaceRole, spaceRoleMap, SpaceMember, Invite } from "~/entities"
 import {
@@ -32,25 +32,25 @@ import {
 import { Picture } from "~/components/picture"
 
 type SpaceMembersStoreProps = {
-    space: SpaceStore
+    spaceStore: SpaceStore
     toast: ReturnType<typeof useStateToast>
 }
 
 class SpaceMembersStore {
-    space: SpaceStore
+    spaceStore: SpaceStore
     members: SpaceMember[] = []
     invites: Invite[] = []
     fetchState: ActionState<FetchMembersResponse> = initialActionState
     toast: ReturnType<typeof useStateToast>
 
     constructor(props: SpaceMembersStoreProps) {
-        const { space, toast } = props
-        this.space = space
+        const { spaceStore, toast } = props
+        this.spaceStore = spaceStore
         this.toast = toast
 
         makeAutoObservable(this)
 
-        this.fetchState = space.fetchMembers()
+        this.fetchState = spaceStore.fetchMembers()
         this.fetchState.then(({ members, invites }) => {
             this.members = members
             this.invites = invites
@@ -58,7 +58,7 @@ class SpaceMembersStore {
     }
 
     cancelInvite(invite: Invite) {
-        const state = this.space.cancelInvite(invite.id)
+        const state = this.spaceStore.cancelInvite(invite.id)
         state.then(
             () => {
                 const idx = this.invites.findIndex((i) => i.id === invite.id)
@@ -78,7 +78,7 @@ class SpaceMembersStore {
 
     removeMember(member: SpaceMember) {
         const { id, email } = member
-        const state = this.space.removeMember(member.id)
+        const state = this.spaceStore.removeMember(member.id)
         state.then(
             () => {
                 const idx = this.members.findIndex((m) => m.id === id)
@@ -95,7 +95,7 @@ class SpaceMembersStore {
     }
 
     updateMember(userId: string, role: SpaceRole) {
-        const state = this.space.updateMember(userId, role)
+        const state = this.spaceStore.updateMember(userId, role)
         state.then(
             () => {
                 const member = this.members.find((m) => m.id === userId)
@@ -128,7 +128,7 @@ const UpdateRoleDialog = observer((props: UpdateRoleDialogProps) => {
     }
 
     const roles: SpaceRole[] =
-        membersStore.space.space.role === "owner"
+        membersStore.spaceStore.space.role === "owner"
             ? ["readonly", "editor", "admin"]
             : ["readonly", "editor"]
     const options = roles.map((r) => ({ value: r, label: spaceRoleMap[r] }))
@@ -251,7 +251,7 @@ const SpaceInviteListItem = observer((props: SpaceInviteItemProps) => {
 
     const showActions = ["owner", "admin"].includes(currentUserRole)
 
-    const [cancelState, setCancelState] = useActionState()
+    const [_cancelState, setCancelState] = useActionState()
     const cancel = () => {
         setCancelState(store.cancelInvite(invite))
     }
@@ -296,9 +296,9 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
     const membersStore = props.store
     const { members, invites } = membersStore
 
-    const store = useStore()
-    const space = useSpace()
-    const role = space.space.role
+    const userStore = useUserStore()
+    const spaceStore = useSpaceStore()
+    const role = spaceStore.space.role
 
     const [owner, restMembers] = partition(members, (m) => m.role === "owner")
 
@@ -309,7 +309,7 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
                     key={m.id}
                     member={m}
                     currentUserRole={role}
-                    currentUserId={store.user.id}
+                    currentUserId={userStore.user.id}
                     store={membersStore}
                 />
             ))}
@@ -326,7 +326,7 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
                     key={m.id}
                     member={m}
                     currentUserRole={role}
-                    currentUserId={store.user.id}
+                    currentUserId={userStore.user.id}
                     store={membersStore}
                 />
             ))}
@@ -335,16 +335,16 @@ const SpaceMemberList = observer((props: SpaceMemberListProps) => {
 })
 
 const SpaceMembersView = observer(() => {
-    const space = useSpace()
+    const spaceStore = useSpaceStore()
     const [_location, navigate] = useLocation()
 
     const toast = useStateToast()
     const membersStore = useMemo(
-        () => new SpaceMembersStore({ space, toast }),
+        () => new SpaceMembersStore({ spaceStore, toast }),
         []
     )
 
-    const role = space.space.role
+    const role = spaceStore.space.role
     const canInvite = ["admin", "owner"].includes(role)
 
     return (

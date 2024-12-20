@@ -5,7 +5,7 @@ import { useMedia } from "react-use"
 import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 
 import { Button, Icon } from "~/ui"
-import { useSpace } from "~/store"
+import { useSpaceStore } from "~/store"
 
 interface CategoryListItemProps {
     item: { id: string; name: string }
@@ -57,7 +57,7 @@ interface CategoriesListProps {
 
 const CategoriesList = (props: CategoriesListProps) => {
     const { items, onRemove, readOnly } = props
-    const spaceStore = useSpace()
+    const spaceStore = useSpaceStore()
     const [_location, navigate] = useLocation()
     const isMobile = useMedia("(max-width: 1023px)")
     return (

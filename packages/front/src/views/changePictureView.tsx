@@ -3,7 +3,7 @@ import { useLocation } from "wouter"
 import { Row } from "oriente"
 import { useState } from "react"
 
-import { useStore, useSpace } from "~/store"
+import { useUserStore, useSpaceStore } from "~/store"
 import {
     ButtonsGrid,
     Container,
@@ -119,20 +119,20 @@ const ChangePictureView = observer((props: ChangePictureViewProps) => {
 
 const ChangeUserPictureView = () => {
     const [_location, navigate] = useLocation()
-    const store = useStore()
+    const userStore = useUserStore()
     return (
         <ChangePictureView
-            initialValue={store.user.picture}
+            initialValue={userStore.user.picture}
             title="Change user picture"
             onClose={() => navigate("/")}
-            onSave={(picture) => store.changePicture(picture)}
+            onSave={(picture) => userStore.changePicture(picture)}
         />
     )
 }
 
 const ChangeSpacePictureView = () => {
     const [_location, navigate] = useLocation()
-    const spaceStore = useSpace()
+    const spaceStore = useSpaceStore()
     return (
         <ChangePictureView
             title="Change space picture"

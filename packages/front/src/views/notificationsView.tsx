@@ -5,7 +5,7 @@ import { useLocation } from "wouter"
 import { Col } from "oriente"
 
 import type { Invite, Space } from "~/entities"
-import { useStore } from "~/store"
+import { useUserStore } from "~/store"
 import {
     ButtonsGrid,
     Container,
@@ -25,11 +25,11 @@ const InviteListItem = observer((props: InviteListItemProps) => {
 
     const [_location, navigate] = useLocation()
     const toast = useStateToast()
-    const store = useStore()
+    const userStore = useUserStore()
 
     const [actionState, setActionState] = useActionState<Invite>()
     const runAction = (action: "cancel" | "hide" | "accept" | "decline") => {
-        const state = store.inviteAction(invite.id, action)
+        const state = userStore.inviteAction(invite.id, action)
         setActionState(state)
         state.then(
             (invite: Invite) => {
@@ -41,11 +41,11 @@ const InviteListItem = observer((props: InviteListItemProps) => {
                     toast.success(
                         <>You have joined the space "{invite.space.name}"</>
                     )
-                    store.user.spaces.push({
+                    userStore.user.spaces.push({
                         ...invite.space,
                         role: invite.role
                     } as Space)
-                    store.changeSpace(invite.space.id)
+                    userStore.changeSpace(invite.space.id)
                     navigate("/")
                 }
                 onRemoveFromList()
@@ -61,7 +61,7 @@ const InviteListItem = observer((props: InviteListItemProps) => {
     }
 
     let content: React.ReactNode
-    if (invite.from.id === store.user.id) {
+    if (invite.from.id === userStore.user.id) {
         if (invite.status === "sent") {
             content = (
                 <>
@@ -147,9 +147,9 @@ const InviteList = observer((props: InviteListProps) => {
 
 const NotificationsView = observer(() => {
     const [_location, navigate] = useLocation()
-    const store = useStore()
+    const userStore = useUserStore()
 
-    const fetchState = useMemo(() => store.fetchNotifications(), [])
+    const fetchState = useMemo(() => userStore.fetchNotifications(), [])
 
     const content = (
         <ActionStateView state={fetchState}>

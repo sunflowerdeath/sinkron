@@ -3,7 +3,7 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 import { Col } from "oriente"
 
-import { useSpace } from "~/store"
+import { useSpaceStore } from "~/store"
 import {
     Container,
     Button,
@@ -19,7 +19,7 @@ import { Field } from "~/components/field"
 const InviteMemberView = observer(() => {
     const [_location, navigate] = useLocation()
     const toast = useStateToast()
-    const space = useSpace()
+    const space = useSpaceStore()
 
     const form = useMemo(
         () =>

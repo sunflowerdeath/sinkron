@@ -6,7 +6,7 @@ import { Col } from "oriente"
 import { parseISO, format } from "date-fns"
 
 import env from "~/env"
-import { useSpace } from "~/store"
+import { useSpaceStore } from "~/store"
 import { Post } from "~/entities"
 import { Api } from "~/api"
 import {
@@ -176,7 +176,7 @@ type PublishViewProps = {
 const PublishView = observer((props: PublishViewProps) => {
     const { onClose, docId } = props
 
-    const spaceStore = useSpace()
+    const spaceStore = useSpaceStore()
     const store = useMemo(
         () =>
             new PublishStore({

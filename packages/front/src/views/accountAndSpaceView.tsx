@@ -17,7 +17,7 @@ import {
     useStateToast
 } from "~/ui"
 import { Picture } from "~/components/picture"
-import { useStore, useSpace } from "~/store"
+import { useUserStore, useSpaceStore } from "~/store"
 
 const statusMap: { [key in ConnectionStatus]: string } = {
     [ConnectionStatus.Disconnected]: "Waiting for connection...",
@@ -27,15 +27,16 @@ const statusMap: { [key in ConnectionStatus]: string } = {
 }
 
 const AccountAndSpaceView = observer(() => {
-    const store = useStore()
-    const space = useSpace()
+    const userStore = useUserStore()
+    const spaceStore = useSpaceStore()
+    const space = spaceStore.space
     const [_location, navigate] = useLocation()
     const toast = useStateToast()
 
     const [leaveState, setLeaveState] = useActionState<void>()
     const leave = () => {
-        const state = fromPromise(store.leaveSpace())
-        const name = space.space.name
+        const state = fromPromise(userStore.leaveSpace())
+        const name = space.name
         setLeaveState(state)
         state.then(
             () => {
@@ -56,7 +57,7 @@ const AccountAndSpaceView = observer(() => {
             return (
                 <Col gap={16}>
                     <Heading>Leave space</Heading>
-                    Are you sure you want to leave space "{space.space.name}"?
+                    Are you sure you want to leave space "{space.name}"?
                     <ButtonsGrid>
                         <Button onClick={close}>Cancel</Button>
                         <Button
@@ -71,12 +72,12 @@ const AccountAndSpaceView = observer(() => {
         }
     })
 
-    const role = space.space.role
+    const role = space.role
     const canInvite = role === "admin" || role === "owner"
 
     const status = (
         <div style={{ color: "var(--color-secondary)" }}>
-            {statusMap[space.collection.status]}
+            {statusMap[spaceStore.collection.status]}
         </div>
     )
 
@@ -85,24 +86,24 @@ const AccountAndSpaceView = observer(() => {
             <Col gap={16}>
                 <Heading>Account</Heading>
                 <Row gap={8} align="center">
-                    <Picture picture={store.user!.picture} />
-                    <div>{store.user!.email}</div>
+                    <Picture picture={userStore.user.picture} />
+                    <div>{userStore.user.email}</div>
                 </Row>
                 <ButtonsGrid>
                     <LinkButton to="/account/settings">
                         Account settings
                     </LinkButton>
-                    <Button onClick={() => store.logout()}>Log out</Button>
+                    <Button onClick={() => userStore.logout()}>Log out</Button>
                 </ButtonsGrid>
             </Col>
             <Col gap={16}>
                 <Heading>Space</Heading>
                 <Row gap={8} align="center">
-                    <Picture picture={space.space.picture} />
+                    <Picture picture={space.picture} />
                     <Col>
-                        <div>{space.space.name}</div>
+                        <div>{space.name}</div>
                         <div style={{ opacity: ".6" }}>
-                            {numForm(space.space.membersCount, {
+                            {numForm(space.membersCount, {
                                 one: "member",
                                 many: "members"
                             })}{" "}

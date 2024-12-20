@@ -7,7 +7,7 @@ import { Col, Row } from "oriente"
 import closeSvg from "@material-design-icons/svg/outlined/close.svg"
 import expandMoreSvg from "@material-design-icons/svg/outlined/expand_more.svg"
 
-import { useSpace } from "~/store"
+import { useSpaceStore } from "~/store"
 import type { CategoryTree, CategoryTreeNode } from "~/store/spaceStore"
 import { Container, Input, Button, Icon, Menu, MenuItem } from "~/ui"
 
@@ -152,6 +152,8 @@ const EditCategoryForm = (props: EditCategoryFormProps) => {
 }
 
 const CreateCategoryView = observer(() => {
+    const spaceStore = useSpaceStore()
+
     const search = queryString.parse(useSearch())
     const initialParent =
         "parent" in search
@@ -160,7 +162,6 @@ const CreateCategoryView = observer(() => {
                 : search.parent
             : null
 
-    const spaceStore = useSpace()
     const [_location, navigate] = useLocation()
 
     const create = (values: { name: string; parent: string | null }) => {
@@ -197,7 +198,7 @@ interface EditCategoryViewProps {
 const EditCategoryView = observer((props: EditCategoryViewProps) => {
     const { id } = props
 
-    const spaceStore = useSpace()
+    const spaceStore = useSpaceStore()
     const [_location, navigate] = useLocation()
 
     if (spaceStore.metaItem === undefined) {

@@ -1,13 +1,23 @@
 import { makeObservable, computed } from "mobx"
 
+import env from "~/env"
 import { matchPath } from "~/utils/matchPath"
 
-const parseDeepLink = (path: string): DeepLink | undefined => {
+const parseDeepLinkPath = (path: string): DeepLink | undefined => {
     const match = matchPath({
         pattern: "/link/:spaceId/:docId",
         path
     })
     return match === undefined ? undefined : (match as DeepLink)
+}
+
+const parseDeepLinkUrl = (url: string): DeepLink | undefined => {
+    const parsedUrl = URL.parse(url)
+    if (parsedUrl !== null && parsedUrl.origin === env.linksOrigin) {
+        return parseDeepLinkPath(parsedUrl.pathname)
+    } else {
+        return undefined
+    }
 }
 
 export type DocumentDeepLink = {
@@ -46,4 +56,4 @@ class DeepLinkController {
     }
 }
 
-export { DeepLinkController, parseDeepLink }
+export { DeepLinkController, parseDeepLinkPath, parseDeepLinkUrl }

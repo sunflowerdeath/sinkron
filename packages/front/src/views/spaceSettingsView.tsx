@@ -4,7 +4,7 @@ import { useLocation } from "wouter"
 import { IPromiseBasedObservable, fromPromise } from "mobx-utils"
 import { ceil } from "lodash-es"
 
-import { useStore, UserStore, SpaceStore } from "~/store"
+import { useUserStore, useSpaceStore, UserStore, SpaceStore } from "~/store"
 import {
     Button,
     ButtonsGrid,
@@ -111,8 +111,8 @@ const DeleteSpaceView = (props: DeleteSpaceViewProps) => {
 
 const SpaceSettingsView = observer(() => {
     const [_location, navigate] = useLocation()
-    const store = useStore()
-    const spaceStore = store.space!
+    const userStore = useUserStore()
+    const spaceStore = useSpaceStore()
     const space = spaceStore.space
 
     const toast = useStateToast()
@@ -126,7 +126,7 @@ const SpaceSettingsView = observer(() => {
     ))
 
     const deleteDialog = useDialog((close) => (
-        <DeleteSpaceView store={store} onClose={close} toast={toast} />
+        <DeleteSpaceView store={userStore} onClose={close} toast={toast} />
     ))
 
     const [deleteOrphansState, setDeleteOrphansState] = useState<

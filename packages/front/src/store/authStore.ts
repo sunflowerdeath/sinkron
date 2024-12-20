@@ -5,7 +5,7 @@ import env from "~/env"
 import { User } from "~/entities"
 import { Api } from "~/api"
 
-import {UserStore} from "./userStore"
+import { UserStore } from "./userStore"
 import { DeepLink, DeepLinkController } from "./deepLink"
 
 type AuthResponse = { user: User; token: string }
@@ -50,6 +50,7 @@ class AuthStore {
 
         makeObservable(this, {
             store: true,
+            deepLink: true,
             login: action,
             code: action,
             logout: action
@@ -73,7 +74,11 @@ class AuthStore {
         localStorage.setItem("token", token)
         localStorage.setItem("user", JSON.stringify(user))
         this.token = token
-        this.store = new UserStore({ authStore: this, user })
+        this.store = new UserStore({
+            authStore: this,
+            user,
+            deepLink: this.deepLink
+        })
         console.log(`Logged in as "${user.email}"`)
     }
 
@@ -82,11 +87,19 @@ class AuthStore {
         localStorage.removeItem("token")
         localStorage.removeItem("user")
         localStorage.removeItem("space")
+        this.deepLink = undefined
         this.token = undefined
         this.store?.dispose()
         this.store = undefined
         history.pushState({}, "", "/")
         IndexedDbCollectionStore.clearAll()
+    }
+
+    handleDeepLink(deepLink: DeepLink) {
+        this.deepLink = new DeepLinkController(deepLink)
+        if (this.store) {
+            this.store.handleDeepLink(this.deepLink)
+        }
     }
 }
 

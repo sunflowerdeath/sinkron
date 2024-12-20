@@ -163,7 +163,6 @@ export type SpaceViewProps =
 type SpaceStoreProps = {
     userStore: UserStore
     space: Space
-    deepLink?: DeepLinkController
 }
 
 class SpaceStore {
@@ -176,7 +175,7 @@ class SpaceStore {
     dispose: () => void
 
     constructor(props: SpaceStoreProps) {
-        const { userStore, space, deepLink } = props
+        const { userStore, space } = props
         this.api = userStore.api
         this.space = space
         this.userStore = userStore
@@ -234,8 +233,6 @@ class SpaceStore {
             }
         })
 
-        if (deepLink) this.handleDeepLink(deepLink)
-
         this.dispose = () => {
             disposeAutorun()
             this.collection.destroy()
@@ -247,15 +244,19 @@ class SpaceStore {
 
         await when(() => this.collection.isLoaded)
         if (this.collection.items.has(docId)) {
-            history.pushState({}, "", `/documents/${docId}`)
-            deepLink.resolve({ status: "resolved" })
+            if (!deepLink.isResolved) {
+                history.pushState({}, "", `/documents/${docId}`)
+                deepLink.resolve({ status: "resolved" })
+            }
             return
         }
 
         await when(() => this.collection.initialSyncCompleted)
         if (this.collection.items.has(docId)) {
-            history.pushState({}, "", `/documents/${docId}`)
-            deepLink.resolve({ status: "resolved" })
+            if (!deepLink.isResolved) {
+                history.pushState({}, "", `/documents/${docId}`)
+                deepLink.resolve({ status: "resolved" })
+            }
         } else {
             deepLink.resolve({
                 status: "failed",

@@ -62,7 +62,7 @@ const DeepLinkView = observer((props: DeepLinkViewProps) => {
                         </Col>
                     )
                 }
-                return null
+                return "hz"
             }}
         </Dialog>
     )

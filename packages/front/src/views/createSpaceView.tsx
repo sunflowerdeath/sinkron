@@ -5,7 +5,7 @@ import { useLocation } from "wouter"
 import { Col } from "oriente"
 
 import { FormStore, FieldStore } from "~/utils/forms"
-import { useStore } from "~/store"
+import { useUserStore } from "~/store"
 import {
     Container,
     Button,
@@ -24,7 +24,7 @@ type CreateSpaceViewProps = {
 
 const CreateSpaceView = observer((props: CreateSpaceViewProps) => {
     const { container } = props
-    const store = useStore()
+    const userStore = useUserStore()
 
     const form = useMemo(
         () =>
@@ -52,7 +52,7 @@ const CreateSpaceView = observer((props: CreateSpaceViewProps) => {
 
     const [createState, setCreateState] = useActionState<void>()
     const create = async () => {
-        const state = fromPromise(store.createSpace(form.values.name!))
+        const state = fromPromise(userStore.createSpace(form.values.name!))
         state.then(
             () => {
                 navigate("/")
@@ -118,7 +118,7 @@ const CreateSpaceView = observer((props: CreateSpaceViewProps) => {
             >
                 <Heading>Create space</Heading>
                 {content}
-                <Button kind="transparent" onClick={() => store.logout()}>
+                <Button kind="transparent" onClick={() => userStore.logout()}>
                     Logout
                 </Button>
             </Col>

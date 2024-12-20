@@ -2,13 +2,13 @@ import { observer } from "mobx-react-lite"
 import { useLocation } from "wouter"
 
 import type { Space } from "~/entities"
-import { useStore } from "~/store"
+import { useUserStore } from "~/store"
 import { Col, Row, Container, Button, LinkButton } from "~/ui"
 import { numForm } from "~/utils/numForm"
 import { Picture } from "~/components/picture"
 
 const SwitchSpaceView = observer(() => {
-    const userStore = useStore()
+    const userStore = useUserStore()
     const [_location, navigate] = useLocation()
 
     const select = (s: Space) => {

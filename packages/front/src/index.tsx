@@ -9,8 +9,8 @@ import { Router, Switch, Route, Redirect, useLocation } from "wouter"
 import { OrienteProvider } from "oriente"
 import { configure } from "mobx"
 
-import { parseDeepLink } from "./store/deepLink"
-import { AuthStore, StoreContext } from "./store"
+import { parseDeepLinkPath } from "./store/deepLink"
+import { AuthStore, UserStoreContext } from "./store"
 import { SpaceView } from "./views/spaceView"
 import { LoginView } from "./views/loginView"
 import { CreateSpaceView } from "./views/createSpaceView"
@@ -41,7 +41,7 @@ const Root = observer(() => {
     const [location, navigate] = useLocation()
 
     const authStore = useMemo(() => {
-        const deepLink = parseDeepLink(location)
+        const deepLink = parseDeepLinkPath(location)
         if (deepLink) {
             // @ts-expect-error replace option
             navigate("/", { replace: "true" })
@@ -59,9 +59,9 @@ const Root = observer(() => {
         <OrienteProvider>
             <Router>
                 {authStore.store ? (
-                    <StoreContext.Provider value={authStore.store}>
+                    <UserStoreContext.Provider value={authStore.store}>
                         <AppView store={authStore} />
-                    </StoreContext.Provider>
+                    </UserStoreContext.Provider>
                 ) : (
                     <Switch>
                         <Route

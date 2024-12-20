@@ -7,7 +7,7 @@ import { ConnectionStatus } from "@sinkron/client/lib/collection"
 import defaultFaviconUrl from "~/favicon.ico"
 import offFaviconUrl from "~/favicon_off.ico"
 
-import { SpaceContext, useStore } from "~/store"
+import { SpaceContext, useUserStore } from "~/store"
 
 import { DocumentListView } from "./documentListView"
 import { DocumentView } from "./documentView"
@@ -28,8 +28,8 @@ import { CreateSpaceView } from "./createSpaceView"
 import { SwitchSpaceView } from "./switchSpaceView"
 
 const SpaceView = observer(() => {
-    const store = useStore()
-    const spaceStore = store.space!
+    const userStore = useUserStore()
+    const spaceStore = userStore.space!
     const isMobile = useMedia("(max-width: 1023px)")
 
     useFavicon(

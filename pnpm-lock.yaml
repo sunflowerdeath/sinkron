@@ -218,8 +218,8 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
       oriente:
-        specifier: ^0.1.11
-        version: 0.1.11(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)(webpack@5.97.1)
+        specifier: ^0.1.12
+        version: 0.1.12(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       pino:
         specifier: ^9.5.0
         version: 9.5.0
@@ -1915,6 +1915,9 @@ packages:
   es-module-lexer@1.5.4:
     resolution: {integrity: sha512-MVNK56NiMrOwitFB7cqDwq0CQutbw+0BvLshJSse0MUNU+y1FC3bUS/AQg7oUng+/wKrrki7JfmwtVHkVfPLlw==}
 
+  es-toolkit@1.30.1:
+    resolution: {integrity: sha512-ZXflqanzH8BpHkDhFa10bBf6ONDCe84EPUm7SSICGzuuROSluT2ynTPtwn9PcRelMtorCRozSknI/U0MNYp0Uw==}
+
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
@@ -2648,8 +2651,8 @@ packages:
     resolution: {integrity: sha512-ur5UIdyw5Y7yEj9wLzhqXiy6GZ3Mwx0yGI+5sMn2r0N0v3cKJvUmFH5yPP+WXh9e0xfyzyJX95D8l088DNFj7A==}
     hasBin: true
 
-  oriente@0.1.11:
-    resolution: {integrity: sha512-8gNVvsGcv618+0qnYkgIBnkNTQ223GhS7N+cen1wMSJek2xIhqu7JnFIF6/eE1TwxI723aUxv6UQTHsxGDvwnQ==}
+  oriente@0.1.12:
+    resolution: {integrity: sha512-eUSLWIfTgCalvOf6wH4iIDFe5Zui+WzxE7kmOTQUjybGmOp6hzwSUXNns6fpwPXtzXGddIcFgotmntgWLJvV4Q==}
 
   oxlint@0.14.1:
     resolution: {integrity: sha512-FwcjPfQu806ibSv73Y9tUM8ezUyd811dp3JwEEOC/dIAgd93egRsRNnFauuAq/WuTjIDv73tbr9hB8MziH31Eg==}
@@ -3204,10 +3207,6 @@ packages:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
 
-  source-map@0.7.4:
-    resolution: {integrity: sha512-l3BikUxvPOcn5E74dZiq5BGsTb5yEwhaTSzccU6t4sDOH8NWJCstKO5QT2CvtFoK6F0saL7p9xHAqHOlCPJygA==}
-    engines: {node: '>= 8'}
-
   spdy-transport@3.0.0:
     resolution: {integrity: sha512-hsLVFE5SjA6TCisWeJXFKniGGOpBgMLmerfO2aCyCU5s7nJ/rpAepqmFifv/GCbSbueEeAJJnmSQ2rKC/g8Fcw==}
 
@@ -3388,13 +3387,6 @@ packages:
 
   ts-easing@0.2.0:
     resolution: {integrity: sha512-Z86EW+fFFh/IFB1fqQ3/+7Zpf9t2ebOAxNI/V6Wo7r5gqiqtxmgTlQ1qbqQcjLKYeSHPTsEmvlJUDg/EuL0uHQ==}
-
-  ts-loader@9.5.1:
-    resolution: {integrity: sha512-rNH3sK9kGZcH9dYzC7CewQm4NtxJTjSEVRJ2DyBZR7f8/wcta+iV44UPCXc5+nzDzivKtlzV6c9P4e+oFhDLYg==}
-    engines: {node: '>=12.0.0'}
-    peerDependencies:
-      typescript: '*'
-      webpack: ^5.0.0
 
   tslib@2.8.0:
     resolution: {integrity: sha512-jWVzBLplnCmoaTr13V9dYbiQ99wvZRd0vNWaDRg+aVYRcjDF3nDksxFDE/+fkXnKhpnUUkmx5pK/v8mCtLVqZA==}
@@ -5713,6 +5705,8 @@ snapshots:
 
   es-module-lexer@1.5.4: {}
 
+  es-toolkit@1.30.1: {}
+
   escalade@3.2.0: {}
 
   escape-html@1.0.3: {}
@@ -6424,15 +6418,14 @@ snapshots:
 
   opener@1.5.2: {}
 
-  oriente@0.1.11(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)(webpack@5.97.1):
+  oriente@0.1.12(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
-      lodash-es: 4.17.21
+      es-toolkit: 1.30.1
       react-focus-lock: 2.13.2(@types/react@18.3.11)(react@18.3.1)
       react-remove-scroll: 2.6.0(@types/react@18.3.11)(react@18.3.1)
       react-spring: 9.7.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-use: 17.5.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       shallow-equal: 1.2.1
-      ts-loader: 9.5.1(typescript@5.6.3)(webpack@5.97.1)
     transitivePeerDependencies:
       - '@react-three/fiber'
       - '@types/react'
@@ -6443,8 +6436,6 @@ snapshots:
       - react-native
       - react-zdog
       - three
-      - typescript
-      - webpack
       - zdog
 
   oxlint@0.14.1:
@@ -7110,8 +7101,6 @@ snapshots:
 
   source-map@0.6.1: {}
 
-  source-map@0.7.4: {}
-
   spdy-transport@3.0.0:
     dependencies:
       debug: 4.3.7(supports-color@8.1.1)
@@ -7279,16 +7268,6 @@ snapshots:
       tslib: 2.8.0
 
   ts-easing@0.2.0: {}
-
-  ts-loader@9.5.1(typescript@5.6.3)(webpack@5.97.1):
-    dependencies:
-      chalk: 4.1.2
-      enhanced-resolve: 5.17.1
-      micromatch: 4.0.8
-      semver: 7.6.3
-      source-map: 0.7.4
-      typescript: 5.6.3
-      webpack: 5.97.1(@swc/core@1.9.3)(webpack-cli@5.1.4)
 
   tslib@2.8.0: {}
 

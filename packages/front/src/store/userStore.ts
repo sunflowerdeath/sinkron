@@ -1,4 +1,4 @@
-import { makeObservable, computed, reaction, autorun, toJS, when } from "mobx"
+import { makeObservable, computed, autorun, toJS, when } from "mobx"
 import { fromPromise } from "mobx-utils"
 import { Channel } from "@sinkron/client/lib/collection"
 import { pino, Logger } from "pino"
@@ -57,13 +57,13 @@ class UserStore {
 
         this.logger = pino({ level: "debug" })
 
-        this.spaceId = user.spaces[0]?.id
+        let initialSpaceId = user.spaces[0]?.id
         if (spaceId !== undefined && this.hasSpace(spaceId)) {
-            this.spaceId = spaceId
+            initialSpaceId = spaceId
         }
-        if (deepLink) this.handleDeepLink(deepLink)
+        this.changeSpace(initialSpaceId)
 
-        this.setSpace()
+        if (deepLink) this.handleDeepLink(deepLink)
 
         makeObservable(this, {
             user: true,
@@ -76,13 +76,6 @@ class UserStore {
             const json = JSON.stringify(toJS(this.user))
             localStorage.setItem("user", json)
         })
-        reaction(
-            () => this.spaceId,
-            () => {
-                this.setSpace()
-            },
-            { fireImmediately: false }
-        )
 
         const token = this.api.getToken()
         this.channel = new Channel({
@@ -101,9 +94,11 @@ class UserStore {
     }
 
     async handleDeepLink(deepLink: DeepLinkController) {
+        this.deepLink = deepLink
         const spaceId = deepLink.link.spaceId
         if (this.hasSpace(spaceId)) {
-            this.spaceId = spaceId
+            this.changeSpace(spaceId)
+            this.space?.handleDeepLink(deepLink)
         } else {
             await when(() => this.userIsFetched)
             if (!this.hasSpace(spaceId)) {
@@ -112,7 +107,10 @@ class UserStore {
                     message: "Space not found"
                 })
             } else {
-                this.spaceId = spaceId
+                if (!deepLink.isResolved) {
+                    this.changeSpace(spaceId)
+                    this.space?.handleDeepLink(deepLink)
+                }
             }
         }
     }
@@ -121,19 +119,15 @@ class UserStore {
         return this.user.spaces.some((s) => s.id === id)
     }
 
-    setSpace() {
+    changeSpace(spaceId: string) {
+        if (this.spaceId === spaceId) return
+
         this.space?.dispose()
+
+        this.spaceId = spaceId
         const space = this.user.spaces.find((s) => s.id === this.spaceId)!
         if (space !== undefined) {
-            const deepLinkShouldBeHandled =
-                this.deepLink &&
-                !this.deepLink.isResolved &&
-                this.deepLink.link.spaceId === this.spaceId
-            this.space = new SpaceStore({
-                space,
-                userStore: this,
-                deepLink: deepLinkShouldBeHandled ? this.deepLink : undefined
-            })
+            this.space = new SpaceStore({ space, userStore: this })
             localStorage.setItem("space", space.id)
         } else {
             this.space = undefined
@@ -199,12 +193,6 @@ class UserStore {
         })
         this.user.spaces.push(space)
         this.changeSpace(space.id)
-    }
-
-    changeSpace(spaceId: string) {
-        if (this.spaceId !== spaceId) {
-            this.spaceId = spaceId
-        }
     }
 
     changePicture(picture: Picture) {

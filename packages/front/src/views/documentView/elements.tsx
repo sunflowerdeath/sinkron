@@ -17,7 +17,8 @@ import checkBox from "@material-design-icons/svg/outlined/check_box.svg"
 import checkBoxOutline from "@material-design-icons/svg/outlined/check_box_outline_blank.svg"
 
 import env from "~/env"
-import { parseDeepLink } from "~/store/deepLink"
+import { useUserStore } from "~/store"
+import { parseDeepLinkUrl } from "~/store/deepLink"
 import { Button, Icon } from "~/ui"
 import {
     SinkronTextElement,
@@ -96,15 +97,11 @@ const Heading = (props: CustomRenderElementProps<HeadingElement>) => {
 const Link = (props: CustomRenderElementProps<LinkElement>) => {
     const { element, attributes, children } = props
 
+    const userStore = useUserStore()
     const documentStore = useDocumentStore()
     const isFocused = useFocused()
     const isSelected = useSelected()
-
-    const parsedUrl = URL.parse(element.url)
-    const isDeepLink =
-        parsedUrl !== null &&
-        parsedUrl.origin === window.location.origin &&
-        parseDeepLink(parsedUrl.pathname) !== undefined
+    const deepLink = parseDeepLinkUrl(element.url)
 
     const popup = useCallback(
         (ref: React.RefObject<HTMLDivElement>) => (
@@ -136,7 +133,13 @@ const Link = (props: CustomRenderElementProps<LinkElement>) => {
                         whiteSpace: "nowrap",
                         paddingLeft: 8
                     }}
-                    target={isDeepLink ? "" : "_blank"}
+                    target={deepLink ? "" : "_blank"}
+                    onClick={(e) => {
+                        if (deepLink) {
+                            userStore.authStore.handleDeepLink(deepLink)
+                            e.preventDefault()
+                        }
+                    }}
                 >
                     {element.url}
                 </a>

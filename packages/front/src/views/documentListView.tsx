@@ -12,7 +12,7 @@ import folderSvg from "@material-design-icons/svg/outlined/folder.svg"
 import arrowCategoryBackSvg from "@material-design-icons/svg/outlined/subdirectory_arrow_left.svg"
 
 import env from "~/env"
-import { useStore, useSpace } from "~/store"
+import { useUserStore, useSpaceStore } from "~/store"
 import type { DocumentListItemData } from "~/store/spaceStore"
 import { Button, LinkButton, Icon } from "~/ui"
 import { Picture } from "~/components/picture"
@@ -143,7 +143,7 @@ const DocumentList = observer((props: DocumentListProps) => {
     const { selectedDocId } = props
 
     const [_location, navigate] = useLocation()
-    const spaceStore = useSpace()
+    const spaceStore = useSpaceStore()
 
     const categoryItems =
         spaceStore.viewProps.kind === "category" &&
@@ -175,29 +175,29 @@ const DocumentList = observer((props: DocumentListProps) => {
 })
 
 const DocumentListView = observer(() => {
-    const store = useStore()
-    const space = useSpace()
     const [_location, navigate] = useLocation()
+    const userStore = useUserStore()
+    const spaceStore = useSpaceStore()
 
     const [match, params] = useRoute("/documents/:id")
     const selectedDocId = match ? params.id : undefined
 
-    const canCreate = space.space.role !== "readonly"
+    const canCreate = spaceStore.space.role !== "readonly"
     const createDocument = () => {
-        const id = space.createDocument()
+        const id = spaceStore.createDocument()
         navigate(`/documents/${id}`)
     }
 
-    const upButton = space.view.kind !== "all" && (
+    const upButton = spaceStore.view.kind !== "all" && (
         <Button
             onClick={() => {
-                if (space.viewProps.kind === "category") {
-                    const parent = space.viewProps.parent
-                    space.view = parent
+                if (spaceStore.viewProps.kind === "category") {
+                    const parent = spaceStore.viewProps.parent
+                    spaceStore.view = parent
                         ? { kind: "category", id: parent }
                         : { kind: "all" }
                 } else {
-                    space.view = { kind: "all" }
+                    spaceStore.view = { kind: "all" }
                 }
             }}
         >
@@ -228,10 +228,10 @@ const DocumentListView = observer(() => {
                         flexGrow: 1
                     }}
                 >
-                    {space.viewProps.name}
+                    {spaceStore.viewProps.name}
                 </div>
                 <div style={{ color: "var(--color-secondary)" }}>
-                    {space.viewProps.count}
+                    {spaceStore.viewProps.count}
                 </div>
             </LinkButton>
             <Button onClick={createDocument} isDisabled={!canCreate}>
@@ -240,7 +240,7 @@ const DocumentListView = observer(() => {
         </Row>
     )
 
-    const unreadMarker = store.user.hasUnreadNotifications && (
+    const unreadMarker = userStore.user.hasUnreadNotifications && (
         <div
             style={{
                 width: 12,
@@ -267,8 +267,8 @@ const DocumentListView = observer(() => {
                 to="/account"
             >
                 <Row gap={8} align="center">
-                    <Picture picture={space.space.picture} />
-                    <div style={{ flexGrow: 1 }}>{space.space.name}</div>
+                    <Picture picture={spaceStore.space.picture} />
+                    <div style={{ flexGrow: 1 }}>{spaceStore.space.name}</div>
                 </Row>
             </LinkButton>
             <LinkButton to="/notifications" style={{ position: "relative" }}>

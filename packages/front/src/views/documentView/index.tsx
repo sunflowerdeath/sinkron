@@ -22,7 +22,7 @@ import arrowBackSvg from "@material-design-icons/svg/outlined/arrow_back.svg"
 import moreHorizSvg from "@material-design-icons/svg/outlined/more_horiz.svg"
 
 import env from "~/env"
-import { useSpace, useStore } from "~/store"
+import { useSpaceStore, useUserStore } from "~/store"
 import { DocumentData } from "~/store/spaceStore"
 import { SelectCategoriesView } from "~/views/selectCategoriesView"
 import { ShareAndAccessView } from "~/views/shareAndAccessView"
@@ -37,6 +37,7 @@ import {
     useStateToast,
     useDialog
 } from "~/ui"
+import { copyToClipboard } from "~/utils/copyToClipboard"
 
 import { DocumentViewStore, DocumentStoreContext } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
@@ -64,8 +65,8 @@ const EditorView = observer((props: EditorViewProps) => {
     const { id, doc, data, onChange, onDelete } = props
 
     const isMobile = useMedia("(max-width: 1023px)")
-    const userStore = useStore()
-    const spaceStore = useSpace()
+    const userStore = useUserStore()
+    const spaceStore = useSpaceStore()
     const toast = useStateToast()
     const documentViewStore = useMemo(
         () => new DocumentViewStore({ spaceStore, toast, id, doc }),
@@ -233,8 +234,8 @@ const EditorView = observer((props: EditorViewProps) => {
         )
 
         const copyLink = () => {
-            const link = `${location.origin}/link/${spaceStore.space.id}/${id}`
-            navigator.clipboard?.writeText(link)
+            const link = `${env.linksOrigin}/link/${spaceStore.space.id}/${id}`
+            copyToClipboard(link)
         }
 
         return (
@@ -453,10 +454,10 @@ interface DocumentViewProps {
 const DocumentView = observer((props: DocumentViewProps) => {
     const { id } = props
 
-    const space = useSpace()
+    const spaceStore = useSpaceStore()
     const [_location, navigate] = useLocation()
 
-    const item = space.collection.items.get(id)
+    const item = spaceStore.collection.items.get(id)
     if (
         item === undefined ||
         item.local === null ||
@@ -471,7 +472,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
             (op) => op.type !== "set_selection"
         )
         if (ops.length > 0) {
-            space.changeDoc(id, (doc) => {
+            spaceStore.changeDoc(id, (doc) => {
                 const content = doc.getMap("root").get("content")
                 if (content instanceof LoroMap) {
                     applySlateOps(content, ops)
@@ -481,7 +482,7 @@ const DocumentView = observer((props: DocumentViewProps) => {
     }
 
     const onDelete = () => {
-        space.collection.delete(id)
+        spaceStore.collection.delete(id)
         navigate("/")
     }
 

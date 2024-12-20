@@ -14,11 +14,16 @@ const apiUrl = isProductionEnv
     ? "http://10.0.2.2:80"
     : `http://${window.location.hostname}:80`
 
+const linksOrigin = isProductionEnv
+    ? "https://new.sinkron.xyz"
+    : location.origin
+
 const env = {
     isProductionEnv,
     tauri,
     wsUrl,
-    apiUrl
+    apiUrl,
+    linksOrigin
 }
 
 export default env
