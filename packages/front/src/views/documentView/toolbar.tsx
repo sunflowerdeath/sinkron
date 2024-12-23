@@ -14,8 +14,17 @@ import formatStrikethroughSvg from "@material-design-icons/svg/outlined/format_s
 import { LinkElement } from "~/types"
 import { Button, Icon, Input } from "~/ui"
 import { DocumentViewStore } from "./store"
+import {
+    isNodeActive,
+    isMarkActive,
+    toggleMark,
+    toggleCodeBlock,
+    toggleHeading,
+    toggleList,
+    toggleNumList,
+    toggleCheckList
+} from "./helpers"
 import type { TextMarkType } from "./helpers"
-import { isNodeActive, isMarkActive, toggleMark } from "./helpers"
 
 type ToolbarButtonProps = {
     isActive: boolean
@@ -60,24 +69,10 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
         { type: "strikethrough", label: <Icon svg={formatStrikethroughSvg} /> }
     ]
 
-    const listTypes = ["list", "ordered-list", "check-list"]
-    const unwrapList = () => {
-        Transforms.unwrapNodes(editor, {
-            match: (n) => Element.isElement(n) && listTypes.includes(n.type),
-            split: true
-        })
-    }
-    const onClickHeading = () => {
-        if (isNodeActive(editor, "heading")) {
-            Transforms.setNodes(editor, { type: "paragraph" })
-        } else {
-            unwrapList()
-            Transforms.setNodes(editor, { type: "heading" })
-        }
-    }
     const onClickImage = () => {
         store.documentStore.openImageDialog()
     }
+
     const onClickLink = () => {
         if (isNodeActive(editor, "link")) {
             store.view = "edit_link"
@@ -85,56 +80,12 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             store.view = "create_link"
         }
     }
-    const onClickCode = () => {
-        if (isNodeActive(editor, "code-block")) {
-            Transforms.unwrapNodes(editor, {
-                match: (n) => Element.isElementType(n, "code-block")
-            })
-        } else {
-            Transforms.setNodes(editor, { type: "code-line" })
-            // @ts-expect-error wrap doesn't require full element
-            Transforms.wrapNodes(editor, { type: "code-block" })
-        }
-    }
-    const onClickList = () => {
-        const isActive = isNodeActive(editor, "list")
-        unwrapList()
-        if (isActive) {
-            Transforms.setNodes(editor, { type: "paragraph" })
-        } else {
-            Transforms.setNodes(editor, { type: "list-item" })
-            // @ts-expect-error wrap doesn't require full element
-            Transforms.wrapNodes(editor, { type: "list" })
-        }
-    }
-    const onClickNumList = () => {
-        const isActive = isNodeActive(editor, "ordered-list")
-        unwrapList()
-        if (isActive) {
-            Transforms.setNodes(editor, { type: "paragraph" })
-        } else {
-            Transforms.setNodes(editor, { type: "list-item" })
-            // @ts-expect-error wrap doesn't require full element
-            Transforms.wrapNodes(editor, { type: "ordered-list" })
-        }
-    }
-    const onClickCheckList = () => {
-        const isActive = isNodeActive(editor, "check-list")
-        unwrapList()
-        if (isActive) {
-            Transforms.setNodes(editor, { type: "paragraph" })
-        } else {
-            Transforms.setNodes(editor, { type: "check-list-item" })
-            // @ts-expect-error wrap doesn't require full element
-            Transforms.wrapNodes(editor, { type: "check-list" })
-        }
-    }
 
     const blockButtons = (
         <>
             <ToolbarButton
                 isActive={isNodeActive(editor, "heading")}
-                onClick={onClickHeading}
+                onClick={() => toggleHeading(editor)}
             >
                 Heading
             </ToolbarButton>
@@ -152,25 +103,25 @@ const ToolbarButtonsView = observer((props: ToolbarViewProps) => {
             </ToolbarButton>
             <ToolbarButton
                 isActive={isNodeActive(editor, "code-block")}
-                onClick={onClickCode}
+                onClick={() => toggleCodeBlock(editor)}
             >
                 Code
             </ToolbarButton>
             <ToolbarButton
                 isActive={isNodeActive(editor, "list")}
-                onClick={onClickList}
+                onClick={() => toggleList(editor)}
             >
                 List
             </ToolbarButton>
             <ToolbarButton
                 isActive={isNodeActive(editor, "ordered-list")}
-                onClick={onClickNumList}
+                onClick={() => toggleNumList(editor)}
             >
                 Num.list
             </ToolbarButton>
             <ToolbarButton
                 isActive={isNodeActive(editor, "check-list")}
-                onClick={onClickCheckList}
+                onClick={() => toggleCheckList(editor)}
             >
                 <span style={{ fontSize: ".87rem" }}>Checklist</span>
             </ToolbarButton>

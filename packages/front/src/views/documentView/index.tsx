@@ -10,7 +10,7 @@ import {
     RenderElementProps,
     RenderLeafProps
 } from "slate-react"
-import { Col, Row } from "oriente"
+import { isHotkey } from "is-hotkey"
 import { isEqual, without } from "lodash-es"
 import { Transforms } from "slate"
 import { LoroMap } from "loro-crdt"
@@ -29,6 +29,8 @@ import { ShareAndAccessView } from "~/views/shareAndAccessView"
 import { PublishView } from "~/views/publishView"
 import { CategoriesList } from "~/components/categoriesList"
 import {
+    Col,
+    Row,
     Button,
     LinkButton,
     Icon,
@@ -41,7 +43,16 @@ import { copyToClipboard } from "~/utils/copyToClipboard"
 
 import { DocumentViewStore, DocumentStoreContext } from "./store"
 import { EditorElement, EditorLeaf } from "./elements"
-import { checkSelectionPoint, isNodeActive, toggleMark } from "./helpers"
+import {
+    checkSelectionPoint,
+    isNodeActive,
+    toggleList,
+    toggleNumList,
+    toggleCheckList,
+    toggleMark,
+    toggleHeading,
+    toggleCodeBlock
+} from "./helpers"
 import { Toolbar } from "./toolbar"
 import { CopyView } from "./copyView"
 
@@ -280,20 +291,50 @@ const EditorView = observer((props: EditorViewProps) => {
         </Menu>
     )
 
+    const hotkeys = {
+        header: isHotkey("cmd+option+h"),
+        code: isHotkey("cmd+option+'"),
+        list: isHotkey("cmd+option+-"),
+        numList: isHotkey("cmd+option+0"),
+        checkList: isHotkey("cmd+option+="),
+        bold: isHotkey("cmd+b"),
+        italic: isHotkey("cmd+i"),
+        underline: isHotkey("cmd+u")
+    }
+
     const onKeyDown = useCallback(
         (event: React.KeyboardEvent) => {
-            if (event.key == "b" && event.ctrlKey) {
+            if (hotkeys.header(event)) {
+                toggleHeading(editor)
+                event.preventDefault()
+                return
+            }
+            if (hotkeys.list(event)) {
+                toggleList(editor)
+                return
+            }
+            if (hotkeys.numList(event)) {
+                toggleNumList(editor)
+                return
+            }
+            if (hotkeys.checkList(event)) {
+                toggleCheckList(editor)
+                return
+            }
+            if (hotkeys.bold(event)) {
                 toggleMark(editor, "bold")
                 return
             }
-
-            if (event.key == "u" && event.ctrlKey) {
+            if (hotkeys.underline(event)) {
                 toggleMark(editor, "underline")
                 return
             }
-
-            if (event.key == "i" && event.ctrlKey) {
+            if (hotkeys.italic(event)) {
                 toggleMark(editor, "italic")
+                return
+            }
+            if (hotkeys.code(event)) {
+                toggleCodeBlock(editor)
                 return
             }
 

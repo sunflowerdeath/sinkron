@@ -47,10 +47,8 @@ const DeepLinkView = observer((props: DeepLinkViewProps) => {
                 if (deepLink.state.status === "failed") {
                     return (
                         <Col gap={16}>
-                            <Heading>Error</Heading>
-                            <div style={{ color: "var(--color-error)" }}>
-                                Couldn't open link: {deepLink.state.message}
-                            </div>
+                            <Heading>Couldn't open link</Heading>
+                            <div>{deepLink.state.message}</div>
                             <Button
                                 style={{ alignSelf: "stretch" }}
                                 onClick={() => {
@@ -62,7 +60,7 @@ const DeepLinkView = observer((props: DeepLinkViewProps) => {
                         </Col>
                     )
                 }
-                return "hz"
+                return null
             }}
         </Dialog>
     )

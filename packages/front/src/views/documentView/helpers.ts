@@ -119,3 +119,67 @@ export const checkSelectionPoint = (editor: Editor, point: Point) => {
     // Limit offset to text length in the node
     return { path, offset: Math.min(node.text.length, point.offset) }
 }
+
+export const toggleCodeBlock = (editor: Editor) => {
+    if (isNodeActive(editor, "code-block")) {
+        Transforms.unwrapNodes(editor, {
+            match: (n) => Element.isElementType(n, "code-block")
+        })
+    } else {
+        Transforms.setNodes(editor, { type: "code-line" })
+        // @ts-expect-error wrap doesn't require full element
+        Transforms.wrapNodes(editor, { type: "code-block" })
+    }
+}
+
+const unwrapList = (editor: Editor) => {
+    Transforms.unwrapNodes(editor, {
+        match: (n) => Element.isElement(n) && listTypes.includes(n.type),
+        split: true
+    })
+}
+
+export const toggleList = (editor: Editor) => {
+    const isActive = isNodeActive(editor, "list")
+    unwrapList(editor)
+    if (isActive) {
+        Transforms.setNodes(editor, { type: "paragraph" })
+    } else {
+        Transforms.setNodes(editor, { type: "list-item" })
+        // @ts-expect-error wrap doesn't require full element
+        Transforms.wrapNodes(editor, { type: "list" })
+    }
+}
+
+export const toggleNumList = (editor: Editor) => {
+    const isActive = isNodeActive(editor, "ordered-list")
+    unwrapList(editor)
+    if (isActive) {
+        Transforms.setNodes(editor, { type: "paragraph" })
+    } else {
+        Transforms.setNodes(editor, { type: "list-item" })
+        // @ts-expect-error wrap doesn't require full element
+        Transforms.wrapNodes(editor, { type: "ordered-list" })
+    }
+}
+
+export const toggleCheckList = (editor: Editor) => {
+    const isActive = isNodeActive(editor, "check-list")
+    unwrapList(editor)
+    if (isActive) {
+        Transforms.setNodes(editor, { type: "paragraph" })
+    } else {
+        Transforms.setNodes(editor, { type: "check-list-item" })
+        // @ts-expect-error wrap doesn't require full element
+        Transforms.wrapNodes(editor, { type: "check-list" })
+    }
+}
+
+export const toggleHeading = (editor: Editor) => {
+    if (isNodeActive(editor, "heading")) {
+        Transforms.setNodes(editor, { type: "paragraph" })
+    } else {
+        unwrapList(editor)
+        Transforms.setNodes(editor, { type: "heading" })
+    }
+}

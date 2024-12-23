@@ -199,6 +199,9 @@ importers:
       date-fns:
         specifier: ^2.30.0
         version: 2.30.0
+      is-hotkey:
+        specifier: ^0.2.0
+        version: 0.2.0
       lodash-es:
         specifier: ^4.17.21
         version: 4.17.21
@@ -218,8 +221,8 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
       oriente:
-        specifier: ^0.1.12
-        version: 0.1.12(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.1.13
+        version: 0.1.13(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       pino:
         specifier: ^9.5.0
         version: 9.5.0
@@ -269,6 +272,9 @@ importers:
       '@swc/core':
         specifier: ^1.9.3
         version: 1.9.3
+      '@types/is-hotkey':
+        specifier: ^0.1.10
+        version: 0.1.10
       '@types/js-cookie':
         specifier: ^3.0.6
         version: 3.0.6
@@ -1268,6 +1274,9 @@ packages:
 
   '@types/http-proxy@1.17.15':
     resolution: {integrity: sha512-25g5atgiVNTIv0LBDTg1H74Hvayx0ajtJPLLcYE3whFv75J0pWNtOBzaXJQgDTmrX1bx5U9YC2w/n65BN1HwRQ==}
+
+  '@types/is-hotkey@0.1.10':
+    resolution: {integrity: sha512-RvC8KMw5BCac1NvRRyaHgMMEtBaZ6wh0pyPTBu7izn4Sj/AX9Y4aXU5c7rX8PnM/knsuUpC1IeoBkANtxBypsQ==}
 
   '@types/js-cookie@2.2.7':
     resolution: {integrity: sha512-aLkWa0C0vO5b4Sr798E26QgOkss68Un0bLjs7u9qxzPT5CG+8DuNTffWES58YzJs3hrVAOs1wonycqEBqNJubA==}
@@ -2651,8 +2660,8 @@ packages:
     resolution: {integrity: sha512-ur5UIdyw5Y7yEj9wLzhqXiy6GZ3Mwx0yGI+5sMn2r0N0v3cKJvUmFH5yPP+WXh9e0xfyzyJX95D8l088DNFj7A==}
     hasBin: true
 
-  oriente@0.1.12:
-    resolution: {integrity: sha512-eUSLWIfTgCalvOf6wH4iIDFe5Zui+WzxE7kmOTQUjybGmOp6hzwSUXNns6fpwPXtzXGddIcFgotmntgWLJvV4Q==}
+  oriente@0.1.13:
+    resolution: {integrity: sha512-keJDdRs5d89LGiWIeIYs6PFWbwvne9sbw/m/vx53yxnda28nJz9Si7CusVumO5XzBf96l1Nx+8F/GDFo9gHzsA==}
 
   oxlint@0.14.1:
     resolution: {integrity: sha512-FwcjPfQu806ibSv73Y9tUM8ezUyd811dp3JwEEOC/dIAgd93egRsRNnFauuAq/WuTjIDv73tbr9hB8MziH31Eg==}
@@ -5070,6 +5079,8 @@ snapshots:
     dependencies:
       '@types/node': 22.9.0
 
+  '@types/is-hotkey@0.1.10': {}
+
   '@types/js-cookie@2.2.7': {}
 
   '@types/js-cookie@3.0.6': {}
@@ -6418,7 +6429,7 @@ snapshots:
 
   opener@1.5.2: {}
 
-  oriente@0.1.12(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  oriente@0.1.13(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       es-toolkit: 1.30.1
       react-focus-lock: 2.13.2(@types/react@18.3.11)(react@18.3.1)
