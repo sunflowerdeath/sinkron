@@ -1,6 +1,6 @@
 # Sinkron
 
-https://sinkron.xyz
+https://sinkr0n.xyz
 
 Sinkron is a collaborative note-taking software with support for offline operation.
 

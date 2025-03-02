@@ -127,10 +127,7 @@ const PublishForm = observer((props: PublishFormProps) => {
             parseISO(store.post.publishedAt),
             "'on' d MMM 'at' H:mm"
         )
-        const host = env.isProductionEnv
-            ? "https://sinkron.xyz"
-            : "http://localhost:1337"
-        const url = `${host}/posts/${store.post.id}/`
+        const url = `${env.frontUrl}/posts/${store.post.id}/`
         return (
             <Col gap={16}>
                 <div>Document is published {date}</div>

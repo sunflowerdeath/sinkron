@@ -223,10 +223,7 @@ const EditorView = observer((props: EditorViewProps) => {
         )
 
         const open = () => {
-            const host = env.isProductionEnv
-                ? "https://sinkron.xyz"
-                : "http://localhost:1337"
-            const url = `${host}/posts/${id}`
+            const url = `${env.frontUrl}/posts/${id}`
             window.open(url)
         }
 

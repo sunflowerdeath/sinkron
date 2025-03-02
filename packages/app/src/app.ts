@@ -471,8 +471,10 @@ class App {
                 "tauri://localhost",
                 "http://tauri.localhost",
                 // production
+                // TODO remove expired
                 "https://sinkron.xyz",
-                "https://new.sinkron.xyz"
+                "https://new.sinkron.xyz",
+                "https://sinkr0n.xyz"
             ],
             credentials: true
         })
