@@ -15,8 +15,8 @@
     "author": "sunflowerdeath",
     "license": "Unlicense",
     "devDependencies": {
-        "@rspack/cli": "^1.1.5",
-        "@rspack/core": "^1.1.5",
+        "@rspack/cli": "^1.2.7",
+        "@rspack/core": "^1.2.7",
         "@types/mocha": "^10.0.9",
         "@types/uuid": "^9.0.8",
         "@types/ws": "^8.5.13",

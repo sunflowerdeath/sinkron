@@ -242,7 +242,7 @@ const EditorView = observer((props: EditorViewProps) => {
         )
 
         const copyLink = () => {
-            const link = `${env.linksOrigin}/link/${spaceStore.space.id}/${id}`
+            const link = `${env.frontUrl}/link/${spaceStore.space.id}/${id}`
             copyToClipboard(link)
         }
 

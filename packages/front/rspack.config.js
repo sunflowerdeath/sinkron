@@ -14,7 +14,7 @@ const rules = [
         include: [src],
         use: [
             {
-                loader: "swc-loader",
+                loader: "builtin:swc-loader",
                 options: {
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: { parser: { syntax: "typescript" } }
@@ -27,7 +27,7 @@ const rules = [
         include: [src],
         use: [
             {
-                loader: "swc-loader",
+                loader: "builtin:swc-loader",
                 options: {
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: {
