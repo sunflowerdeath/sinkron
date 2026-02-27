@@ -184,7 +184,7 @@ class SpaceStore {
         const collectionStore = new IndexedDbCollectionStore(col)
         const token = this.api.getToken()!
         this.collection = new SinkronCollection({
-            url: env.wsUrl,
+            url: env.urls.sync,
             token,
             col,
             store: collectionStore,

@@ -80,7 +80,7 @@ class UserStore {
         const token = this.api.getToken()
         this.channel = new Channel({
             logger: this.logger,
-            url: `${env.apiUrl}/channel/${token}`,
+            url: `${env.urls.api}/channel/${token}`,
             handler: (msg) => {
                 if (msg === "auth_failed") {
                     this.logout()

@@ -15,7 +15,7 @@ import { Api } from "./api"
 import { EditorLeaf, PostElement } from "./views/documentView/elements"
 
 const api = new Api({
-    baseUrl: env.apiUrl,
+    baseUrl: env.urls.api,
     getToken: () => undefined
 })
 

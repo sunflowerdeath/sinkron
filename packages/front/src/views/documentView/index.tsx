@@ -223,7 +223,7 @@ const EditorView = observer((props: EditorViewProps) => {
         )
 
         const open = () => {
-            const url = `${env.frontUrl}/posts/${id}`
+            const url = `${env.urls.front}/posts/${id}`
             window.open(url)
         }
 
@@ -242,7 +242,7 @@ const EditorView = observer((props: EditorViewProps) => {
         )
 
         const copyLink = () => {
-            const link = `${env.frontUrl}/link/${spaceStore.space.id}/${id}`
+            const link = `${env.urls.front}/link/${spaceStore.space.id}/${id}`
             copyToClipboard(link)
         }
 
@@ -402,7 +402,7 @@ const EditorView = observer((props: EditorViewProps) => {
                     position: "absolute",
                     top: 0,
                     left: 0,
-                    height: env.tauri ? "100vh" : "100dvh",
+                    height: env.isTauri ? "100vh" : "100dvh",
                     width: "100%",
                     background: "var(--color-background)",
                     overflow: "scroll"
@@ -448,7 +448,7 @@ const EditorView = observer((props: EditorViewProps) => {
         <Col
             style={{
                 position: "relative",
-                height: env.tauri ? "100vh" : "100dvh"
+                height: env.isTauri ? "100vh" : "100dvh"
             }}
             gap="8"
             align="stretch"

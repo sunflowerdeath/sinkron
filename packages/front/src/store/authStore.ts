@@ -26,7 +26,7 @@ class AuthStore {
         this.token = localStorage.getItem("token") || undefined
 
         this.api = new Api({
-            baseUrl: env.apiUrl,
+            baseUrl: env.urls.api,
             getToken: () => this.token
         })
 

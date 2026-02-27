@@ -279,7 +279,7 @@ const Image = observer((props: CustomRenderElementProps<ImageElement>) => {
     } else {
         const src = env.isProductionEnv
             ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
-            : `${env.apiUrl}/files/${id}`
+            : `${env.urls.api}/files/${id}`
         content = (
             <Img
                 src={src}
@@ -465,7 +465,7 @@ const PostImage = observer((props: CustomRenderElementProps<ImageElement>) => {
     } else {
         const src = env.isProductionEnv
             ? `https://s3.timeweb.cloud/aaf9ded1-sinkron/${id}`
-            : `${env.apiUrl}/files/${id}`
+            : `${env.urls.api}/files/${id}`
         content = (
             <Img
                 src={src}

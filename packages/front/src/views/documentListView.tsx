@@ -282,7 +282,7 @@ const DocumentListView = observer(() => {
         <Col
             style={{
                 alignItems: "stretch",
-                height: env.tauri ? "100vh" : "100dvh"
+                height: env.isTauri ? "100vh" : "100dvh"
             }}
             gap={8}
         >

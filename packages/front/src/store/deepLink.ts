@@ -13,7 +13,7 @@ const parseDeepLinkPath = (path: string): DeepLink | undefined => {
 
 const parseDeepLinkUrl = (url: string): DeepLink | undefined => {
     const parsedUrl = URL.parse(url)
-    if (parsedUrl !== null && parsedUrl.origin === env.frontUrl) {
+    if (parsedUrl !== null && parsedUrl.origin === env.urls.front) {
         return parseDeepLinkPath(parsedUrl.pathname)
     } else {
         return undefined
