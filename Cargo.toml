@@ -1,0 +1,7 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/sinkron",
+    "crates/sinkron-api-client",
+    "crates/sinkron-tests"
+]
