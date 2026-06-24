@@ -1,0 +1,12 @@
+[package]
+name = "sinkron-tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.49.0", features = ["rt-multi-thread"] } 
+futures-util = "0.3.32"
+tokio-tungstenite = "0.29"
+uuid = { version = "1.20.0", features = ["serde", "v4"] }
+tungstenite = "0.29.0"
+sinkron = { path = "../sinkron" }
