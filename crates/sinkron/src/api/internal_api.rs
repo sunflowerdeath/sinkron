@@ -10,6 +10,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::api::helpers::{err_response, get_header_value, json_response};
+use crate::config::InternalApiConfig;
 use crate::controllers::SinkronControllers;
 use crate::controllers::collections::CreateCollection;
 use crate::controllers::documents::{
@@ -20,16 +21,16 @@ use crate::error::SinkronError;
 
 #[derive(Clone)]
 pub struct SinkronApi {
-    api_token: String,
     controller: Arc<SinkronControllers>,
+    config: InternalApiConfig,
 }
 
 impl SinkronApi {
-    pub fn new(api_token: String, controller: Arc<SinkronControllers>) -> Self {
-        Self {
-            api_token,
-            controller,
-        }
+    pub fn new(
+        controller: Arc<SinkronControllers>,
+        config: InternalApiConfig,
+    ) -> Self {
+        Self { controller, config }
     }
 
     pub fn router(&self) -> Router {
@@ -88,7 +89,7 @@ async fn check_auth_token(
     next: middleware::Next,
 ) -> Response {
     let header = get_header_value(&req, "x-sinkron-api-token");
-    if Some(state.api_token) == header {
+    if Some(state.config.api_token) == header {
         next.run(req).await
     } else {
         err_response(SinkronError::auth_failed("Invalid authorization token"))

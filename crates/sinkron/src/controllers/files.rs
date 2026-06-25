@@ -3,6 +3,7 @@ use bytes::Bytes;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use s3;
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::actors::sinkron::SinkronHandle;
@@ -31,6 +32,7 @@ per file. Calling `init_file_upload` again for the same file ID replaces
 the existing upload process.
 */
 
+#[derive(Deserialize)]
 pub struct InitFileUpload {
     file_id: Uuid,
     col_id: String,
@@ -38,11 +40,11 @@ pub struct InitFileUpload {
     checksum: String,
 }
 
+#[derive(Deserialize)]
 pub struct UploadFileChunk {
     file_id: Uuid,
     col_id: String,
     chunk_number: u32, // starts from 1
-    data: bytes::Bytes,
 }
 
 pub struct FilesController {
@@ -151,12 +153,12 @@ impl FilesController {
     pub async fn upload_file_chunk(
         &self,
         props: UploadFileChunk,
+        data: bytes::Bytes,
     ) -> Result<(), SinkronError> {
         let UploadFileChunk {
             file_id,
             col_id,
             chunk_number,
-            data,
         } = props;
         // check that file upload exists
         let mut conn = self.connect().await?;
@@ -285,11 +287,10 @@ impl FilesController {
         &self,
         col: String,
         file_id: Uuid,
-        chunk_number: u32
+        chunk_number: u32,
     ) -> Result<Bytes, SinkronError> {
         Err(SinkronError::internal("Not implemented"))
     }
-
 }
 
 #[async_trait]

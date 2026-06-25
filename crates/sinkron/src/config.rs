@@ -11,18 +11,26 @@ fn default_port() -> u32 {
 }
 
 #[derive(Clone, serde::Deserialize)]
+pub struct PublicApiConfig {
+    pub auth_url: Option<String>,
+}
+
+#[derive(Clone, serde::Deserialize)]
+pub struct InternalApiConfig {
+    pub api_token: String,
+}
+
+#[derive(Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SinkronConfig {
     #[serde(default = "default_host")]
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u32,
-    // TODO internal_api_auth_token
-    pub api_token: String,
-    // TODO public_api_auth_url
-    pub sync_auth_url: Option<String>,
     pub db: db::DbConfig,
     pub storage: S3StorageConfig,
+    pub public_api: PublicApiConfig,
+    pub internal_api: InternalApiConfig,
 }
 
 impl SinkronConfig {

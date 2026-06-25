@@ -46,8 +46,11 @@ impl Sinkron {
         controller_cell.set(controller.clone());
 
         let internal_api =
-            SinkronApi::new(config.api_token.clone(), controller.clone());
-        let public_api = SinkronPublicApi::new(controller.clone());
+            SinkronApi::new(controller.clone(), config.internal_api.clone());
+        let public_api = SinkronPublicApi::new(
+            controller.clone(),
+            config.public_api.clone(),
+        );
 
         Self {
             db,
@@ -77,7 +80,7 @@ impl Sinkron {
     }
 
     async fn auth(&self, token: &str) -> Result<String, SinkronError> {
-        match &self.config.sync_auth_url {
+        match &self.config.public_api.auth_url { // TODO move to public api
             Some(auth_url) => {
                 let url = "".to_string() + auth_url + token;
                 let req = reqwest::Client::new()

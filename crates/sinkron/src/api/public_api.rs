@@ -1,18 +1,20 @@
 use std::sync::Arc;
 
-use uuid::Uuid;
 use axum::{
     Json, Router,
+    body::Bytes,
     extract::{Query, Request, State},
     middleware,
     response::Response,
     routing::{get, post},
 };
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::api::helpers::{
     bin_response, err_response, get_header_value, json_response,
 };
+use crate::config::PublicApiConfig;
 use crate::controllers::SinkronControllers;
 use crate::controllers::files::{InitFileUpload, UploadFileChunk};
 use crate::error::{SinkronError, internal_error};
@@ -20,11 +22,15 @@ use crate::error::{SinkronError, internal_error};
 #[derive(Clone)]
 pub struct SinkronPublicApi {
     controller: Arc<SinkronControllers>,
+    config: PublicApiConfig,
 }
 
 impl SinkronPublicApi {
-    pub fn new(controller: Arc<SinkronControllers>) -> Self {
-        Self { controller }
+    pub fn new(
+        controller: Arc<SinkronControllers>,
+        config: PublicApiConfig,
+    ) -> Self {
+        Self { controller, config }
     }
 
     pub fn router(&self) -> Router {
@@ -41,7 +47,7 @@ impl SinkronPublicApi {
     }
 
     async fn auth(&self, token: &str) -> Result<String, SinkronError> {
-        match &self.config.sync_auth_url {
+        match &self.config.auth_url {
             Some(auth_url) => {
                 let url = "".to_string() + auth_url + token;
                 let req = reqwest::Client::new()
@@ -77,7 +83,7 @@ async fn auth_middleware(
         ));
     };
     match state.auth(&header).await {
-        Ok(user_id) => next.run(req).await,
+        Ok(user_id) => next.run(req).await, // TODO pass user_id somehow
         Err(error) => err_response(error),
     }
 }
@@ -91,19 +97,13 @@ async fn init_file_upload(
     json_response(res)
 }
 
-#[derive(Deserialize)]
-struct UploadFileChunkQuery {
-    file_id: Uuid,
-    col_id: String,
-    chunk_number: u32,
-}
-
 async fn upload_file_chunk(
     State(state): State<SinkronPublicApi>,
-    Query(query): Query<UploadFileChunkQuery>,
+    Query(query): Query<UploadFileChunk>,
+    body: Bytes,
 ) -> Response {
     // TODO check user permissions in collection
-    let res = state.controller.files.upload_file_chunk(query).await;
+    let res = state.controller.files.upload_file_chunk(query, body).await;
     json_response(res)
 }
 
