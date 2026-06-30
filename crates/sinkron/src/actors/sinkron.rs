@@ -110,7 +110,6 @@ impl SinkronActor {
             user_id,
             websocket,
             self.self_handle.clone(),
-            None, // TODO on_exit
         );
     }
 

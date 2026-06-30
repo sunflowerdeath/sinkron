@@ -3,14 +3,19 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     body::Bytes,
+    extract::ws::{WebSocket, WebSocketUpgrade},
     extract::{Query, Request, State},
     middleware,
     response::Response,
-    routing::{get, post},
+    routing::{any, get, post},
 };
+use log::debug;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::actors::sinkron::{
+    ConnectMessage, SinkronActorMessage, SinkronHandle,
+};
 use crate::api::helpers::{
     bin_response, err_response, get_header_value, json_response,
 };
@@ -21,20 +26,28 @@ use crate::error::{SinkronError, internal_error};
 
 #[derive(Clone)]
 pub struct SinkronPublicApi {
-    controller: Arc<SinkronControllers>,
     config: PublicApiConfig,
+    controller: Arc<SinkronControllers>,
+    actor: SinkronHandle,
 }
 
 impl SinkronPublicApi {
     pub fn new(
-        controller: Arc<SinkronControllers>,
         config: PublicApiConfig,
+        controller: Arc<SinkronControllers>,
+        actor: SinkronHandle,
     ) -> Self {
-        Self { controller, config }
+        Self {
+            config,
+            controller,
+            actor,
+        }
     }
 
     pub fn router(&self) -> Router {
         Router::new()
+            // Websocket
+            .route("/sync", any(sync_handler))
             // Files
             .route("/init_file_upload", post(init_file_upload))
             .route("/upload_file_chunk", post(upload_file_chunk))
@@ -70,6 +83,33 @@ impl SinkronPublicApi {
             None => Ok("anonymous".to_string()),
         }
     }
+
+    async fn handle_connect(&self, websocket: WebSocket, query: SyncQuery) {
+        let user_id = match self.auth(&query.token).await {
+            Ok(user) => {
+                debug!("sinkron: authorized client as {}", user);
+                user
+            }
+            Err(err) => {
+                debug!("sinkron: client authorization failed {:?}", err);
+                // TODO send something?
+                // let msg = ServerMessage::SyncError(SyncErrorMessage {
+                // code: err.code,
+                // });
+                // let Ok(str_msg) = serde_json::to_string(&msg) else {
+                // return;
+                // };
+                // _ = websocket.send(Message::Text(str_msg.into())).await;
+                return;
+            }
+        };
+        self.actor
+            .send(SinkronActorMessage::Connect(ConnectMessage {
+                websocket,
+                user_id,
+            }))
+            .expect("SinkronActor shoudn't exit");
+    }
 }
 
 async fn auth_middleware(
@@ -83,9 +123,25 @@ async fn auth_middleware(
         ));
     };
     match state.auth(&header).await {
-        Ok(user_id) => next.run(req).await, // TODO pass user_id somehow
+        Ok(user_id) => {
+            // TODO req.extensions_mut().insert(user);
+            next.run(req).await
+        },
         Err(error) => err_response(error),
     }
+}
+
+#[derive(Deserialize)]
+struct SyncQuery {
+    token: String,
+}
+
+async fn sync_handler(
+    ws: WebSocketUpgrade,
+    Query(query): Query<SyncQuery>,
+    State(sinkron): State<SinkronPublicApi>,
+) -> Response {
+    ws.on_upgrade(async move |ws| sinkron.handle_connect(ws, query).await)
 }
 
 async fn init_file_upload(

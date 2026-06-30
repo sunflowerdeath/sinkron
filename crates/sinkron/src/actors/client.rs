@@ -11,7 +11,6 @@ use tokio::{
 use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::SinkronHandle;
-use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::error::SinkronError;
 use crate::protocol::*;
 
@@ -98,7 +97,6 @@ impl ClientChannelSender {
 
 struct SyncState {
     col: String,
-    colrev: i64,
     col_handle: CollectionHandle,
     subscriber_id: i32,
 }
@@ -114,7 +112,7 @@ struct ClientChannel {
 impl ClientChannel {
     async fn handle_message(&mut self, msg: ClientMessage) {
         if self.is_closed {
-            // Invalid message: channel is closed
+            // Invalid: channel is closed
             return;
         }
 
@@ -153,12 +151,13 @@ impl ClientChannel {
         };
 
         let (sender, receiver) = oneshot::channel();
-        col_handle.send(CollectionMessage::Sync(collection::SyncMessage {
-            colrev,
-            source: self.source(),
-            reply: sender,
-            updates: self.sender.clone(),
-        }));
+        let _ =
+            col_handle.send(CollectionMessage::Sync(collection::SyncMessage {
+                colrev,
+                source: self.source(),
+                reply: sender,
+                updates: self.sender.clone(),
+            }));
 
         match receiver.await {
             Ok(Ok(res)) => {
@@ -189,7 +188,6 @@ impl ClientChannel {
                 ));
                 self.sync_state = Some(SyncState {
                     col,
-                    colrev: res.colrev,
                     col_handle,
                     subscriber_id: res.subscriber_id,
                 });
@@ -234,7 +232,7 @@ impl ClientChannel {
             source: self.source(),
             reply: sender,
         });
-        sync_state.col_handle.send(get_msg);
+        let _ = sync_state.col_handle.send(get_msg);
         match receiver.await {
             Ok(Ok(doc)) => {
                 let msg = DocMessage {
@@ -282,7 +280,7 @@ impl ClientChannel {
             source: self.source(),
             reply: sender,
         });
-        sync_state.col_handle.send(col_msg);
+        let _ = sync_state.col_handle.send(col_msg);
 
         match receiver.await {
             Ok(Ok(_)) => {
@@ -322,7 +320,7 @@ impl ClientChannel {
             source: self.source(),
             reply: sender,
         });
-        sync_state.col_handle.send(col_msg);
+        let _ = sync_state.col_handle.send(col_msg);
 
         match receiver.await {
             Ok(Ok(_)) => {
@@ -360,7 +358,8 @@ impl ClientChannel {
             source: self.source(),
             reply: sender,
         });
-        sync_state.col_handle.send(col_msg);
+        // TODO should handle send errors (in all places) ?
+        let _ = sync_state.col_handle.send(col_msg).is_err();
 
         match receiver.await {
             Ok(Ok(_)) => {
@@ -386,18 +385,18 @@ impl ClientChannel {
         }
     }
 
-    pub async fn close(&mut self) {
+    pub fn close(&mut self) {
         if self.is_closed {
             return;
         }
         if let Some(state) = &self.sync_state {
-            state.col_handle.send(CollectionMessage::SyncStop(
+            let _ = state.col_handle.send(CollectionMessage::SyncStop(
                 collection::SyncStopMessage {
                     subscriber_id: state.subscriber_id,
                 },
             ));
         };
-        self.close();
+        self.is_closed = true;
     }
 }
 
@@ -408,7 +407,6 @@ struct ClientActor {
     receiver: mpsc::UnboundedReceiver<ClientActorMessage>,
     sinkron_handle: SinkronHandle,
     self_handle: ClientHandle,
-    on_exit: Option<ExitCallback>,
     heartbeat_timeout: Pin<Box<tokio::time::Sleep>>,
     idle_timeout: Pin<Box<tokio::time::Sleep>>,
     channels: std::collections::HashMap<i32, ClientChannel>,
@@ -422,7 +420,6 @@ impl ClientActor {
         sinkron_handle: SinkronHandle,
         receiver: mpsc::UnboundedReceiver<ClientActorMessage>,
         self_handle: ClientHandle,
-        on_exit: Option<ExitCallback>,
     ) -> Self {
         ClientActor {
             user_id,
@@ -431,7 +428,6 @@ impl ClientActor {
             receiver,
             sinkron_handle,
             self_handle,
-            on_exit,
             heartbeat_timeout: Box::pin(sleep(HEARTBEAT_DISCONNECT_TIMEOUT)),
             idle_timeout: Box::pin(sleep(IDLE_DISCONNECT_TIMEOUT)),
             channels: std::collections::HashMap::new(),
@@ -590,7 +586,6 @@ impl ClientHandle {
         user_id: String,
         websocket: WebSocket,
         sinkron: SinkronHandle,
-        on_exit: Option<ExitCallback>,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let handle = Self { sender };
@@ -601,7 +596,6 @@ impl ClientHandle {
             sinkron,
             receiver,
             handle.clone(),
-            on_exit,
         );
         tokio::spawn(async move { actor.run().await });
         handle
