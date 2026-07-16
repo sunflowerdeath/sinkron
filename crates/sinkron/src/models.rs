@@ -15,6 +15,27 @@ pub struct Collection {
     pub used_storage: i64,
 }
 
+impl Into<sinkron_common::types::Collection> for Collection {
+    fn into(self) -> sinkron_common::types::Collection {
+        let Collection {
+            id,
+            is_ref,
+            colrev,
+            permissions,
+            storage_limit,
+            used_storage,
+        } = self;
+        sinkron_common::types::Collection {
+            id,
+            is_ref,
+            colrev,
+            permissions,
+            storage_limit,
+            used_storage,
+        }
+    }
+}
+
 #[derive(serde::Deserialize, Insertable)]
 #[diesel(table_name = schema::collections)]
 #[diesel(check_for_backend(diesel::pg::Pg))]

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use sinkron_common::error::SinkronError;
+use crate::error::SinkronError;
 
 /*
 Client connects to server via webscokets. All messages must be prefixed

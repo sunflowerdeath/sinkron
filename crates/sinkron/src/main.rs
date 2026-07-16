@@ -3,13 +3,10 @@ mod api;
 mod config;
 mod controllers;
 mod db;
-mod error;
 mod models;
-mod permissions;
 mod protocol;
 mod schema;
 mod sinkron;
-mod types;
 
 use crate::config::SinkronConfig;
 use crate::sinkron::Sinkron;

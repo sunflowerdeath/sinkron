@@ -6,9 +6,10 @@ use s3;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use sinkron_common::error::{SinkronError, internal_error};
+
 use crate::actors::sinkron::SinkronHandle;
 use crate::db::{Db, DbConnection};
-use crate::error::{SinkronError, internal_error};
 use crate::models;
 use crate::schema;
 

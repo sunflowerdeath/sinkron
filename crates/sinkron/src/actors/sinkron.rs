@@ -8,14 +8,16 @@ use log::debug;
 use tokio::select;
 use tokio::sync::{mpsc, oneshot};
 
+use sinkron_common::error::{SinkronError, internal_error};
+use sinkron_common::types::Collection;
+
 use crate::actors::client::ClientHandle;
 use crate::actors::collection::CollectionHandle;
 use crate::actors::supervisor::ExitCallback;
 use crate::controllers::SinkronControllers;
 use crate::db::{Db, DbConnection};
-use crate::error::{SinkronError, internal_error};
 use crate::schema;
-use crate::types::Collection;
+use crate::models;
 
 pub struct ConnectMessage {
     pub websocket: WebSocket,
@@ -132,7 +134,7 @@ impl SinkronActor {
         let mut conn = self.connect().await?;
         let col = schema::collections::table
             .find(id)
-            .first::<Collection>(&mut conn)
+            .first::<models::Collection>(&mut conn)
             .await
             .map_err(|err| match err {
                 diesel::NotFound => {
@@ -140,7 +142,7 @@ impl SinkronActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
-        Ok(self.get_collection_actor(col))
+        Ok(self.get_collection_actor(col.into()))
     }
 
     fn spawn_collection_actor(&mut self, col: Collection) -> CollectionHandle {

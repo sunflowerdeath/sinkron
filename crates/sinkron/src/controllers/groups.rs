@@ -6,11 +6,12 @@ use lru::LruCache;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 
+use sinkron_common::error::{SinkronError, internal_error};
+use sinkron_common::types::{Group, User};
+
 use crate::db::{Db, DbConnection};
-use crate::error::{SinkronError, internal_error};
 use crate::models;
 use crate::schema;
-use crate::types::{Group, User};
 
 #[derive(Deserialize)]
 pub struct AddRemoveUserToGroup {

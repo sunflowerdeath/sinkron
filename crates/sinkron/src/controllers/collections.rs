@@ -1,12 +1,13 @@
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
+use sinkron_common::error::{SinkronError, internal_error};
+use sinkron_common::types::Collection;
+
 use crate::actors::sinkron::SinkronHandle;
 use crate::db::Db;
-use crate::error::{SinkronError, internal_error};
 use crate::models;
 use crate::schema;
-use crate::types::Collection;
 
 pub type CreateCollection = models::NewCollection;
 
@@ -40,7 +41,7 @@ impl CollectionsController {
             .get_result(&mut conn)
             .await
             .map_err(internal_error)?;
-        Ok(col)
+        Ok(col.into())
     }
 
     pub async fn get_collection(

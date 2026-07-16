@@ -2,12 +2,13 @@ use serde::Deserialize;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+use sinkron_common::error::{SinkronError, internal_error};
+use sinkron_common::types::Document;
+
 use crate::actors::collection;
 use crate::actors::collection::CollectionMessage;
 use crate::actors::sinkron::SinkronHandle;
-use crate::error::{SinkronError, internal_error};
 use crate::protocol::FilesUpdate;
-use crate::types::Document;
 
 #[derive(Deserialize)]
 pub struct GetDocument {

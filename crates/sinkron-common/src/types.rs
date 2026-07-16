@@ -1,5 +1,3 @@
-use crate::models;
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
@@ -12,7 +10,16 @@ pub struct Document {
     pub permissions: String,
 }
 
-pub type Collection = models::Collection;
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
+    pub id: String,
+    pub is_ref: bool,
+    pub colrev: i64,
+    pub permissions: String,
+    pub storage_limit: i64,
+    pub used_storage: i64,
+}
 
 #[derive(serde::Serialize)]
 pub struct Group {

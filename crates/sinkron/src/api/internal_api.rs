@@ -9,6 +9,8 @@ use axum::{
 };
 use serde::Deserialize;
 
+use sinkron_common::error::SinkronError;
+
 use crate::api::helpers::{err_response, get_header_value, json_response};
 use crate::config::InternalApiConfig;
 use crate::controllers::SinkronControllers;
@@ -17,7 +19,6 @@ use crate::controllers::documents::{
     CreateDocument, DeleteDocument, GetDocument, UpdateDocument,
 };
 use crate::controllers::groups::AddRemoveUserToGroup;
-use crate::error::SinkronError;
 
 #[derive(Clone)]
 pub struct SinkronApi {

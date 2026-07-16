@@ -13,6 +13,8 @@ use log::debug;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use sinkron_common::error::{SinkronError, internal_error};
+
 use crate::actors::sinkron::{
     ConnectMessage, SinkronActorMessage, SinkronHandle,
 };
@@ -22,7 +24,6 @@ use crate::api::helpers::{
 use crate::config::PublicApiConfig;
 use crate::controllers::SinkronControllers;
 use crate::controllers::files::{InitFileUpload, UploadFileChunk};
-use crate::error::{SinkronError, internal_error};
 
 #[derive(Clone)]
 pub struct SinkronPublicApi {
@@ -126,7 +127,7 @@ async fn auth_middleware(
         Ok(user_id) => {
             // TODO req.extensions_mut().insert(user);
             next.run(req).await
-        },
+        }
         Err(error) => err_response(error),
     }
 }

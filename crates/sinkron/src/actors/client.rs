@@ -8,10 +8,11 @@ use tokio::{
     time::{Duration, Instant, sleep},
 };
 
+use sinkron_common::error::SinkronError;
+
 use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::SinkronHandle;
-use crate::error::SinkronError;
 use crate::protocol::*;
 
 fn parse_channel_prefix(input: &str) -> Option<(i32, &str)> {
