@@ -7,3 +7,6 @@ edition = "2024"
 chrono = "0.4.45"
 uuid = "1.23.4"
 sinkron-common = { path = "../sinkron-common" }
+reqwest = { version = "0.13.4", features = ["json"] }
+serde = "1.0.228"
+serde_json = "1.0.150"

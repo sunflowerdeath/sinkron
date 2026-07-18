@@ -1,31 +1,46 @@
-use sinkron_common::permissions::Permissions;
+use reqwest::header::{HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use uuid::Uuid;
+
 use sinkron_common::error::SinkronError;
+use sinkron_common::permissions::Permissions;
+use sinkron_common::types::{Collection, Document};
+
+#[derive(Deserialize)]
+struct SinkronErrorResponse {
+    error: SinkronError,
+}
 
 pub struct SinkronClient {
     url: String,
     token: String,
 }
 
+#[derive(Serialize)]
 pub struct CreateCollection {
     id: String,
     permissions: Permissions,
 }
 
-pub struct Collection {
-    id: String,
-    is_ref: bool,
-    colrev: i64,
-    permissions: Permissions,
+#[derive(Serialize)]
+pub struct CreateDocument {
+    id: Uuid,
+    col: String,
+    content: Vec<u8>, // String?
+                      // TODO permissions: Permissions
 }
 
-pub struct Document {
-    id: uuid::Uuid,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+#[derive(Serialize)]
+pub struct GetDocument {
+    id: Uuid,
     col: String,
-    colrev: i64,
-    data: Option<Uint8Array>,
-    permissions: Permissions,
+}
+
+pub type DeleteDocument = GetDocument;
+
+#[derive(Serialize)]
+pub struct Id {
+    id: String,
 }
 
 impl SinkronClient {
@@ -33,32 +48,102 @@ impl SinkronClient {
         Self { url, token }
     }
 
+    async fn send_request<T: Serialize, U: DeserializeOwned>(
+        self,
+        url: &str,
+        payload: T,
+    ) -> Result<U, SinkronError> {
+        let Ok(body) = serde_json::to_string(&payload) else {
+            return Err(SinkronError::internal("Couldn't serialize json"));
+        };
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "content-type",
+            HeaderValue::from_static("application/json"),
+        );
+        headers.insert("accept", HeaderValue::from_static("application/json"));
+        headers.insert(
+            "x-sinkron-api-token",
+            HeaderValue::from_str(&self.token).unwrap(),
+        );
+
+        // TODO reuse client and headers
+        let client = reqwest::Client::new();
+
+        let url = format!("{}/{}", &self.url, url);
+        let Ok(res) = client.post(url).headers(headers).body(body).send().await
+        else {
+            return Err(SinkronError::internal("Couldn't send request"));
+        };
+
+        if res.status().is_success() {
+            // TODO how to handle empty response ?
+            let parsed = res.json::<U>().await;
+            match parsed {
+                Ok(res) => Ok(res),
+                Err(_) => {
+                    Err(SinkronError::internal("Couldn't parse response json"))
+                }
+            }
+        } else {
+            let err = res.json::<SinkronErrorResponse>().await;
+            match err {
+                Ok(err) => Err(err.error),
+                Err(_) => {
+                    Err(SinkronError::internal("Couldn't parse response json"))
+                }
+            }
+        }
+    }
+
     pub async fn create_collection(
+        self,
         props: CreateCollection,
     ) -> Result<Collection, SinkronError> {
-        Err(SinkronError::internal("Not implemented")) // TODO
+        // TODO parse permissions ?
+        self.send_request("create_collection", props).await
     }
 
     pub async fn get_collection(
+        self,
         id: String,
     ) -> Result<Collection, SinkronError> {
+        let props = Id { id };
+        self.send_request("get_collection", props).await
+    }
+
+    pub async fn delete_collection(
+        self,
+        id: String,
+    ) -> Result<(), SinkronError> {
+        let props = Id { id };
+        self.send_request("delete_collection", props).await
+    }
+
+    pub async fn create_document(
+        self,
+        props: CreateDocument,
+    ) -> Result<Document, SinkronError> {
+        self.send_request("create_document", props).await
+    }
+
+    pub async fn get_document(
+        self,
+        props: GetDocument,
+    ) -> Result<Document, SinkronError> {
+        self.send_request("get_document", props).await
+    }
+
+    pub async fn update_document() -> Result<Document, SinkronError> {
         Err(SinkronError::internal("Not implemented")) // TODO
     }
 
-    pub async fn delete_collection(id: String) -> Result<(), SinkronError> {
-        Err(SinkronError::internal("Not implemented")) // TODO
-    }
-
-    pub async fn create_document() -> Result<Document, SinkronError> {
-        Err(SinkronError::internal("Not implemented")) // TODO
-    }
-
-    pub async fn get_document() -> Result<Document, SinkronError> {
-        Err(SinkronError::internal("Not implemented")) // TODO
-    }
-
-    pub async fn delete_document() -> Result<(), SinkronError> {
-        Err(SinkronError::internal("Not implemented")) // TODO
+    pub async fn delete_document(
+        self,
+        props: DeleteDocument,
+    ) -> Result<(), SinkronError> {
+        self.send_request("delete_document", props).await
     }
 
     // create_group

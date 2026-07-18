@@ -1,4 +1,6 @@
-#[derive(serde::Serialize)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
     pub id: uuid::Uuid,
@@ -10,7 +12,7 @@ pub struct Document {
     pub permissions: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Collection {
     pub id: String,
@@ -21,13 +23,13 @@ pub struct Collection {
     pub used_storage: i64,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 pub struct Group {
     pub id: String,
     pub members: Vec<String>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(Serialize, Clone)]
 pub struct User {
     pub id: String,
     pub groups: Vec<String>,
