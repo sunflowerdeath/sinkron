@@ -11,13 +11,13 @@ use uuid::Uuid;
 use sinkron_common::error::{SinkronError, internal_error};
 use sinkron_common::permissions::{Action, Permissions};
 use sinkron_common::types::{Collection, Document};
+use sinkron_common::protocol::*;
 
 use crate::actors::client::ClientChannelSender;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
 use crate::controllers::SinkronControllers;
 use crate::db::{Db, DbConnection};
 use crate::models;
-use crate::protocol::*;
 use crate::schema;
 
 // Collection actor performs document operations over single collection,

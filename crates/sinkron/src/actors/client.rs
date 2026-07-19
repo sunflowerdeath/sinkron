@@ -9,11 +9,11 @@ use tokio::{
 };
 
 use sinkron_common::error::SinkronError;
+use sinkron_common::protocol::*;
 
 use crate::actors::collection;
 use crate::actors::collection::{CollectionHandle, CollectionMessage};
 use crate::actors::sinkron::SinkronHandle;
-use crate::protocol::*;
 
 fn parse_channel_prefix(input: &str) -> Option<(i32, &str)> {
     // String must start with a number, followed by ":" symbol

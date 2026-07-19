@@ -1,39 +1,14 @@
-use serde::Deserialize;
 use tokio::sync::oneshot;
-use uuid::Uuid;
 
+use sinkron_common::api_types::{
+    CreateDocument, DeleteDocument, GetDocument, UpdateDocument,
+};
 use sinkron_common::error::{SinkronError, internal_error};
 use sinkron_common::types::Document;
 
 use crate::actors::collection;
 use crate::actors::collection::CollectionMessage;
 use crate::actors::sinkron::SinkronHandle;
-use crate::protocol::FilesUpdate;
-
-#[derive(Deserialize)]
-pub struct GetDocument {
-    id: Uuid,
-    col: String,
-}
-
-pub type DeleteDocument = GetDocument;
-
-#[derive(Deserialize)]
-pub struct CreateDocument {
-    id: Uuid,
-    col: String,
-    content: String,
-    files: Vec<Uuid>,
-    permissions: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct UpdateDocument {
-    id: Uuid,
-    col: String,
-    content_update: Option<String>,
-    files_update: Option<FilesUpdate>,
-}
 
 pub struct DocumentsController {
     sinkron_actor: SinkronHandle,

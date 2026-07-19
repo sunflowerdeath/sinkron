@@ -4,7 +4,6 @@ mod config;
 mod controllers;
 mod db;
 mod models;
-mod protocol;
 mod schema;
 mod sinkron;
 

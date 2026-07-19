@@ -1,9 +1,11 @@
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use uuid::Uuid;
 
+use sinkron_common::api_types::{
+    CreateCollection, CreateDocument, DeleteDocument, GetDocument, Id,
+    UpdateDocument,
+};
 use sinkron_common::error::SinkronError;
-use sinkron_common::permissions::Permissions;
 use sinkron_common::types::{Collection, Document};
 
 #[derive(Deserialize)]
@@ -14,33 +16,6 @@ struct SinkronErrorResponse {
 pub struct SinkronClient {
     url: String,
     token: String,
-}
-
-#[derive(Serialize)]
-pub struct CreateCollection {
-    id: String,
-    permissions: Permissions,
-}
-
-#[derive(Serialize)]
-pub struct CreateDocument {
-    id: Uuid,
-    col: String,
-    content: Vec<u8>, // String?
-                      // TODO permissions: Permissions
-}
-
-#[derive(Serialize)]
-pub struct GetDocument {
-    id: Uuid,
-    col: String,
-}
-
-pub type DeleteDocument = GetDocument;
-
-#[derive(Serialize)]
-pub struct Id {
-    id: String,
 }
 
 impl SinkronClient {
@@ -135,8 +110,11 @@ impl SinkronClient {
         self.send_request("get_document", props).await
     }
 
-    pub async fn update_document() -> Result<Document, SinkronError> {
-        Err(SinkronError::internal("Not implemented")) // TODO
+    pub async fn update_document(
+        self,
+        props: UpdateDocument,
+    ) -> Result<Document, SinkronError> {
+        self.send_request("update_document", props).await
     }
 
     pub async fn delete_document(

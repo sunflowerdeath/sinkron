@@ -1,6 +1,7 @@
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
+use sinkron_common::api_types::CreateCollection;
 use sinkron_common::error::{SinkronError, internal_error};
 use sinkron_common::types::Collection;
 
@@ -8,8 +9,6 @@ use crate::actors::sinkron::SinkronHandle;
 use crate::db::Db;
 use crate::models;
 use crate::schema;
-
-pub type CreateCollection = models::NewCollection;
 
 pub struct CollectionsController {
     db: Db,
@@ -35,8 +34,14 @@ impl CollectionsController {
         if cnt != 0 {
             return Err(SinkronError::unprocessable("Duplicate collection id"));
         }
+        let new_col = models::NewCollection {
+            id: props.id,
+            is_ref: props.is_ref,
+            permissions: props.permissions,
+            storage_limit: props.storage_limit,
+        };
         let col = diesel::insert_into(schema::collections::table)
-            .values(&props)
+            .values(&new_col)
             .returning(models::Collection::as_returning())
             .get_result(&mut conn)
             .await
@@ -47,18 +52,21 @@ impl CollectionsController {
     pub async fn get_collection(
         &self,
         id: String,
-    ) -> Result<models::Collection, SinkronError> {
+    ) -> Result<Collection, SinkronError> {
         let mut conn = self.db.get().await.map_err(internal_error)?;
-        schema::collections::table
+        let res = schema::collections::table
             .find(id)
-            .first(&mut conn)
-            .await
-            .map_err(|err| match err {
+            .first::<models::Collection>(&mut conn)
+            .await;
+        match res {
+            Ok(col) => Ok(col.into()),
+            Err(err) => Err(match err {
                 diesel::NotFound => {
                     SinkronError::not_found("Collection not found")
                 }
                 err => SinkronError::internal(&err.to_string()),
-            })
+            }),
+        }
     }
 
     // TODO delete_collection

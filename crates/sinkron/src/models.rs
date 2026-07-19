@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::schema;
 
-#[derive(serde::Serialize, Selectable, Queryable)]
+#[derive(Selectable, Queryable)]
 #[diesel(table_name = schema::collections)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Collection {
@@ -36,7 +36,7 @@ impl Into<sinkron_common::types::Collection> for Collection {
     }
 }
 
-#[derive(serde::Deserialize, Insertable)]
+#[derive(Insertable)]
 #[diesel(table_name = schema::collections)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewCollection {
@@ -46,7 +46,7 @@ pub struct NewCollection {
     pub storage_limit: i64,
 }
 
-#[derive(serde::Serialize, Selectable, Queryable)]
+#[derive(Selectable, Queryable)]
 #[diesel(table_name = schema::documents)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Document {
@@ -82,7 +82,7 @@ pub struct DocumentUpdate<'a> {
     pub files: Option<&'a Vec<Uuid>>,
 }
 
-#[derive(serde::Serialize, Selectable, Queryable)]
+#[derive(Selectable, Queryable)]
 #[diesel(table_name = schema::refs)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Ref {
@@ -91,7 +91,7 @@ pub struct Ref {
     pub col_id: String,
 }
 
-#[derive(serde::Deserialize, Insertable)]
+#[derive(Insertable)]
 #[diesel(table_name = schema::refs)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct NewRef {
@@ -114,7 +114,7 @@ pub struct Member {
     pub group: String,
 }
 
-#[derive(serde::Serialize, Selectable, Queryable)]
+#[derive(Selectable, Queryable)]
 #[diesel(table_name = schema::file_uploads)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct FileUpload {
@@ -137,7 +137,7 @@ pub struct NewFileUpload {
     pub checksum: String,
 }
 
-#[derive(serde::Serialize, Selectable, Queryable)]
+#[derive(Selectable, Queryable)]
 #[diesel(table_name = schema::files)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct File {

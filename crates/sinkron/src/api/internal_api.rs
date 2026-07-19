@@ -9,15 +9,15 @@ use axum::{
 };
 use serde::Deserialize;
 
+use sinkron_common::api_types::{
+    CreateCollection, CreateDocument, DeleteDocument, GetDocument,
+    UpdateDocument,
+};
 use sinkron_common::error::SinkronError;
 
 use crate::api::helpers::{err_response, get_header_value, json_response};
 use crate::config::InternalApiConfig;
 use crate::controllers::SinkronControllers;
-use crate::controllers::collections::CreateCollection;
-use crate::controllers::documents::{
-    CreateDocument, DeleteDocument, GetDocument, UpdateDocument,
-};
 use crate::controllers::groups::AddRemoveUserToGroup;
 
 #[derive(Clone)]
