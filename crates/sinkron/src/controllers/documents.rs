@@ -1,10 +1,9 @@
 use tokio::sync::oneshot;
 
-use sinkron_common::api_types::{
-    CreateDocument, DeleteDocument, GetDocument, UpdateDocument,
-};
 use sinkron_common::error::{SinkronError, internal_error};
-use sinkron_common::types::Document;
+use sinkron_common::types::{
+    CreateDocument, DeleteDocument, Document, GetDocument, UpdateDocument,
+};
 
 use crate::actors::collection;
 use crate::actors::collection::CollectionMessage;

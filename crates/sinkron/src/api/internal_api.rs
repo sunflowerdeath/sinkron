@@ -7,18 +7,16 @@ use axum::{
     response::Response,
     routing::post,
 };
-use serde::Deserialize;
 
-use sinkron_common::api_types::{
-    CreateCollection, CreateDocument, DeleteDocument, GetDocument,
-    UpdateDocument,
-};
 use sinkron_common::error::SinkronError;
+use sinkron_common::types::{
+    AddRemoveUserToGroup, CreateCollection, CreateDocument, DeleteDocument,
+    GetDocument, Id, UpdateDocument,
+};
 
 use crate::api::helpers::{err_response, get_header_value, json_response};
 use crate::config::InternalApiConfig;
 use crate::controllers::SinkronControllers;
-use crate::controllers::groups::AddRemoveUserToGroup;
 
 #[derive(Clone)]
 pub struct SinkronApi {
@@ -132,11 +130,6 @@ async fn delete_document(
 }
 
 // Collections
-
-#[derive(Deserialize)]
-struct Id {
-    id: String,
-}
 
 async fn create_collection(
     State(state): State<SinkronApi>,

@@ -11,11 +11,13 @@ fn default_port() -> u32 {
 }
 
 #[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PublicApiConfig {
     pub auth_url: Option<String>,
 }
 
 #[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InternalApiConfig {
     pub api_token: String,
 }

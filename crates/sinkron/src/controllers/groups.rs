@@ -3,21 +3,14 @@ use std::num::NonZeroUsize;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use lru::LruCache;
-use serde::Deserialize;
 use tokio::sync::Mutex;
 
 use sinkron_common::error::{SinkronError, internal_error};
-use sinkron_common::types::{Group, User};
+use sinkron_common::types::{AddRemoveUserToGroup, Group, User};
 
 use crate::db::{Db, DbConnection};
 use crate::models;
 use crate::schema;
-
-#[derive(Deserialize)]
-pub struct AddRemoveUserToGroup {
-    pub user: String,
-    pub group: String,
-}
 
 pub struct GroupsController {
     db: Db,

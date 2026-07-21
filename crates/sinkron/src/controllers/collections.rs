@@ -1,9 +1,8 @@
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 
-use sinkron_common::api_types::CreateCollection;
 use sinkron_common::error::{SinkronError, internal_error};
-use sinkron_common::types::Collection;
+use sinkron_common::types::{Collection, CreateCollection};
 
 use crate::actors::sinkron::SinkronHandle;
 use crate::db::Db;
