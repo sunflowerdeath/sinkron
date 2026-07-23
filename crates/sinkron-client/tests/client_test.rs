@@ -1,13 +1,12 @@
-use sinkron_client::SinkronClient;
+use sinkron_client::{ClientError, SinkronClient};
+use sinkron_common::error::SinkronError;
 use sinkron_common::permissions::Permissions;
 use sinkron_common::types::CreateCollection;
 
-const URL: &str = "https://localhost:123";
+const URL: &str = "https://localhost:3000";
 
 #[tokio::test]
 async fn test_auth() {
-    // const permissions = Permissions.any()
-
     let invalid_url_client = SinkronClient::new(
         "INVALID_URL".to_string(),
         "INVALID_TOKEN".to_string(),
@@ -20,8 +19,7 @@ async fn test_auth() {
             storage_limit: 0,
         })
         .await;
-    assert!(res.is_err());
-    // assert.strictEqual(invalidUrlRes.error.code, ErrorCode.FetchError)
+    assert!(matches!(res, Err(ClientError::Request(_))));
 
     let invalid_token_client =
         SinkronClient::new(URL.to_string(), "INVALID_TOKEN".to_string());
@@ -33,7 +31,8 @@ async fn test_auth() {
             storage_limit: 0,
         })
         .await;
-    assert!(res.is_err());
-    // assert(!invalidTokenRes.isOk, "auth failed")
-    // assert.strictEqual(invalidTokenRes.error.code, ErrorCode.AuthFailed)
+    assert!(matches!(
+        res,
+        Err(ClientError::Response(SinkronError::AuthFailed { .. }))
+    ));
 }

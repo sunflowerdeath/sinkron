@@ -16,7 +16,9 @@ services:
             timeout: 3s
 
     sinkron:
-        build: ../sinkron
+        build:
+          context: ../..
+          dockerfile: sinkron.Dockerfile
         environment:
             SINKRON_CONFIG: >
                 {
