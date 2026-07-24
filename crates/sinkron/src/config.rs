@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::controllers::files::S3StorageConfig;
+use crate::controllers::files::StorageConfig;
 use crate::db;
 
 fn default_host() -> String {
@@ -30,7 +30,7 @@ pub struct SinkronConfig {
     #[serde(default = "default_port")]
     pub port: u32,
     pub db: db::DbConfig,
-    pub storage: S3StorageConfig,
+    pub storage: StorageConfig,
     pub public_api: PublicApiConfig,
     pub internal_api: InternalApiConfig,
 }

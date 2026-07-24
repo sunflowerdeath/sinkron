@@ -15,6 +15,24 @@ use crate::schema;
 
 const CHUNK_SIZE: u64 = 2 * 1024 * 1024; // 2 Mb
 
+#[derive(Clone, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum StorageConfig {
+    #[serde(rename = "s3")]
+    S3(S3StorageConfig),
+    #[serde(rename = "fs")]
+    Fs(FsStorageConfig),
+}
+
+#[derive(Clone, serde::Deserialize)]
+pub struct S3StorageConfig {
+    pub temp_bucket: S3BucketConfig,
+    pub permanent_bucket: S3BucketConfig,
+}
+
+#[derive(Clone, serde::Deserialize)]
+pub struct FsStorageConfig {}
+
 /*
 To upload a file client first initiates upload using `init_file_upload` method.
 Then client uploads file chunks one by one using the `upload_file_chunk` method.
@@ -58,12 +76,18 @@ impl FilesController {
     pub fn new(
         db: Db,
         sinkron_actor: SinkronHandle,
-        s3_config: S3StorageConfig,
+        config: StorageConfig,
     ) -> Self {
-        let storage_adapter = Box::new(
-            S3StorageAdapter::new(s3_config)
-                .expect("Failed to initialize S3StorageAdapter"),
-        );
+        let storage_adapter: Box<dyn StorageAdapter + Send + Sync> =
+            match config {
+                StorageConfig::S3(config) => Box::new(
+                    S3StorageAdapter::new(config)
+                        .expect("Failed to initialize S3StorageAdapter"),
+                ),
+                StorageConfig::Fs(config) => {
+                    Box::new(FsStorageAdapter::new(config))
+                }
+            };
         FilesController {
             db,
             sinkron_actor,
@@ -328,12 +352,6 @@ pub struct S3BucketConfig {
     pub bucket_name: String,
 }
 
-#[derive(Clone, serde::Deserialize)]
-pub struct S3StorageConfig {
-    pub temp_bucket: S3BucketConfig,
-    pub permanent_bucket: S3BucketConfig,
-}
-
 struct S3StorageAdapter {
     temp_bucket: Box<s3::Bucket>,
     permanent_bucket: Box<s3::Bucket>,
@@ -488,3 +506,42 @@ impl StorageAdapter for S3StorageAdapter {
 }
 
 struct FsStorageAdapter {}
+
+impl FsStorageAdapter {
+    fn new(config: FsStorageConfig) -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl StorageAdapter for FsStorageAdapter {
+    async fn upload_file_chunk(
+        &self,
+        file_id: Uuid,
+        chunk_number: u32,
+        content: &[u8],
+    ) -> Result<(), SinkronError> {
+        Err(SinkronError::internal("Not implemented"))
+    }
+
+    async fn create_file_from_chunks(
+        &self,
+        file_id: Uuid,
+        file_size: u64,
+        checksum: String,
+    ) -> Result<(), SinkronError> {
+        Err(SinkronError::internal("Not implemented"))
+    }
+
+    async fn get_file_chunk(
+        &self,
+        file_id: Uuid,
+        chunk_number: u32,
+    ) -> Result<Bytes, SinkronError> {
+        Err(SinkronError::internal("Not implemented"))
+    }
+
+    async fn delete_file(&self, file_id: Uuid) -> Result<(), SinkronError> {
+        Err(SinkronError::internal("Not implemented"))
+    }
+}

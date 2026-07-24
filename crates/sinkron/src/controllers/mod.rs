@@ -5,7 +5,7 @@ pub mod groups;
 
 use crate::actors::sinkron::SinkronHandle;
 use crate::db::Db;
-use files::S3StorageConfig;
+use files::StorageConfig;
 
 pub struct SinkronControllers {
     pub documents: documents::DocumentsController,
@@ -18,7 +18,7 @@ impl SinkronControllers {
     pub fn new(
         db: Db,
         sinkron_actor: SinkronHandle,
-        storage_config: S3StorageConfig,
+        storage_config: StorageConfig,
     ) -> Self {
         Self {
             documents: documents::DocumentsController::new(

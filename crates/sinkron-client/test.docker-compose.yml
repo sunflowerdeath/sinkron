@@ -32,12 +32,15 @@ services:
                         "database": "sinkron"
                     },
                     "storage": {
+                      "type": "fs",
+                      "temp_path": "temp/files/temp",
+                      "permanent_path": "temp/files/permanent"
                     },
                     "publicApi": {
-                        "authUrl": "http://auth/",
+                        "authUrl": "http://auth/"
                     },
                     "internalApi": {
-                        "apiToken": "SINKRON_API_TOKEN",
+                        "apiToken": "SINKRON_API_TOKEN"
                     }
                 }
             RUST_LOG: sinkron=trace
