@@ -120,7 +120,7 @@ async fn auth_middleware(
 ) -> Response {
     let Some(header) = get_header_value(&req, "x-sinkron-auth-token") else {
         return err_response(SinkronError::auth_failed(
-            "Invalid authorization token",
+            "Invalid user authorization token",
         ));
     };
     match state.auth(&header).await {

@@ -29,6 +29,7 @@ impl SinkronApi {
         controller: Arc<SinkronControllers>,
         config: InternalApiConfig,
     ) -> Self {
+        println!("TOKEN: {:?}", config.api_token);
         Self { controller, config }
     }
 
@@ -87,11 +88,15 @@ async fn check_auth_token(
     req: Request,
     next: middleware::Next,
 ) -> Response {
+    println!("CHECK AUTH TOKEN");
     let header = get_header_value(&req, "x-sinkron-api-token");
+    println!("HEADER: {:?}", header);
     if Some(state.config.api_token) == header {
         next.run(req).await
     } else {
-        err_response(SinkronError::auth_failed("Invalid authorization token"))
+        err_response(SinkronError::auth_failed(
+            "Invalid API authorization token",
+        ))
     }
 }
 

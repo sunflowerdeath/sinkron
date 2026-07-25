@@ -8,6 +8,7 @@ use sinkron_common::types::{
     DeleteDocument, Document, GetDocument, Group, Id, UpdateDocument, User,
 };
 
+#[derive(Debug)]
 pub enum ClientError {
     Request(String),
     Response(SinkronError),
@@ -31,7 +32,7 @@ impl SinkronClient {
     }
 
     async fn send_request<T: Serialize>(
-        self,
+        &self,
         url: &str,
         payload: T,
     ) -> Result<Response, ClientError> {
@@ -80,7 +81,7 @@ impl SinkronClient {
     }
 
     async fn send_json_request<T: Serialize, U: DeserializeOwned>(
-        self,
+        &self,
         url: &str,
         payload: T,
     ) -> Result<U, ClientError> {
@@ -91,7 +92,7 @@ impl SinkronClient {
     }
 
     async fn send_empty_request<T: Serialize>(
-        self,
+        &self,
         url: &str,
         payload: T,
     ) -> Result<(), ClientError> {
@@ -100,7 +101,7 @@ impl SinkronClient {
     }
 
     pub async fn create_collection(
-        self,
+        &self,
         props: CreateCollection,
     ) -> Result<Collection, ClientError> {
         // TODO parse permissions ?
@@ -108,7 +109,7 @@ impl SinkronClient {
     }
 
     pub async fn get_collection(
-        self,
+        &self,
         id: String,
     ) -> Result<Collection, ClientError> {
         let props = Id { id };
@@ -116,7 +117,7 @@ impl SinkronClient {
     }
 
     pub async fn delete_collection(
-        self,
+        &self,
         id: String,
     ) -> Result<(), ClientError> {
         let props = Id { id };
@@ -124,58 +125,58 @@ impl SinkronClient {
     }
 
     pub async fn create_document(
-        self,
+        &self,
         props: CreateDocument,
     ) -> Result<Document, ClientError> {
         self.send_json_request("create_document", props).await
     }
 
     pub async fn get_document(
-        self,
+        &self,
         props: GetDocument,
     ) -> Result<Document, ClientError> {
         self.send_json_request("get_document", props).await
     }
 
     pub async fn update_document(
-        self,
+        &self,
         props: UpdateDocument,
     ) -> Result<Document, ClientError> {
         self.send_json_request("update_document", props).await
     }
 
     pub async fn delete_document(
-        self,
+        &self,
         props: DeleteDocument,
     ) -> Result<(), ClientError> {
         self.send_empty_request("delete_document", props).await
     }
 
-    pub async fn create_group(self, id: String) -> Result<(), ClientError> {
+    pub async fn create_group(&self, id: String) -> Result<(), ClientError> {
         self.send_empty_request("create_group", Id { id }).await
     }
 
-    pub async fn get_group(self, id: String) -> Result<Group, ClientError> {
+    pub async fn get_group(&self, id: String) -> Result<Group, ClientError> {
         self.send_json_request("get_group", Id { id }).await
     }
 
-    pub async fn delete_group(self, id: String) -> Result<(), ClientError> {
+    pub async fn delete_group(&self, id: String) -> Result<(), ClientError> {
         self.send_empty_request("delete_group", Id { id }).await
     }
 
-    pub async fn get_user(self, id: String) -> Result<User, ClientError> {
+    pub async fn get_user(&self, id: String) -> Result<User, ClientError> {
         self.send_json_request("get_user", Id { id }).await
     }
 
     pub async fn add_user_to_group(
-        self,
+        &self,
         props: AddRemoveUserToGroup,
     ) -> Result<(), ClientError> {
         self.send_empty_request("add_user_to_group", props).await
     }
 
     pub async fn remove_user_from_group(
-        self,
+        &self,
         props: AddRemoveUserToGroup,
     ) -> Result<(), ClientError> {
         self.send_empty_request("remove_user_from_group", props)
@@ -183,7 +184,7 @@ impl SinkronClient {
     }
 
     pub async fn remove_user_from_all_groups(
-        self,
+        &self,
         id: String,
     ) -> Result<(), ClientError> {
         self.send_empty_request("remove_user_from_all_groups", Id { id })
