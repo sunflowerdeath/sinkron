@@ -1,10 +1,22 @@
 {
-  "name": "sinkron-root",
-  "version": "0.0.1",
-  "description": "",
-  "license": "Unlicense",
-  "author": "sunflowerdeath",
-  "private": true,
-  "scripts": {
-  }
+    "name": "sinkron-root",
+    "version": "0.0.1",
+    "private": true,
+    "description": "",
+    "license": "Unlicense",
+    "author": "sunflowerdeath",
+    "scripts": {},
+    "dependencies": {},
+    "devDependencies": {
+        "oxfmt": "^0.60.0",
+        "prettier": "^3.9.6",
+        "typescript": "^7.0.2"
+    },
+    "devEngines": {
+        "packageManager": {
+            "name": "pnpm",
+            "version": "11.17.0",
+            "onFail": "download"
+        }
+    }
 }

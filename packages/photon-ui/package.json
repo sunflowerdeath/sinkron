@@ -1,0 +1,38 @@
+{
+    "name": "photon-ui",
+    "version": "0.0.1",
+    "description": "",
+    "keywords": [],
+    "license": "Unlicense",
+    "author": "",
+    "type": "module",
+    "scripts": {
+        "lint": "oxlint -c oxlintrc.json src",
+        "build": "NODE_ENV=production rspack --config rspack.config.js",
+        "dev": "rspack serve"
+    },
+    "dependencies": {
+        "mobx": "^6.16.1",
+        "mobx-react-lite": "^4.1.1",
+        "oriente": "^0.1.14",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+        "react-use": "^17.6.1",
+        "wouter": "^3.10.0"
+    },
+    "devDependencies": {
+        "@rspack/cli": "^2.1.5",
+        "@rspack/core": "^2.1.5",
+        "@rspack/dev-server": "^2.1.0",
+        "@types/node": "^26.1.1",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3"
+    },
+    "devEngines": {
+        "packageManager": {
+            "name": "pnpm",
+            "version": "11.17.0",
+            "onFail": "download"
+        }
+    }
+}
