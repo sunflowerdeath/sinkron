@@ -207,12 +207,27 @@ importers:
 
   .:
     dependencies:
+      '@maskito/core':
+        specifier: ^5.3.1
+        version: 5.3.1
+      '@maskito/react':
+        specifier: ^5.3.1
+        version: 5.3.1(@maskito/core@5.3.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@material-design-icons/svg':
+        specifier: ^0.14.15
+        version: 0.14.15
+      lodash-es:
+        specifier: ^4.18.1
+        version: 4.18.1
       mobx:
         specifier: ^6.16.1
         version: 6.16.1
       mobx-react-lite:
         specifier: ^4.1.1
         version: 4.1.1(mobx@6.16.1)(react-dom@19.2.8(react@19.2.8))(react-native@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.8)(supports-color@8.1.1))(react@19.2.8)
+      mobx-utils:
+        specifier: ^6.1.1
+        version: 6.1.1(mobx@6.16.1)
       oriente:
         specifier: ^0.1.14
         version: 0.1.14(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -360,6 +375,19 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@maskito/core@5.3.1':
+    resolution: {integrity: sha512-4imRPDKsV9zQwCUt5pR+XOQNgYTO99dzH2MZgyMFfK6npHart6kiNM1CEWLsMUj4BER2s+97uHGDS0eOER+PeQ==}
+
+  '@maskito/react@5.3.1':
+    resolution: {integrity: sha512-dpbxZ4Hon59GtGCF5Jt/KORPihJHK8cwtorJgHC5jUX83J5mE0e/tQdictJl9lKcDdGFK97vxdjwEL/OkKgj9Q==}
+    peerDependencies:
+      '@maskito/core': ^5.3.1
+      react: '>=16.8'
+      react-dom: '>=16.8'
+
+  '@material-design-icons/svg@0.14.15':
+    resolution: {integrity: sha512-6nbjwGwyJnphwQUscJAYqw1Tk6+W8KvsgOAeyVgzIFXVsHfgX5XyplTUcZ29wbcTUysMMyCUi1LYpmFKA/e61g==}
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -965,6 +993,9 @@ packages:
   lighthouse-logger@1.4.2:
     resolution: {integrity: sha512-gPWxznF6TKmUHrOQjlVo2UbaL2EJ71mb2CCeRs/2qBpi4L/g4LUVc9+3lKQ6DTUZwJswfM7ainGrLO1+fOqa2g==}
 
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
+
   lodash.throttle@4.1.1:
     resolution: {integrity: sha512-wIkUCfVKpVsWo3JSZlc+8MB5it+2AN5W8J7YVMST30UrvcQNZ1Okbj+rbVniijTWE6FGYy4XJq/rHkas8qJMLQ==}
 
@@ -1085,6 +1116,11 @@ packages:
         optional: true
       react-native:
         optional: true
+
+  mobx-utils@6.1.1:
+    resolution: {integrity: sha512-ZR4tOKucWAHOdMjqElRl2BEvrzK7duuDdKmsbEbt2kzgVpuLuoYLiDCjc3QwWQl8CmOlxPgaZQpZ7emwNqPkIg==}
+    peerDependencies:
+      mobx: ^6.0.0
 
   mobx@6.16.1:
     resolution: {integrity: sha512-syNcDdX3KT+Jq3je6eGjBhuc24Z68td2VG0zNFqRswaE433D9SNH5VRy/xrGbJsUixfppLLccXhAW9JSf6n+SQ==}
@@ -1710,6 +1746,16 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
     optional: true
+
+  '@maskito/core@5.3.1': {}
+
+  '@maskito/react@5.3.1(@maskito/core@5.3.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@maskito/core': 5.3.1
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+
+  '@material-design-icons/svg@0.14.15': {}
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
     dependencies:
@@ -2361,6 +2407,8 @@ snapshots:
       - supports-color
     optional: true
 
+  lodash-es@4.18.1: {}
+
   lodash.throttle@4.1.1:
     optional: true
 
@@ -2607,6 +2655,10 @@ snapshots:
     optionalDependencies:
       react-dom: 19.2.8(react@19.2.8)
       react-native: 0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.8)(supports-color@8.1.1)
+
+  mobx-utils@6.1.1(mobx@6.16.1):
+    dependencies:
+      mobx: 6.16.1
 
   mobx@6.16.1: {}
 

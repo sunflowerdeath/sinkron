@@ -2,9 +2,12 @@ import { observer } from "mobx-react-lite"
 import { OrienteProvider } from "oriente"
 import React from "react"
 import { useMemo } from "react"
+import { useState } from "react"
 import { createRoot } from "react-dom/client"
 import { useTitle } from "react-use"
 import { Router, Switch, Route, Redirect, useLocation } from "wouter"
+
+import { Col, Input, Button } from "./ui"
 
 export type User = {
     id: string
@@ -12,21 +15,40 @@ export type User = {
 }
 
 class Store {
+    api: Api
+
+    authToken?: string = undefined
     user?: User
+
+    constructor() {
+        this.api = new Api({
+            baseUrl: env.urls.api,
+            getToken: () => this.token
+        })
+    }
+
+    async login(email: string) {
+        return await this.api.fetch<{ id: string }>({
+            method: "POST",
+            url: "/login",
+            data: { email }
+        })
+    }
+
+    async code(id: string, code: string) {
+        const { user, token } = await this.api.fetch<AuthResponse>({
+            method: "POST",
+            url: "/code",
+            data: { id, code }
+        })
+        localStorage.setItem("token", token)
+        localStorage.setItem("user", JSON.stringify(user))
+        this.token = token
+        this.user = user
+        console.log(`Logged in as "${user.email}"`)
+    }
 }
 
-const LoginView = observer(() => {
-    return (
-        <div>
-            Photon
-            <div>
-                Enter your email adress:
-                <input />
-                <button>Continue</button>
-            </div>
-        </div>
-    )
-})
 
 const PhotonView = observer(() => {
     return <div>Photon</div>

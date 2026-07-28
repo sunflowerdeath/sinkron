@@ -1,4 +1,5 @@
-import path from 'node:path';
+import path from "node:path"
+
 import { defineConfig } from "@rspack/cli"
 import { rspack } from "@rspack/core"
 
@@ -34,6 +35,7 @@ const rules = [
                     env: { targets, mode: "entry", coreJs: "3.38" },
                     jsc: {
                         parser: { syntax: "typescript", jsx: true },
+                        transform: { react: { runtime: "automatic" } },
                     },
                 },
             },

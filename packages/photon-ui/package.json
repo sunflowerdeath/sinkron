@@ -12,8 +12,13 @@
         "dev": "rspack serve"
     },
     "dependencies": {
+        "@maskito/core": "^5.3.1",
+        "@maskito/react": "^5.3.1",
+        "@material-design-icons/svg": "^0.14.15",
+        "lodash-es": "^4.18.1",
         "mobx": "^6.16.1",
         "mobx-react-lite": "^4.1.1",
+        "mobx-utils": "^6.1.1",
         "oriente": "^0.1.14",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
