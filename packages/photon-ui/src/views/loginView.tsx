@@ -63,7 +63,10 @@ const CodeStep = (props: CodeStepProps) => {
         IPromiseBasedObservable<any>
     >(fromPromise.resolve())
 
-    const sendCode = () => {}
+    const sendCode = () => {
+        const state = store.sendCode(code)
+        setSendCodeState(fromPromise(state))
+    }
 
     const onKeyPress = (event: React.KeyboardEvent) => {
         if (event.key === "Enter") {
