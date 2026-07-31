@@ -1,3 +1,6 @@
+pub mod models;
+pub mod schema;
+
 use std::env;
 
 use diesel_migrations::{EmbeddedMigrations, embed_migrations};

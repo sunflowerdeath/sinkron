@@ -2264,6 +2264,7 @@ name = "photon"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "deadpool 0.13.0",
  "diesel",
  "diesel-async 0.9.2",
@@ -2274,6 +2275,7 @@ dependencies = [
  "serde_json",
  "sinkron-common",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
