@@ -3,8 +3,9 @@ import { fromPromise, IPromiseBasedObservable } from "mobx-utils"
 import React from "react"
 import { useState } from "react"
 
+import logoSvg from "../logo2.svg"
 import { validateEmail } from "../common/validations"
-import { Col, Button, Input } from "../ui"
+import { Col, Button, Input, Icon } from "../ui"
 
 type Otp = {
     id: string
@@ -24,9 +25,10 @@ const EmailStep = (props: EmailStepProps) => {
         fromPromise.resolve(),
     )
     const login = () => {
-        const state = store.login(email)
-        state.then((otp) => onComplete(otp))
-        setLoginState(fromPromise(state))
+        onComplete({ email, id: "123" })
+        // const state = store.login(email)
+        // state.then((otp) => onComplete(otp))
+        // setLoginState(fromPromise(state))
     }
 
     return (
@@ -37,6 +39,7 @@ const EmailStep = (props: EmailStepProps) => {
                     value={email}
                     onChange={setEmail}
                     style={{ width: "100%" }}
+                    autoFocus
                 />
             </Col>
             <Button
@@ -77,12 +80,7 @@ const CodeStep = (props: CodeStepProps) => {
     return (
         <>
             <Col gap={4}>
-                <Col gap={4}>
-                    Enter code from your email:
-                    <div style={{ color: "var(--color-secondary)" }}>
-                        Code has been sent to "{otp.email}"
-                    </div>
-                </Col>
+                <div>Enter code from your email:</div>
                 <Input
                     value={code}
                     onChange={setCode}
@@ -90,6 +88,9 @@ const CodeStep = (props: CodeStepProps) => {
                     onKeyPress={onKeyPress}
                     autoFocus
                 />
+                <div style={{ color: "var(--color-secondary)" }}>
+                    Code has been sent to "{otp.email}"
+                </div>
             </Col>
             <Button
                 onClick={sendCode}
@@ -120,7 +121,15 @@ const LoginView = observer(() => {
             }}
             gap={16}
         >
-            Photon
+            <Icon
+                svg={logoSvg}
+                style={{
+                    alignSelf: "center",
+                    width: "100%",
+                    height: "auto"
+                }}
+                fill="#8B008B"
+            />
             {loginState.step === "email" ? (
                 <EmailStep
                     onComplete={(otp: Otp) =>

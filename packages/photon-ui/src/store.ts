@@ -1,11 +1,17 @@
 import { Api } from "./api"
+import { User, Otp } from "./entities"
+import { env } from "./env"
 
-type InitStoreProps = {
+type AuthResponse = {
+    user: User
+    token: string
 }
 
-// Local storage key names 
+type InitStoreProps = {}
+
+// Local storage key names
 const AUTH_TOKEN_KEY = "photon_auth_token"
-const USER_KEY = "photon_user"
+const USER_DATA_KEY = "photon_user_data"
 
 // Store that handles app initialization, and user login and logout procedure
 class InitStore {
@@ -18,11 +24,11 @@ class InitStore {
 
         this.api = new Api({
             baseUrl: env.urls.api,
-            getToken: () => this.authToken
+            getToken: () => this.authToken,
         })
 
         if (this.authToken !== undefined) {
-            const user = localStorage.getItem(USER_KEY)
+            const user = localStorage.getItem(USER_DATA_KEY)
             if (user !== null) {
                 this.photon = new PhotonStore({
                     initStore: this,
@@ -35,10 +41,10 @@ class InitStore {
     }
 
     async login(email: string) {
-        return await this.api.fetch<{ id: string }>({
+        return await this.api.fetch<Otp>({
             method: "POST",
             url: "/login",
-            data: { email }
+            data: { email },
         })
     }
 
@@ -46,10 +52,10 @@ class InitStore {
         const { user, token } = await this.api.fetch<AuthResponse>({
             method: "POST",
             url: "/code",
-            data: { id, code }
+            data: { id, code },
         })
-        localStorage.setItem("token", token)
-        localStorage.setItem("user", JSON.stringify(user))
+        localStorage.setItem(AUTH_TOKEN_KEY, token)
+        localStorage.setItem(USER_DATA_KEY, JSON.stringify(user))
         this.authToken = token
         this.photon = new PhotonStore({
             initStore: this,
@@ -61,20 +67,17 @@ class InitStore {
 
     logout() {
         console.log("Logout")
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
-        localStorage.removeItem("space")
-        this.deepLink = undefined
+        localStorage.removeItem(AUTH_TOKEN_KEY)
+        localStorage.removeItem(USER_DATA_KEY)
         this.authToken = undefined
         this.photon?.dispose()
         this.photon = undefined
         history.pushState({}, "", "/")
-        IndexedDbCollectionStore.clearAll()
     }
 }
 
 type PhotonStoreProps = {
-    initStore: InitStore,
+    initStore: InitStore
     user: User
 }
 
@@ -82,15 +85,50 @@ type PhotonStoreProps = {
 class PhotonStore {
     initStore: InitStore
     user: User
+    api: Api
+
+    userIsFetched = false
 
     constructor(props: PhotonStoreProps) {
         const { user, initStore } = props
         this.initStore = initStore
+        this.api = initStore.api
         this.user = user
     }
 
-    dispose() {
+    async fetchUser() {
+        this.stopFetchUser?.()
+        this.stopFetchUser = autoRetry(async (retry) => {
+            this.logger.debug("Fetching user...")
+            let user: User
+            try {
+                user = await this.api.fetch<User>({
+                    method: "GET",
+                    url: "/profile"
+                })
+            } catch (e) {
+                if (e instanceof FetchError && e.kind === "http") {
+                    // TODO if auth error - logout
+                    // this.logout()
+                    // else - keep trying
+                    this.logger.error("Fetch user received error response")
+                } else {
+                    this.logger.error("Couldn't fetch user, will retry")
+                    retry()
+                }
+                return
+            }
+            this.updateUser(user)
+            this.userIsFetched = true
+            this.logger.info("Fetch user success")
+        })
     }
+
+    updateUser(user: User) {
+        this.user = user
+    }
+
+    dispose() {}
 }
 
 export { InitStore, PhotonStore }
