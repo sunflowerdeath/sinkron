@@ -3,13 +3,13 @@ use serde::Serialize;
 #[derive(Serialize)]
 pub enum ErrorCode {
     // Invalid request format
-    InvalidRequest,
+    BadRequest,
     // User could not be authenticated, connection should be closed
-    AuthenticationFailed,
+    AuthFailed,
     // User doesn't have permission to perform the operation
-    AccessDenied,
+    Forbidden,
     // Operation cannot be performed
-    UnprocessableRequest,
+    UnprocessableContent,
     // Requested entity not found
     NotFound,
     // Unexpected error
@@ -22,6 +22,45 @@ pub struct RequestError {
     pub message: String,
 }
 
+impl RequestError {
+    pub fn bad_request(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::BadRequest,
+            message: msg.to_string(),
+        }
+    }
+    pub fn auth_failed(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::AuthFailed,
+            message: msg.to_string(),
+        }
+    }
+    pub fn not_found(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::NotFound,
+            message: msg.to_string(),
+        }
+    }
+    pub fn forbidden(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::Forbidden,
+            message: msg.to_string(),
+        }
+    }
+    pub fn internal(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::InternalServerError,
+            message: msg.to_string(),
+        }
+    }
+    pub fn unprocessable(msg: &str) -> Self {
+        Self {
+            code: ErrorCode::UnprocessableContent,
+            message: msg.to_string(),
+        }
+    }
+}
+
 /// Utility function for mapping any error into an Internal Server Error
 pub fn internal_error<E>(err: E) -> RequestError
 where
@@ -30,6 +69,6 @@ where
     // error!("internal error: {:?}", err);
     RequestError {
         code: ErrorCode::InternalServerError,
-        message: err.to_string()
+        message: err.to_string(),
     }
 }
