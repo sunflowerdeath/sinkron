@@ -26,6 +26,15 @@ pub struct Otp {
     pub attempts: i16,
 }
 
+#[derive(Insertable)]
+#[diesel(table_name = schema::otps)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct NewOtp {
+    pub id: Uuid,
+    pub code: String,
+    pub email: String,
+}
+
 #[derive(serde::Serialize, Selectable, Queryable)]
 #[diesel(table_name = schema::auth_tokens)]
 #[diesel(check_for_backend(diesel::pg::Pg))]

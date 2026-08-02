@@ -17,3 +17,5 @@ serde_json.workspace = true
 serde.workspace = true
 uuid.workspace = true
 chrono = "0.4.45"
+rand = "0.10.2"
+async-trait = "0.1.91"

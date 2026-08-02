@@ -1,8 +1,10 @@
-pub mod controllers;
-pub mod models;
-pub mod schema;
 pub mod api;
+pub mod controllers;
+pub mod email;
+pub mod error;
+pub mod models;
 pub mod photon;
+pub mod schema;
 
 use std::env;
 
