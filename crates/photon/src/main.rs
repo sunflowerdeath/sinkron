@@ -1,75 +1,12 @@
+pub mod controllers;
 pub mod models;
 pub mod schema;
+pub mod api;
+pub mod photon;
 
 use std::env;
 
-use diesel_migrations::{EmbeddedMigrations, embed_migrations};
-use sinkron_common::db::{DbConfig, DbConnectionManager};
-
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
-
-struct PhotonController {
-    auth: AuthController,
-}
-
-impl PhotonController {
-    fn new() -> Self {
-        Self {
-            auth: AuthController::new(),
-        }
-    }
-}
-
-struct AuthController {}
-
-impl AuthController {
-    fn new() -> Self {
-        Self {}
-    }
-
-    async fn send_code(&self, email: String) {}
-
-    async fn auth_with_code(&self, id: String, code: String) {}
-
-    async fn issue_auth_token(&self) {}
-
-    async fn check_auth_token(&self) {}
-}
-
-#[derive(Clone, serde::Deserialize)]
-struct PhotonConfig {
-    db: DbConfig,
-}
-
-struct Photon {
-    controller: PhotonController,
-    db: DbConnectionManager,
-}
-
-impl Photon {
-    fn new(config: PhotonConfig) -> Self {
-        Self {
-            controller: PhotonController::new(),
-            db: DbConnectionManager::new(config.db),
-        }
-    }
-
-    async fn run(&self) {
-        self.db.run_migrations(MIGRATIONS).await.unwrap();
-    }
-
-    pub fn router(&self) -> Router {
-        Router::new()
-            .route("/login", post(login))
-            .route("/code", post(code))
-            .route("/profile", get(profile))
-            .layer(middleware::from_fn_with_state(
-                self.clone(),
-                check_auth_token,
-            ))
-            .with_state(self.clone())
-    }
-}
+use crate::photon::{Photon, PhotonConfig};
 
 const PHOTON_CONFIG_ENV_VAR: &str = "PHOTON_CONFIG";
 

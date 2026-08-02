@@ -1,3 +1,4 @@
+pub mod api_helpers;
 pub mod db;
 pub mod error;
 pub mod permissions;
