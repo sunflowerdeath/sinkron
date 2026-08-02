@@ -15,6 +15,13 @@ pub struct User {
     pub picture: String, // json
 }
 
+#[derive(Insertable)]
+#[diesel(table_name = schema::users)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct NewUser {
+    pub email: String,
+}
+
 #[derive(serde::Serialize, Selectable, Queryable)]
 #[diesel(table_name = schema::otps)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -44,6 +51,14 @@ pub struct AuthToken {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
     pub last_access: chrono::DateTime<chrono::Utc>,
+    pub client_string: String,
+    pub user_id: Uuid,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = schema::auth_tokens)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct NewAuthToken {
     pub client_string: String,
     pub user_id: Uuid,
 }

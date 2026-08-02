@@ -9,7 +9,7 @@ use uuid::Uuid;
 use sinkron_common::db::DbConnectionManager;
 
 use crate::email::{EmailSender, SendEmailProps};
-use crate::error::{ErrorCode, RequestError, internal_error};
+use crate::error::{RequestError, internal_error};
 use crate::models;
 use crate::models::{Otp, User};
 use crate::schema;
@@ -21,11 +21,6 @@ pub struct VerifyOtp {
     id: Uuid,
     password: String,
     client: String,
-}
-
-#[derive(Serialize)]
-pub struct AuthToken {
-    token: String,
 }
 
 #[derive(Serialize)]
@@ -52,8 +47,7 @@ impl AuthController {
     }
 
     pub async fn issue_otp(&self, email: String) -> Result<Otp, RequestError> {
-        let is_valid = validate_email(&email);
-        if !is_valid {
+        if !validate_email(&email) {
             return Err(RequestError::bad_request("Invalid email address"));
         }
 
@@ -95,7 +89,7 @@ impl AuthController {
     pub async fn verify_otp(
         &self,
         props: VerifyOtp,
-    ) -> Result<AuthToken, RequestError> {
+    ) -> Result<models::AuthToken, RequestError> {
         let VerifyOtp {
             id,
             password,
@@ -114,6 +108,7 @@ impl AuthController {
                 err => RequestError::internal(&err.to_string()),
             })?;
 
+        // TODO
         // const expiresAt = addSeconds(otp.createdAt, otpLifeSpan)
         // if (isAfter(new Date(), expiresAt)) {
         // await models.otps.delete({ id })
@@ -167,17 +162,63 @@ impl AuthController {
     }
 
     async fn create_user(&self, email: String) -> Result<User, RequestError> {
-        // TODO
-        Err(RequestError::internal("Not implemented"))
+        if !validate_email(&email) {
+            return Err(RequestError::bad_request("Invalid email address"));
+        }
+
+        let mut conn = self.db.get().await.map_err(internal_error)?;
+        let count: i64 = schema::users::table
+            .filter(schema::users::email.eq(&email))
+            .count()
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if count > 0 {
+            return Err(RequestError::unprocessable(
+                "User with this email already exists.",
+            ));
+        }
+
+        let new_user = models::NewUser { email };
+        let user = diesel::insert_into(schema::users::table)
+            .values(&new_user)
+            .returning(models::User::as_returning())
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        Ok(user)
     }
 
     async fn issue_auth_token(
         &self,
         user_id: Uuid,
-        client: String,
-    ) -> Result<AuthToken, RequestError> {
+        client_string: String,
+    ) -> Result<models::AuthToken, RequestError> {
+        let mut conn = self.db.get().await.map_err(internal_error)?;
+        let count: i64 = schema::users::table
+            .filter(schema::users::id.eq(&user_id))
+            .count()
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        if count == 0 {
+            return Err(RequestError::unprocessable("User not found."));
+        }
+
+        let new_token = models::NewAuthToken { user_id, client_string };
+        let token = diesel::insert_into(schema::auth_tokens::table)
+            .values(&new_token)
+            .returning(models::AuthToken::as_returning())
+            .get_result(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
         // TODO
-        Err(RequestError::internal("Not implemented"))
+        // this.#deleteExpiredTokens(models, userId)
+        // this.#deleteTokensOverLimit(models, userId)
+
+        Ok(token)
     }
 
     pub async fn get_user_profile(
