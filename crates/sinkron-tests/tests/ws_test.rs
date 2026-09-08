@@ -1,35 +1,66 @@
 use futures_util::{
+    SinkExt,
     StreamExt,
-    stream::{SplitSink, SplitStream},
+    // stream::{SplitSink, SplitStream},
 };
 use tokio::net::TcpStream;
-use tokio_tungstenite::{WebSocketStream, connect_async};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 use tungstenite::protocol::Message;
 use uuid::Uuid;
 
 use sinkron_client::SinkronClient;
 use sinkron_common::error::SinkronError;
 use sinkron_common::protocol::{
-    ClientMessage, DocMessage, ServerMessage, SyncCompleteMessage,
-    SyncErrorMessage, SyncStartMessage,
+    ClientMessage, DocMessage, ServerDeleteMessage, ServerMessage,
+    SyncCompleteMessage, SyncErrorMessage, SyncStartMessage,
 };
-use sinkron_common::types::{
-    Collection, CreateCollection, CreateDocument, DeleteDocument,
-};
+use sinkron_common::types::{CreateCollection, CreateDocument, DeleteDocument};
 
 const API_URL: &'static str = "http://localhost:3000";
 const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 
-const SYNC_AUTH_TOKEN: &'static str = "token-test";
-
 fn ws_url(token: &'static str) -> String {
     format!("ws://localhost:3000/sync?token={token}")
 }
+const WS_AUTH_TOKEN: &'static str = "token-test";
 
 struct WsTest {
     ws: WebSocketStream<MaybeTlsStream<TcpStream>>,
     // sender: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
     // receiver: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>
+}
+
+fn parse_channel_prefix(input: &str) -> Option<(i32, &str)> {
+    // String must start with a number, followed by ":" symbol
+    let mut len = 0;
+    for c in input.chars() {
+        if char::is_numeric(c) {
+            len += 1;
+        } else {
+            break;
+        }
+    }
+    if len == 0 {
+        return None;
+    }
+    if input.chars().nth(len) != Some(':') {
+        return None;
+    }
+    let Ok(prefix) = str::parse::<i32>(&input[0..len]) else {
+        return None;
+    };
+    return Some((prefix, &input[len + 1..]));
+}
+
+fn serialize_with_channel_prefix(
+    channel: i32,
+    msg: &ClientMessage,
+) -> Option<String> {
+    let mut res = channel.to_string() + ":";
+    match serde_json::to_writer(unsafe { res.as_mut_vec() }, &msg) {
+        Ok(_) => Some(res),
+        Err(_) => None,
+    }
 }
 
 impl WsTest {
@@ -40,19 +71,29 @@ impl WsTest {
     }
 
     async fn next_or_fail(&mut self) -> (i32, ServerMessage) {
-        match self.ws.next().await {
-            Some(data) => {
-                // parse message
-            }
-            None => {
-                panic!("Failed to receive message from websocket");
-            }
-        }
+        let Some(res) = self.ws.next().await else {
+            panic!("Failed to receive message from websocket");
+        };
+        let Ok(msg) = res else {
+            panic!("Failed to receive message from websocket");
+        };
+        let Message::Text(str) = msg else {
+            panic!("Unsupported message type");
+        };
+        let Some((channel_id, body)) = parse_channel_prefix(&str) else {
+            panic!("Failed to parse channel prefix");
+        };
+        let parsed = serde_json::from_str::<ServerMessage>(&body)
+            .expect("Failed to parse message body");
+        (channel_id, parsed)
     }
 
-    async fn send_or_fail(&self, chan: i32, msg: ClientMessage) {
+    async fn send_or_fail(&mut self, chan: i32, msg: ClientMessage) {
+        let Some(serialized) = serialize_with_channel_prefix(chan, &msg) else {
+            panic!("Failed to serialize message");
+        };
         self.ws
-            .send("Hello")
+            .send(Message::Text(serialized.into()))
             .await
             .expect("Failed to send to websocket")
     }
@@ -98,7 +139,7 @@ async fn test_connect() {
 
     // invalid col
     {
-        let url = ws_url("VALID_TOKEN");
+        let url = ws_url(WS_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         let invalid_col = "INVALID_COL".to_string();
@@ -108,7 +149,8 @@ async fn test_connect() {
                 col: invalid_col.clone(),
                 colrev: 0,
             }),
-        );
+        )
+        .await;
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
@@ -125,7 +167,7 @@ async fn test_connect() {
 
     // invalid colrev
     {
-        let url = ws_url("VALID_TOKEN");
+        let url = ws_url(WS_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         conn.send_or_fail(
@@ -134,7 +176,8 @@ async fn test_connect() {
                 col: col.clone(),
                 colrev: 12345,
             }),
-        );
+        )
+        .await;
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
@@ -151,7 +194,7 @@ async fn test_connect() {
 
     // valid
     {
-        let url = ws_url("VALID_TOKEN");
+        let url = ws_url(WS_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         conn.send_or_fail(
@@ -160,7 +203,8 @@ async fn test_connect() {
                 col: col.clone(),
                 colrev: 0,
             }),
-        );
+        )
+        .await;
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
@@ -227,7 +271,9 @@ async fn test_sync() {
     // sync without colrev:
     //   should recieve doc1
     {
-        let mut conn = WsTest::new_or_fail(ws_url(SYNC_AUTH_TOKEN)).await;
+        let url = ws_url(WS_AUTH_TOKEN);
+        let mut conn = WsTest::new_or_fail(url).await;
+
         conn.send_or_fail(
             1,
             ClientMessage::SyncStart(SyncStartMessage {
@@ -262,29 +308,41 @@ async fn test_sync() {
         conn.close();
     }
 
-    // sync with colrev of doc2:
+    // sync after doc2 was created but before it was deleted:
     //   should receive "delete" message for doc2
     {
-        let mut conn = WsTest::new_or_fail(ws_url(SYNC_AUTH_TOKEN)).await;
+        let url = ws_url(WS_AUTH_TOKEN);
+        let mut conn = WsTest::new_or_fail(url).await;
+
         conn.send_or_fail(
             1,
             ClientMessage::SyncStart(SyncStartMessage {
-                col,
+                col: col.clone(),
                 colrev: doc2.colrev,
             }),
         )
         .await;
 
         let (chan, msg) = conn.next_or_fail().await;
-        // assertIsMatch(e2, {
-        // kind: "message",
-        // data: { kind: "doc", col, id: doc2.id, data: null }
-        // })
+        assert_eq!(chan, 1);
+        assert_eq!(
+            msg,
+            ServerMessage::Delete(ServerDeleteMessage {
+                id: doc2.id,
+                col: col.clone(),
+                colrev: 1 // TODO doc2_deleted.colrev
+            })
+        );
+
         let (chan, msg) = conn.next_or_fail().await;
-        // assertIsMatch(e3, {
-        // kind: "message",
-        // data: { kind: "sync_complete", col, colrev: doc2deleted.colrev }
-        // })
+        assert_eq!(chan, 1);
+        assert_eq!(
+            msg,
+            ServerMessage::SyncComplete(SyncCompleteMessage {
+                col: col.clone(),
+                colrev: 1 // TODO doc2_deleted.colrev
+            })
+        );
 
         conn.close();
     }

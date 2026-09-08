@@ -12,3 +12,4 @@ tungstenite = "0.29.0"
 sinkron = { path = "../sinkron" }
 sinkron-common = { path = "../sinkron-common" }
 sinkron-client = { path = "../sinkron-client" }
+serde_json.workspace = true
