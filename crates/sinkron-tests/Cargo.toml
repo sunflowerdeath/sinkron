@@ -10,3 +10,5 @@ tokio-tungstenite = "0.29"
 uuid = { version = "1.20.0", features = ["serde", "v4"] }
 tungstenite = "0.29.0"
 sinkron = { path = "../sinkron" }
+sinkron-common = { path = "../sinkron-common" }
+sinkron-client = { path = "../sinkron-client" }

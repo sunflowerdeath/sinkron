@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
+use chrono::{Duration, Utc};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use rand::{Rng, RngExt};
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use sinkron_common::db::DbConnectionManager;
+use sinkron_common::db::{DbConnection, DbConnectionManager};
 
 use crate::email::{EmailSender, SendEmailProps};
 use crate::error::{RequestError, internal_error};
@@ -14,18 +15,27 @@ use crate::models;
 use crate::models::{Otp, User};
 use crate::schema;
 
-const MAX_OTP_ATTEMPTS: i16 = 3;
+const OTP_MAX_ATTEMPTS: i16 = 3;
+const OTP_EXPIRATION_DURATION: Duration = Duration::minutes(30);
 
 #[derive(Deserialize)]
-pub struct VerifyOtp {
+pub struct AuthWithOtp {
     id: Uuid,
     password: String,
-    client: String,
+    client_string: String,
 }
 
 #[derive(Serialize)]
 pub struct UserProfile {
     id: String,
+}
+
+#[derive(Serialize)]
+pub struct Session {
+    is_current: bool,
+    last_active: chrono::DateTime<chrono::Utc>,
+    from: Option<String>,
+    client_string: String,
 }
 
 fn validate_email(email: &str) -> bool {
@@ -46,7 +56,7 @@ impl AuthController {
         Self { db, email_sender }
     }
 
-    pub async fn issue_otp(&self, email: String) -> Result<Otp, RequestError> {
+    pub async fn send_otp(&self, email: String) -> Result<Otp, RequestError> {
         if !validate_email(&email) {
             return Err(RequestError::bad_request("Invalid email address"));
         }
@@ -70,6 +80,7 @@ impl AuthController {
             .await;
 
         if let Err(send_err) = send_res {
+            // TODO log send err
             return Err(RequestError::internal("Couldn't send email"));
         }
 
@@ -86,17 +97,18 @@ impl AuthController {
         Ok(otp)
     }
 
-    pub async fn verify_otp(
+    pub async fn auth_with_otp(
         &self,
-        props: VerifyOtp,
+        props: AuthWithOtp,
     ) -> Result<models::AuthToken, RequestError> {
-        let VerifyOtp {
+        let AuthWithOtp {
             id,
             password,
-            client,
+            client_string,
         } = props;
 
         let mut conn = self.db.get().await.map_err(internal_error)?;
+
         let otp = schema::otps::table
             .find(id)
             .first::<models::Otp>(&mut conn)
@@ -108,24 +120,20 @@ impl AuthController {
                 err => RequestError::internal(&err.to_string()),
             })?;
 
-        // TODO
-        // const expiresAt = addSeconds(otp.createdAt, otpLifeSpan)
-        // if (isAfter(new Date(), expiresAt)) {
-        // await models.otps.delete({ id })
-        // return Result.err({
-        // code: ErrorCode.InvalidRequest,
-        // message: "Code is expired. Generate new code.",
-        // details: { error: "is_expired" }
-        // })
-        // }
+        // check if otp is expired
+        let now = Utc::now();
+        let expires_at = otp.created_at + OTP_EXPIRATION_DURATION;
+        if expires_at < now {
+            self.delete_otp(&mut conn, &id).await?;
+            return Err(RequestError::unprocessable(
+                "Code is expired. Generate new code.",
+            ));
+        }
 
+        // check code
         if otp.code != password {
-            if otp.attempts + 1 >= MAX_OTP_ATTEMPTS {
-                let _ = diesel::delete(schema::otps::table)
-                    .filter(schema::otps::id.eq(&id))
-                    .execute(&mut conn)
-                    .await
-                    .map_err(internal_error)?;
+            if otp.attempts + 1 >= OTP_MAX_ATTEMPTS {
+                self.delete_otp(&mut conn, &id).await?;
                 return Err(RequestError::unprocessable(
                     "Too many incorrect attempts. Generate new code.",
                 ));
@@ -140,37 +148,108 @@ impl AuthController {
             return Err(RequestError::unprocessable("Incorrect code."));
         }
 
-        let _ = diesel::delete(schema::otps::table)
-            .filter(schema::otps::id.eq(&id))
+        self.delete_otp(&mut conn, &id).await?;
+        let user = self.get_or_create_user(&mut conn, otp.email).await?;
+        self.create_auth_token(user.id, client_string).await
+    }
+
+    pub async fn get_user_profile(
+        &self,
+        id: Uuid,
+    ) -> Result<UserProfile, RequestError> {
+        // TODO
+        Err(RequestError::internal("Not implemented"))
+    }
+
+    pub async fn delete_other_auth_tokens(
+        &self,
+        user_id: Uuid,
+        token: &str,
+    ) -> Result<(), RequestError> {
+        let mut conn = self.db.get().await.map_err(internal_error)?;
+        let _ = diesel::delete(schema::auth_tokens::table)
+            .filter(schema::auth_tokens::user_id.eq(user_id))
+            .filter(schema::auth_tokens::token.ne(token))
             .execute(&mut conn)
             .await
             .map_err(internal_error)?;
+        Ok(())
+    }
 
-        let user = schema::users::table
-            .filter(schema::users::email.eq(otp.email.clone()))
-            .first::<models::User>(&mut conn)
+    pub async fn get_active_sessions(
+        &self,
+        user_id: Uuid,
+        token: &str,
+    ) -> Result<Vec<Session>, RequestError> {
+        let mut conn = self.db.get().await.map_err(internal_error)?;
+
+        // await this.#deleteExpiredTokens(models, userId)
+
+        let tokens = schema::auth_tokens::table
+            .filter(schema::auth_tokens::user_id.eq(user_id))
+            .order_by(schema::auth_tokens::last_access.desc())
+            .load::<models::AuthToken>(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        let sessions = tokens
+            .into_iter()
+            .map(|t| Session {
+                last_active: t.last_access,
+                from: None,
+                client_string: t.client_string,
+                is_current: t.token == token,
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+
+    // Helpers
+
+    async fn delete_otp(
+        &self,
+        conn: &mut DbConnection,
+        id: &Uuid,
+    ) -> Result<(), RequestError> {
+        let _ = diesel::delete(schema::otps::table)
+            .filter(schema::otps::id.eq(id))
+            .execute(conn)
+            .await
+            .map_err(internal_error)?;
+        Ok(())
+    }
+
+    async fn get_or_create_user(
+        &self,
+        conn: &mut DbConnection,
+        email: String,
+    ) -> Result<User, RequestError> {
+        let res = schema::users::table
+            .filter(schema::users::email.eq(email.clone()))
+            .first::<models::User>(conn)
             .await
             .optional()
             .map_err(internal_error)?;
-
-        let user_id = match user {
-            Some(user) => user.id,
-            None => self.create_user(otp.email).await?.id,
-        };
-
-        self.issue_auth_token(user_id, client).await
+        match res {
+            Some(user) => Ok(user),
+            None => self.create_user(conn, email).await,
+        }
     }
 
-    async fn create_user(&self, email: String) -> Result<User, RequestError> {
+    async fn create_user(
+        &self,
+        conn: &mut DbConnection,
+        email: String,
+    ) -> Result<User, RequestError> {
         if !validate_email(&email) {
             return Err(RequestError::bad_request("Invalid email address"));
         }
 
-        let mut conn = self.db.get().await.map_err(internal_error)?;
         let count: i64 = schema::users::table
             .filter(schema::users::email.eq(&email))
             .count()
-            .get_result(&mut conn)
+            .get_result(conn)
             .await
             .map_err(internal_error)?;
         if count > 0 {
@@ -183,14 +262,14 @@ impl AuthController {
         let user = diesel::insert_into(schema::users::table)
             .values(&new_user)
             .returning(models::User::as_returning())
-            .get_result(&mut conn)
+            .get_result(conn)
             .await
             .map_err(internal_error)?;
 
         Ok(user)
     }
 
-    async fn issue_auth_token(
+    async fn create_auth_token(
         &self,
         user_id: Uuid,
         client_string: String,
@@ -206,7 +285,10 @@ impl AuthController {
             return Err(RequestError::unprocessable("User not found."));
         }
 
-        let new_token = models::NewAuthToken { user_id, client_string };
+        let new_token = models::NewAuthToken {
+            user_id,
+            client_string,
+        };
         let token = diesel::insert_into(schema::auth_tokens::table)
             .values(&new_token)
             .returning(models::AuthToken::as_returning())
@@ -219,13 +301,5 @@ impl AuthController {
         // this.#deleteTokensOverLimit(models, userId)
 
         Ok(token)
-    }
-
-    pub async fn get_user_profile(
-        &self,
-        id: Uuid,
-    ) -> Result<UserProfile, RequestError> {
-        // TODO
-        Err(RequestError::internal("Not implemented"))
     }
 }

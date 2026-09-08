@@ -3155,6 +3155,8 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "sinkron",
+ "sinkron-client",
+ "sinkron-common",
  "tokio",
  "tokio-tungstenite",
  "tungstenite",
