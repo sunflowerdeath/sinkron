@@ -14,7 +14,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use sinkron_common::error::{SinkronError, internal_error};
-use sinkron_common::protocol::ServerMessage;
+use sinkron_common::protocol::{ServerMessage, serialize_with_channel_prefix};
 
 use crate::actors::sinkron::{
     ConnectMessage, SinkronActorMessage, SinkronHandle,
@@ -96,7 +96,8 @@ impl SinkronPublicApi {
             Err(err) => {
                 debug!("sinkron: client authorization failed {:?}", err);
                 let msg = ServerMessage::ConnectionError(err);
-                let Ok(str_msg) = serde_json::to_string(&msg) else {
+                let Some(str_msg) = serialize_with_channel_prefix(0, &msg)
+                else {
                     return;
                 };
                 _ = websocket.send(Message::Text(str_msg.into())).await;

@@ -15,6 +15,9 @@ services:
             start_period: 3s
             timeout: 3s
 
+    fake_auth:
+        build: ./fake_auth
+
     sinkron:
         build:
           context: ../..
@@ -37,7 +40,7 @@ services:
                       "permanent_path": "temp/files/permanent"
                     },
                     "publicApi": {
-                        "authUrl": "http://auth/"
+                        "authUrl": "http://fake_auth/"
                     },
                     "internalApi": {
                         "apiToken": "SINKRON_API_TOKEN"

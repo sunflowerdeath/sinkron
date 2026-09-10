@@ -165,7 +165,7 @@ pub enum ClientMessage {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ServerMessage {
-    #[serde(rename = "error")]
+    #[serde(rename = "connection_error")]
     ConnectionError(SinkronError),
 
     #[serde(rename = "h")]

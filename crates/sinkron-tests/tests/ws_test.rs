@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use sinkron_client::SinkronClient;
 use sinkron_common::error::SinkronError;
+use sinkron_common::permissions::{Permissions, Role};
 use sinkron_common::protocol::{
     ClientMessage, DocMessage, ServerDeleteMessage, ServerMessage,
     SyncCompleteMessage, SyncErrorMessage, SyncStartMessage,
@@ -17,7 +18,7 @@ use sinkron_common::protocol::{
 };
 use sinkron_common::types::{CreateCollection, CreateDocument, DeleteDocument};
 
-const API_URL: &'static str = "http://localhost:3000";
+const API_URL: &'static str = "http://localhost:3000/api";
 const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 
 fn ws_url(token: &'static str) -> String {
@@ -71,6 +72,15 @@ impl WsTest {
     }
 }
 
+fn any_permissions() -> Permissions {
+    Permissions {
+        read: vec![Role::Any],
+        create: vec![Role::Any],
+        update: vec![Role::Any],
+        delete: vec![Role::Any],
+    }
+}
+
 #[tokio::test]
 async fn test_connect() {
     let col = Uuid::new_v4().to_string();
@@ -81,7 +91,7 @@ async fn test_connect() {
         .create_collection(CreateCollection {
             id: col.clone(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: any_permissions().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -198,7 +208,7 @@ async fn test_sync() {
         .create_collection(CreateCollection {
             id: col.clone(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: any_permissions().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -251,6 +261,7 @@ async fn test_sync() {
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
+        println!("{:?}", msg);
         assert!(matches!(
             msg,
             ServerMessage::Doc(DocMessage {
@@ -267,7 +278,7 @@ async fn test_sync() {
             msg,
             ServerMessage::SyncComplete(SyncCompleteMessage {
                 col: col.clone(),
-                colrev: 1 // TODO doc2_deleted.colrev
+                colrev: 3 // TODO doc2_deleted.colrev
             })
         );
 
@@ -296,7 +307,7 @@ async fn test_sync() {
             ServerMessage::Delete(ServerDeleteMessage {
                 id: doc2.id,
                 col: col.clone(),
-                colrev: 1 // TODO doc2_deleted.colrev
+                colrev: 3 // TODO doc2_deleted.colrev
             })
         );
 
@@ -306,7 +317,7 @@ async fn test_sync() {
             msg,
             ServerMessage::SyncComplete(SyncCompleteMessage {
                 col: col.clone(),
-                colrev: 1 // TODO doc2_deleted.colrev
+                colrev: 3 // TODO doc2_deleted.colrev
             })
         );
 
