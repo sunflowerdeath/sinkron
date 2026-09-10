@@ -8,7 +8,10 @@ Client connects to server via webscokets. All messages must be prefixed
 with an integer specifying a channel. It allows to synchronize multiple
 collections at the same time using one connection.
 
-The first message in the channel from the client must always be "sync_start".
+Channel "0" is reserved for system messages.
+
+The first message in the newly opened channel from the client must always be
+"sync_start" message.
 
 In case of success server replies with document updates messages required
 to achieve synchronized state ("doc", "update" and "delete"), followed by
@@ -162,6 +165,9 @@ pub enum ClientMessage {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ServerMessage {
+    #[serde(rename = "error")]
+    ConnectionError(SinkronError),
+
     #[serde(rename = "h")]
     Heartbeat(HeartbeatMessage),
 
@@ -185,6 +191,39 @@ pub enum ServerMessage {
 
     #[serde(rename = "change_error")]
     ChangeError(ChangeErrorMessage),
+}
+
+pub fn parse_channel_prefix(input: &str) -> Option<(i32, &str)> {
+    // String must start with a number, followed by ":" symbol
+    let mut len = 0;
+    for c in input.chars() {
+        if char::is_numeric(c) {
+            len += 1;
+        } else {
+            break;
+        }
+    }
+    if len == 0 {
+        return None;
+    }
+    if input.chars().nth(len) != Some(':') {
+        return None;
+    }
+    let Ok(prefix) = str::parse::<i32>(&input[0..len]) else {
+        return None;
+    };
+    return Some((prefix, &input[len + 1..]));
+}
+
+pub fn serialize_with_channel_prefix<T: Serialize>(
+    channel: i32,
+    msg: &T,
+) -> Option<String> {
+    let mut res = channel.to_string() + ":";
+    match serde_json::to_writer(unsafe { res.as_mut_vec() }, &msg) {
+        Ok(_) => Some(res),
+        Err(_) => None,
+    }
 }
 
 /*

@@ -13,6 +13,7 @@ use sinkron_common::error::SinkronError;
 use sinkron_common::protocol::{
     ClientMessage, DocMessage, ServerDeleteMessage, ServerMessage,
     SyncCompleteMessage, SyncErrorMessage, SyncStartMessage,
+    parse_channel_prefix, serialize_with_channel_prefix,
 };
 use sinkron_common::types::{CreateCollection, CreateDocument, DeleteDocument};
 
@@ -28,39 +29,6 @@ struct WsTest {
     ws: WebSocketStream<MaybeTlsStream<TcpStream>>,
     // sender: SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
     // receiver: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>
-}
-
-fn parse_channel_prefix(input: &str) -> Option<(i32, &str)> {
-    // String must start with a number, followed by ":" symbol
-    let mut len = 0;
-    for c in input.chars() {
-        if char::is_numeric(c) {
-            len += 1;
-        } else {
-            break;
-        }
-    }
-    if len == 0 {
-        return None;
-    }
-    if input.chars().nth(len) != Some(':') {
-        return None;
-    }
-    let Ok(prefix) = str::parse::<i32>(&input[0..len]) else {
-        return None;
-    };
-    return Some((prefix, &input[len + 1..]));
-}
-
-fn serialize_with_channel_prefix(
-    channel: i32,
-    msg: &ClientMessage,
-) -> Option<String> {
-    let mut res = channel.to_string() + ":";
-    match serde_json::to_writer(unsafe { res.as_mut_vec() }, &msg) {
-        Ok(_) => Some(res),
-        Err(_) => None,
-    }
 }
 
 impl WsTest {
@@ -98,8 +66,8 @@ impl WsTest {
             .expect("Failed to send to websocket")
     }
 
-    fn close(&self) {
-        // TODO
+    async fn close(&mut self) {
+        let _ = self.ws.close(None).await;
     }
 }
 
@@ -119,7 +87,6 @@ async fn test_connect() {
         .await;
     assert!(res.is_ok());
 
-    // TODO other way to AUTH FAILED ?
     // invalid auth token
     {
         let url = ws_url("INVALID_TOKEN");
@@ -128,13 +95,12 @@ async fn test_connect() {
         assert_eq!(chan, 0);
         assert!(matches!(
             msg,
-            ServerMessage::SyncError(SyncErrorMessage {
-                col: a_col,
-                error: SinkronError::AuthFailed { message: _ }
-            }) if a_col == col
+            ServerMessage::ConnectionError(SinkronError::AuthFailed {
+                message: _
+            })
         ));
 
-        conn.close();
+        conn.close().await;
     }
 
     // invalid col
@@ -162,7 +128,7 @@ async fn test_connect() {
             }) if col == invalid_col
         ));
 
-        conn.close();
+        conn.close().await;
     }
 
     // invalid colrev
@@ -189,7 +155,7 @@ async fn test_connect() {
             })
         );
 
-        conn.close();
+        conn.close().await;
     }
 
     // valid
@@ -213,7 +179,7 @@ async fn test_connect() {
             ServerMessage::SyncComplete(SyncCompleteMessage { col, colrev: 0 })
         );
 
-        conn.close();
+        conn.close().await;
     }
 }
 
@@ -305,7 +271,7 @@ async fn test_sync() {
             })
         );
 
-        conn.close();
+        conn.close().await;
     }
 
     // sync after doc2 was created but before it was deleted:
@@ -344,6 +310,24 @@ async fn test_sync() {
             })
         );
 
-        conn.close();
+        conn.close().await;
     }
 }
+
+// TODO
+//
+// crud
+//      create
+//      get
+//      get error
+//      update
+//      delete
+//
+// permissions
+//      forbidden
+//      readonly
+//      permitted
+//      updating permissions
+//
+// files
+//      TODO
