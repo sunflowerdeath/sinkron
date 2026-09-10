@@ -487,13 +487,118 @@ async fn test_crud() {
     ));
 }
 
-// TODO
-//
 // permissions
-//      forbidden
-//      readonly
-//      permitted
-//      updating permissions
-//
+#[tokio::test]
+async fn test_permissions() {
+    let client = SinkronClient::new(API_URL.to_string(), API_TOKEN.to_string());
+
+    let readonly = "user-readonly".to_string();
+    let editor = "user-editor".to_string();
+    let permissions = Permissions {
+        read: vec![
+            Role::User { id: readonly },
+            Role::User { id: editor.clone() },
+        ],
+        create: vec![Role::User { id: editor.clone() }],
+        update: vec![Role::User { id: editor.clone() }],
+        delete: vec![Role::User { id: editor.clone() }],
+    };
+
+    // create collection
+    let col = Uuid::new_v4().to_string();
+    let res = client
+        .create_collection(CreateCollection {
+            id: col.clone(),
+            is_ref: false,
+            permissions: permissions.to_string(),
+            storage_limit: 0,
+        })
+        .await;
+    assert!(res.is_ok());
+
+    let sync_msg = ClientMessage::SyncStart(SyncStartMessage {
+        col: col.clone(),
+        colrev: 0,
+    });
+
+    // forbidden: sync should fail
+    let mut ws_forbidden = WsTest::new_or_fail(ws_url("token-forbidden")).await;
+    ws_forbidden.send_or_fail(1, sync_msg.clone()).await;
+    let (chan, msg) = ws_forbidden.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::SyncError(SyncErrorMessage {
+            col: a_col,
+            error: SinkronError::Forbidden { message: _ },
+        }) if a_col == col
+    ));
+
+    // readonly: sync should success, change should fail
+    let mut ws_readonly = WsTest::new_or_fail(ws_url("token-readonly")).await;
+    ws_readonly.send_or_fail(1, sync_msg.clone()).await;
+    let (chan, msg) = ws_readonly.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert_eq!(
+        msg,
+        ServerMessage::SyncComplete(SyncCompleteMessage {
+            col: col.clone(),
+            colrev: 0
+        })
+    );
+
+    let id = Uuid::new_v4();
+    let loro_doc = new_test_doc();
+    let content = serialize_doc(&loro_doc);
+    ws_readonly
+        .send_or_fail(
+            1,
+            ClientMessage::Create(ClientCreateMessage {
+                id,
+                col: col.clone(),
+                content: content.clone(),
+                files: Vec::new(),
+            }),
+        )
+        .await;
+    let (chan, msg) = ws_readonly.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::ChangeError(ChangeErrorMessage {
+            id: an_id,
+            col: a_col,
+            error: SinkronError::Forbidden { message: _ }
+        }) if an_id == id && a_col == col
+    ));
+
+    // editor: sync should success, change should success
+    let mut ws_editor = WsTest::new_or_fail(ws_url("token-editor")).await;
+    ws_editor.send_or_fail(1, sync_msg.clone()).await;
+    let _ = ws_editor.next_or_fail().await;
+
+    ws_editor
+        .send_or_fail(
+            1,
+            ClientMessage::Create(ClientCreateMessage {
+                id,
+                col: col.clone(),
+                content,
+                files: Vec::new(),
+            }),
+        )
+        .await;
+    let (chan, msg) = ws_readonly.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::Doc(DocMessage {
+            id: an_id,
+            col: a_col,
+            ..
+        }) if an_id == id && a_col == col
+    ));
+}
+
 // files
 //      TODO

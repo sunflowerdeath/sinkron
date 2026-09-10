@@ -26,42 +26,42 @@ recieve realtime updates performed by other clients.
 Invalid messages, e.g. messages to a closed channel, are simply ignored.
 */
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct HeartbeatMessage {
     pub i: i32,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SyncStartMessage {
     pub col: String,
     pub colrev: i64,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SyncStopMessage {
     pub col: String,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SyncErrorMessage {
     pub col: String,
     #[serde(flatten)]
     pub error: SinkronError,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SyncCompleteMessage {
     pub col: String,
     pub colrev: i64,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GetMessage {
     pub col: String,
     pub id: Uuid,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GetErrorMessage {
     pub col: String,
     pub id: Uuid,
@@ -69,7 +69,7 @@ pub struct GetErrorMessage {
     pub error: SinkronError,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ClientCreateMessage {
     pub col: String,
     pub id: Uuid,
@@ -77,13 +77,13 @@ pub struct ClientCreateMessage {
     pub files: Vec<Uuid>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct FilesUpdate {
     pub add: Vec<Uuid>,
     pub delete: Vec<Uuid>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientUpdateMessage {
     pub col: String,
@@ -92,13 +92,13 @@ pub struct ClientUpdateMessage {
     pub files_update: Option<FilesUpdate>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ClientDeleteMessage {
     pub col: String,
     pub id: Uuid,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocMessage {
     pub id: Uuid,
@@ -110,7 +110,7 @@ pub struct DocMessage {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerUpdateMessage {
     pub col: String,
@@ -122,14 +122,14 @@ pub struct ServerUpdateMessage {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ServerDeleteMessage {
     pub col: String,
     pub id: Uuid,
     pub colrev: i64,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ChangeErrorMessage {
     pub col: String,
     pub id: Uuid,
@@ -137,7 +137,7 @@ pub struct ChangeErrorMessage {
     pub error: SinkronError,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ClientMessage {
     #[serde(rename = "h")]
@@ -162,7 +162,7 @@ pub enum ClientMessage {
     Delete(ClientDeleteMessage),
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum ServerMessage {
     #[serde(rename = "connection_error")]
