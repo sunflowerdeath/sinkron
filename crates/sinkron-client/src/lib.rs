@@ -78,7 +78,7 @@ impl SinkronClient {
             match err {
                 Ok(err) => Err(ClientError::Sinkron(err.error)),
                 Err(_) => Err(ClientError::Json(
-                    "Couldn't parse response json".to_string(),
+                    "Couldn't parse error response json".to_string(),
                 )),
             }
         }

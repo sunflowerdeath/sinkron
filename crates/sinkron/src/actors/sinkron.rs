@@ -16,8 +16,8 @@ use crate::actors::collection::CollectionHandle;
 use crate::actors::supervisor::ExitCallback;
 use crate::controllers::SinkronControllers;
 use crate::db::{Db, DbConnection};
-use crate::schema;
 use crate::models;
+use crate::schema;
 
 pub struct ConnectMessage {
     pub websocket: WebSocket,
@@ -40,7 +40,7 @@ struct SinkronActor {
     client_id: i32,
     collections: HashMap<String, CollectionHandle>,
     db: Db,
-    controller_cell: OnceLock<Arc<SinkronControllers>>,
+    controller_cell: Arc<OnceLock<Arc<SinkronControllers>>>,
     exit_channel: (
         mpsc::UnboundedSender<String>,
         mpsc::UnboundedReceiver<String>,
@@ -52,7 +52,7 @@ impl SinkronActor {
         self_handle: SinkronHandle,
         receiver: mpsc::UnboundedReceiver<SinkronActorMessage>,
         db: Db,
-        controller_cell: OnceLock<Arc<SinkronControllers>>,
+        controller_cell: Arc<OnceLock<Arc<SinkronControllers>>>,
     ) -> Self {
         Self {
             self_handle,
@@ -173,7 +173,7 @@ pub struct SinkronHandle {
 impl SinkronHandle {
     pub fn new(
         db: Db,
-        controller_cell: OnceLock<Arc<SinkronControllers>>,
+        controller_cell: Arc<OnceLock<Arc<SinkronControllers>>>,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let handle = Self { sender };

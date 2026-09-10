@@ -25,7 +25,7 @@ impl Sinkron {
 
         // Resolve circular dependency between SinkronActor and
         // SinkronController
-        let controller_cell = OnceLock::new();
+        let controller_cell = Arc::new(OnceLock::new());
         let actor = SinkronHandle::new(db.clone(), controller_cell.clone());
         let controller = Arc::new(SinkronControllers::new(
             db.clone(),

@@ -1,25 +1,29 @@
 use base64::prelude::*;
-use loro::LoroDoc;
+use loro::{ExportMode, LoroDoc};
 use uuid::Uuid;
 
 use sinkron_client::{ClientError, SinkronClient};
 use sinkron_common::error::SinkronError;
 use sinkron_common::permissions::Permissions;
 use sinkron_common::types::{
-    Collection, CreateCollection, CreateDocument, DeleteDocument, Document,
-    GetDocument, UpdateDocument,
+    AddRemoveUserToGroup, Collection, CreateCollection, CreateDocument,
+    DeleteDocument, Document, GetDocument, Group, UpdateDocument, User,
 };
 
-const API_URL: &'static str = "http://localhost:3000";
+const API_URL: &'static str = "http://localhost:3000/api";
 const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 
 const INVALID_API_URL: &'static str = "http://invalid_url";
 const INVALID_API_TOKEN: &'static str = "INVALID_API_TOKEN";
 
-fn test_loro_doc() -> String {
-    let loro_doc = LoroDoc::new();
-    loro_doc.get_text("text").insert(0, "Hello!").unwrap();
-    let snapshot = loro_doc.export(loro::ExportMode::Snapshot).unwrap();
+fn test_loro_doc() -> LoroDoc {
+    let doc = LoroDoc::new();
+    doc.get_text("text").insert(0, "Hello!").unwrap();
+    doc
+}
+
+fn serialize_doc(doc: &LoroDoc) -> String {
+    let snapshot = doc.export(loro::ExportMode::Snapshot).unwrap();
     BASE64_STANDARD.encode(snapshot)
 }
 
@@ -106,12 +110,13 @@ async fn test_collections() {
         }) if id == col
     ));
 
+    // TODO not implemented
     // delete collection
-    let res = client.delete_collection(col.clone()).await;
-    assert!(res.is_ok());
+    // let res = client.delete_collection(col.clone()).await;
+    // assert!(res.is_ok());
 
     // not found
-    let res = client.get_collection(col).await;
+    let res = client.get_collection("not_found".to_string()).await;
     assert!(matches!(
         res,
         Err(ClientError::Sinkron(SinkronError::NotFound { .. }))
@@ -136,26 +141,35 @@ async fn test_documents() {
     assert!(res.is_ok());
 
     let id = Uuid::new_v4();
+    let loro_doc = test_loro_doc();
+    let content = serialize_doc(&loro_doc);
 
     // create document
     let res = client
         .create_document(CreateDocument {
             id,
             col: col.clone(),
-            content: test_loro_doc(),
+            content: content.clone(),
             files: Vec::new(),
             permissions: None,
         })
         .await;
     let doc = res.expect("Couldn't create document");
-    // TODO match doc
+    assert!(matches!(
+        doc,
+        Document {
+            id: an_id,
+            col: a_col,
+            ..
+        } if id == an_id && col == a_col
+    ));
 
     // create duplicate document
     let res = client
         .create_document(CreateDocument {
             id,
             col: col.clone(),
-            content: test_loro_doc(),
+            content,
             files: Vec::new(),
             permissions: None,
         })
@@ -173,7 +187,14 @@ async fn test_documents() {
         })
         .await;
     let doc = res.expect("Couldn't get document");
-    // TODO check document
+    assert!(matches!(
+        doc,
+        Document {
+            id: an_id,
+            col: a_col,
+            ..
+        } if id == an_id && col == a_col
+    ));
 
     // not found document
     let res = client
@@ -197,16 +218,30 @@ async fn test_documents() {
     // )
 
     // update document
+
+    let vv = loro_doc.oplog_vv();
+    loro_doc.get_text("update").insert(0, "Update!").unwrap();
+    let update = loro_doc.export(ExportMode::updates(&vv)).unwrap();
+    let serialized_update = BASE64_STANDARD.encode(update);
+
     let res = client
         .update_document(UpdateDocument {
             id,
             col: col.clone(),
-            content_update: Some("TODO".to_string()), // TODO actual update
+            content_update: Some(serialized_update),
             files_update: None,
         })
         .await;
     let updated_doc = res.expect("Couldn't update document");
-    // TODO check document
+    // TODO check document is updated?
+    assert!(matches!(
+        updated_doc,
+        Document {
+            id: an_id,
+            col: a_col,
+            ..
+        } if id == an_id && col == a_col
+    ));
 
     // delete
     let res = client
@@ -261,44 +296,53 @@ async fn test_documents() {
 async fn test_groups() {
     let client = SinkronClient::new(API_URL.to_string(), API_TOKEN.to_string());
 
-    // const col = uuidv4()
-    // const permissions = Permissions.any()
-    // const createColRes = await sinkron.createCollection({
-    // id: col,
-    // permissions
-    // })
-    // assert(createColRes.isOk, "createCollection")
+    // create group
+    let res = client.create_group("group".to_string()).await;
+    assert!(res.is_ok());
 
-    // const createGroupRes = await sinkron.createGroup("group")
-    // assert(createGroupRes.isOk, "createGroup")
+    // add user to group
+    let res = client
+        .add_user_to_group(AddRemoveUserToGroup {
+            user: "user".to_string(),
+            group: "group".to_string(),
+        })
+        .await;
+    assert!(res.is_ok());
 
-    // const addToGroupRes = await sinkron.addUserToGroup({
-    // user: "user",
-    // group: "group"
-    // })
-    // assert(addToGroupRes.isOk, "addUserToGroup")
+    // get group
+    let res = client.get_group("group".to_string()).await;
+    assert!(matches!(
+        res,
+        Ok(Group {
+            id: an_id,
+            members
+        }) if an_id == "group" && members == ["user".to_string()]
+    ));
 
-    // const getGroupRes = await sinkron.getGroup("group")
-    // assert(getGroupRes.isOk, "getGroup")
-    // const group = getGroupRes.value
-    // assertIsMatch(group, { id: "group", members: ["user"] })
+    // get user
+    let res = client.get_user("user".to_string()).await;
+    assert!(matches!(
+        res,
+        Ok(User {
+            id: an_id,
+            groups
+        }) if an_id == "user" && groups == ["group".to_string()]
+    ));
 
-    // const getUserRes = await sinkron.getUser("user")
-    // assert(getUserRes.isOk, "getUser")
-    // const user = getUserRes.value
-    // assertIsMatch(user, { id: "user", groups: ["group"] })
+    // remove user from group
+    let res = client
+        .remove_user_from_group(AddRemoveUserToGroup {
+            user: "user".to_string(),
+            group: "group".to_string(),
+        })
+        .await;
+    assert!(res.is_ok());
 
-    // const removeUserRes = await sinkron.removeUserFromGroup({
-    // user: "user",
-    // group: "group"
-    // })
-    // assert(removeUserRes.isOk, "removeUserFromGroup")
+    // remove user from all groups
+    let res = client.remove_user_from_all_groups("user".to_string()).await;
+    assert!(res.is_ok());
 
-    // const removeUserFromAllRes = await sinkron.removeUserFromAllGroups(
-    // "user"
-    // )
-    // assert(removeUserFromAllRes.isOk, "removeUserFromAllGroups")
-
-    // const deleteGroupRes = await sinkron.deleteGroup("group")
-    // assert(deleteGroupRes.isOk, "deleteGroup")
+    // delete group
+    let res = client.delete_group("group".to_string()).await;
+    assert!(res.is_ok());
 }

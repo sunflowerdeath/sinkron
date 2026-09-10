@@ -47,7 +47,7 @@ impl SinkronPublicApi {
     }
 
     pub fn router(&self) -> Router {
-        let header_auth_routes = Router::new()
+        let files_routes = Router::new()
             .route("/init_file_upload", post(init_file_upload))
             .route("/upload_file_chunk", post(upload_file_chunk))
             .route("/get_file_chunk", get(get_file_chunk))
@@ -58,7 +58,7 @@ impl SinkronPublicApi {
             .with_state(self.clone());
         Router::new()
             .route("/sync", any(sync_handler))
-            .merge(header_auth_routes)
+            .nest("/files", files_routes)
             .with_state(self.clone())
     }
 
