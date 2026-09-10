@@ -16,7 +16,7 @@ const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 const INVALID_API_URL: &'static str = "http://invalid_url";
 const INVALID_API_TOKEN: &'static str = "INVALID_API_TOKEN";
 
-fn test_loro_doc() -> LoroDoc {
+fn new_test_doc() -> LoroDoc {
     let doc = LoroDoc::new();
     doc.get_text("text").insert(0, "Hello!").unwrap();
     doc
@@ -140,11 +140,11 @@ async fn test_documents() {
         .await;
     assert!(res.is_ok());
 
+    // create document
     let id = Uuid::new_v4();
-    let loro_doc = test_loro_doc();
+    let loro_doc = new_test_doc();
     let content = serialize_doc(&loro_doc);
 
-    // create document
     let res = client
         .create_document(CreateDocument {
             id,
