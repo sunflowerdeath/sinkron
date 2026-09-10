@@ -1,9 +1,9 @@
 use uuid::Uuid;
 
-use sinkron_client::SinkronClient;
+use sinkron_client::{ClientError, SinkronClient};
 use sinkron_common::error::SinkronError;
 use sinkron_common::types::{
-    CreateCollection, CreateDocument, DeleteDocument, GetDocument,
+    Collection, CreateCollection, CreateDocument, DeleteDocument, GetDocument,
 };
 
 const API_URL: &'static str = "http://localhost:3000";
@@ -14,71 +14,97 @@ const INVALID_API_TOKEN: &'static str = "INVALID_API_TOKEN";
 
 #[tokio::test]
 async fn test_auth() {
-    // const permissions = Permissions.any()
-
     let client =
         SinkronClient::new(INVALID_API_URL.to_string(), API_TOKEN.to_string());
-    // const invalidUrlClient = new SinkronClient({
-    // url: "INVALID",
-    // token: "INVALID"
-    // })
-    // const invalidUrlRes = await invalidUrlClient.createCollection({
-    // id: uuidv4(),
-    // permissions
-    // })
-    // assert(!invalidUrlRes.isOk, "fetch error")
-    // assert.strictEqual(invalidUrlRes.error.code, ErrorCode.FetchError)
+    let res = client
+        .create_collection(CreateCollection {
+            id: Uuid::new_v4().to_string(),
+            is_ref: false,
+            permissions: "TODO".to_string(),
+            storage_limit: 0,
+        })
+        .await;
+    assert!(matches!(res, Err(ClientError::Request(_))));
 
     let client =
         SinkronClient::new(API_URL.to_string(), INVALID_API_TOKEN.to_string());
-    // const invalidTokenClient = new SinkronClient({ url, token: "INVALID" })
-    // const invalidTokenRes = await invalidTokenClient.createCollection({
-    // id: uuidv4(),
-    // permissions
-    // })
-    // assert(!invalidTokenRes.isOk, "auth failed")
-    // assert.strictEqual(invalidTokenRes.error.code, ErrorCode.AuthFailed)
+    let res = client
+        .create_collection(CreateCollection {
+            id: Uuid::new_v4().to_string(),
+            is_ref: false,
+            permissions: "TODO".to_string(),
+            storage_limit: 0,
+        })
+        .await;
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(SinkronError::AuthFailed { .. }))
+    ));
 }
 
 #[tokio::test]
 async fn test_collections() {
     let client = SinkronClient::new(API_URL.to_string(), API_TOKEN.to_string());
 
-    // const col = uuidv4()
-    // const permissions = Permissions.any()
-    // const createRes = await sinkron.createCollection({
-    // id: col,
-    // permissions
-    // })
-    // assertIsMatch(createRes, {
-    // isOk: true,
-    // value: { id: col, colrev: 0 }
-    // })
+    let col = Uuid::new_v4().to_string();
 
-    // const duplicateRes = await sinkron.createCollection({
-    // id: col,
-    // permissions
-    // })
-    // assert(!duplicateRes.isOk, "duplicate")
-    // assertIsMatch(duplicateRes, {
-    // isOk: false,
-    // error: { code: ErrorCode.UnprocessableContent }
-    // })
+    // create collection
+    let res = client
+        .create_collection(CreateCollection {
+            id: col.clone(),
+            is_ref: false,
+            permissions: "TODO".to_string(),
+            storage_limit: 0,
+        })
+        .await;
+    assert!(matches!(
+        res,
+        Ok(Collection {
+            id,
+            colrev: 0,
+            is_ref: false,
+            ..
+        }) if id == col
+    ));
 
-    // const getRes = await sinkron.getCollection(col)
-    // assertIsMatch(getRes, {
-    // isOk: true,
-    // value: { id: col, colrev: 0 }
-    // })
+    // create duplicate col
+    let res = client
+        .create_collection(CreateCollection {
+            id: col.clone(),
+            is_ref: false,
+            permissions: "TODO".to_string(),
+            storage_limit: 0,
+        })
+        .await;
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(
+            SinkronError::UnprocessableContent { .. }
+        ))
+    ));
 
-    // const notFoundRes = await sinkron.getCollection("not_found")
-    // assertIsMatch(notFoundRes, {
-    // isOk: false,
-    // error: { code: ErrorCode.NotFound }
-    // })
+    // get collection
+    let res = client.get_collection(col.clone()).await;
+    assert!(matches!(
+        res,
+        Ok(Collection {
+            id,
+            colrev: 0,
+            is_ref: false,
+            ..
+        }) if id == col
+    ));
 
-    // // const deleteRes = await sinkron.deleteCollection("test")
-    // // assert(deleteRes.isOk, "delete")
+    // delete collection
+    let res = client.delete_collection(col.clone()).await;
+    assert!(res.is_ok());
+
+    // not found
+    let res = client.get_collection(col).await;
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(SinkronError::NotFound { .. }))
+    ));
 }
 
 #[tokio::test]
@@ -125,7 +151,7 @@ async fn test_documents() {
     let err = res.unwrap_err();
     assert_eq!(
         err,
-        ClientError::Response(SinkronError::DuplicateDocumentId)
+        ClientError::Sinkron(SinkronError::DuplicateDocumentId)
     );
 
     // get document

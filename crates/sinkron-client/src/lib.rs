@@ -10,8 +10,12 @@ use sinkron_common::types::{
 
 #[derive(Debug)]
 pub enum ClientError {
+    // Couldn't perform request
     Request(String),
-    Response(SinkronError),
+    // Serialization or deserialization error
+    Json(String),
+    // Sinkron error response
+    Sinkron(SinkronError),
 }
 
 #[derive(Deserialize)]
@@ -72,8 +76,8 @@ impl SinkronClient {
         } else {
             let err = res.json::<SinkronErrorResponse>().await;
             match err {
-                Ok(err) => Err(ClientError::Response(err.error)),
-                Err(_) => Err(ClientError::Request(
+                Ok(err) => Err(ClientError::Sinkron(err.error)),
+                Err(_) => Err(ClientError::Json(
                     "Couldn't parse response json".to_string(),
                 )),
             }
@@ -87,7 +91,7 @@ impl SinkronClient {
     ) -> Result<U, ClientError> {
         let res = self.send_request(url, payload).await?;
         res.json::<U>().await.map_err(|_| {
-            ClientError::Request("Couldn't parse response json".to_string())
+            ClientError::Json("Couldn't parse response json".to_string())
         })
     }
 

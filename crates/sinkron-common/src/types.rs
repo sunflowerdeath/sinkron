@@ -10,7 +10,7 @@ pub struct Id {
     pub id: String
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Collection {
     pub id: String,
