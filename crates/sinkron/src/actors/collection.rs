@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use sinkron_common::error::{SinkronError, internal_error};
 use sinkron_common::permissions::{Action, Permissions};
-use sinkron_common::types::{Collection, Document};
 use sinkron_common::protocol::*;
+use sinkron_common::types::{Collection, Document};
 
 use crate::actors::client::ClientChannelSender;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
@@ -19,6 +19,16 @@ use crate::controllers::SinkronControllers;
 use crate::db::{Db, DbConnection};
 use crate::models;
 use crate::schema;
+
+fn filter_null_values<T>(items: Vec<Option<T>>) -> Vec<T> {
+    let mut res = Vec::new();
+    for item in items {
+        if let Some(f) = item {
+            res.push(f)
+        }
+    }
+    res
+}
 
 // Collection actor performs document operations over single collection,
 // then replies back with results and also broadcasts messages to all
@@ -281,6 +291,7 @@ impl CollectionActor {
             created_at: doc.created_at,
             updated_at: doc.updated_at,
             content: doc.content.map(|content| BASE64_STANDARD.encode(content)),
+            files: filter_null_values(doc.files),
             col: doc.col_id,
             colrev: doc.colrev,
             permissions: doc.permissions,
@@ -444,7 +455,7 @@ impl CollectionActor {
             created_at,
             updated_at: created_at,
             content: Some(content),
-            // TODO files
+            files: Vec::new(), // TODO files
             col: self.id.clone(),
             colrev: next_colrev,
             permissions,
@@ -517,18 +528,19 @@ impl CollectionActor {
             return Err(SinkronError::DocumentAlreadyDeleted);
         }
 
+        // TODO delete files
+
         // Increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;
 
         // TODO increment refs colrev
 
         // Update document
-        let files = Some(Vec::new());
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
             is_deleted: true,
             content: Some(None),
-            files: files.as_ref(),
+            files: Some(&Vec::new()),
         };
         let updated_at: chrono::DateTime<chrono::Utc> =
             diesel::update(schema::documents::table)
@@ -551,8 +563,8 @@ impl CollectionActor {
             id: doc.id,
             created_at: doc.created_at,
             updated_at,
-            content: Some("".to_string()), // correct new content or old content
-            // files: Vec::new(), // TODO
+            content: None,
+            files: Vec::new(),
             col: doc.col_id,
             colrev: next_colrev,
             permissions: doc.permissions,
@@ -588,15 +600,16 @@ impl CollectionActor {
             return Err(SinkronError::DocumentAlreadyDeleted);
         }
 
-        let content_update_value = match &content_update {
+        // content & files are updated using Diesel AsChangeset behaviour
+        let next_content = match &content_update {
             Some(update) => {
-                let doc_content = doc.content.unwrap();
+                let doc_content = doc.content.clone().unwrap();
                 Some(Some(self.update_loro_doc(doc_content, &update).await?))
             }
             None => None,
         };
 
-        let files_update_value = match files_update {
+        let next_files = match files_update {
             Some(files_update) => {
                 // TODO actually update files
                 Some(Vec::<Uuid>::new())
@@ -613,8 +626,8 @@ impl CollectionActor {
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
             is_deleted: false,
-            content: content_update_value.as_ref().map(|i| i.as_ref()),
-            files: files_update_value.as_ref(),
+            content: next_content.as_ref().map(|i| i.as_ref()),
+            files: next_files.as_ref(),
         };
         let updated_at: chrono::DateTime<chrono::Utc> =
             diesel::update(schema::documents::table)
@@ -627,27 +640,33 @@ impl CollectionActor {
 
         drop(conn);
 
+        let updated_doc_files = match next_files {
+            Some(files) => files,
+            None => filter_null_values(doc.files),
+        };
+
         // Broadcast message to subscribers
         let msg = ServerUpdateMessage {
             id,
             col: self.id.clone(),
             colrev: next_colrev,
             content_update,
-            files: files_update_value.unwrap_or(Vec::new()),
-            // TODO OR doc.files (but correctly filter)
+            files: updated_doc_files.clone(),
             created_at: doc.created_at,
             updated_at,
         };
         self.broadcast(ServerMessage::Update(msg));
 
-        // let serialized_new_content =
-        // content_update.map(|d| BASE64_STANDARD.encode(d));
+        let serialized_new_content = next_content
+            .unwrap_or_else(|| doc.content)
+            .map(|d| BASE64_STANDARD.encode(d));
 
         let updated_doc = Document {
             id: doc.id,
             created_at: doc.created_at,
             updated_at,
-            content: Some("".to_string()), // correct new data or old data
+            content: serialized_new_content,
+            files: updated_doc_files,
             col: doc.col_id,
             colrev: next_colrev,
             permissions: doc.permissions,

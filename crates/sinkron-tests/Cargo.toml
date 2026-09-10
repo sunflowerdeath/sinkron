@@ -13,3 +13,5 @@ sinkron = { path = "../sinkron" }
 sinkron-common = { path = "../sinkron-common" }
 sinkron-client = { path = "../sinkron-client" }
 serde_json.workspace = true
+loro = "1.16.0"
+base64 = "0.23.1"

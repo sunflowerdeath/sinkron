@@ -39,6 +39,7 @@ pub struct Document {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub content: Option<String>,
+    pub files: Vec<Uuid>,
     pub col: String,
     pub colrev: i64,
     pub permissions: String,

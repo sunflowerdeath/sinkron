@@ -1,10 +1,13 @@
+use base64::prelude::*;
+use loro::LoroDoc;
 use uuid::Uuid;
 
 use sinkron_client::{ClientError, SinkronClient};
-use sinkron_common::permissions::Permissions;
 use sinkron_common::error::SinkronError;
+use sinkron_common::permissions::Permissions;
 use sinkron_common::types::{
-    Collection, CreateCollection, CreateDocument, DeleteDocument, GetDocument,
+    Collection, CreateCollection, CreateDocument, DeleteDocument, Document,
+    GetDocument, UpdateDocument,
 };
 
 const API_URL: &'static str = "http://localhost:3000";
@@ -12,6 +15,13 @@ const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 
 const INVALID_API_URL: &'static str = "http://invalid_url";
 const INVALID_API_TOKEN: &'static str = "INVALID_API_TOKEN";
+
+fn test_loro_doc() -> String {
+    let loro_doc = LoroDoc::new();
+    loro_doc.get_text("text").insert(0, "Hello!").unwrap();
+    let snapshot = loro_doc.export(loro::ExportMode::Snapshot).unwrap();
+    BASE64_STANDARD.encode(snapshot)
+}
 
 #[tokio::test]
 async fn test_auth() {
@@ -132,7 +142,7 @@ async fn test_documents() {
         .create_document(CreateDocument {
             id,
             col: col.clone(),
-            content: "TODO".to_string(), // TODO
+            content: test_loro_doc(),
             files: Vec::new(),
             permissions: None,
         })
@@ -145,7 +155,7 @@ async fn test_documents() {
         .create_document(CreateDocument {
             id,
             col: col.clone(),
-            content: "TODO".to_string(), // TODO
+            content: test_loro_doc(),
             files: Vec::new(),
             permissions: None,
         })
@@ -169,16 +179,13 @@ async fn test_documents() {
     let res = client
         .get_document(GetDocument {
             id: Uuid::new_v4(),
-            col,
+            col: col.clone(),
         })
         .await;
-    assert!(res.is_err());
-    // TODO check error => NOT FOUND
-    // assert.strictEqual(
-    // notFoundRes.error.code,
-    // ErrorCode.NotFound,
-    // "not found"
-    // )
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(SinkronError::NotFound { .. }))
+    ));
 
     // // col not found
     // const colNotFoundRes = await sinkron.getDocument({ id, col: uuidv4() })
@@ -189,43 +196,65 @@ async fn test_documents() {
     // "col not found"
     // )
 
-    // // update
-    // const version = loroDoc.version()
-    // loroDoc.getText("text").insert(5, ", world!")
-    // const update = loroDoc.export({ mode: "update", from: version })
-    // const updateRes = await sinkron.updateDocument({
-    // id,
-    // col,
-    // data: update
-    // })
-    // assert(updateRes.isOk, "update")
+    // update document
+    let res = client
+        .update_document(UpdateDocument {
+            id,
+            col: col.clone(),
+            content_update: Some("TODO".to_string()), // TODO actual update
+            files_update: None,
+        })
+        .await;
+    let updated_doc = res.expect("Couldn't update document");
+    // TODO check document
 
-    // // delete
-    // const deleteRes = await sinkron.deleteDocument({ id, col })
-    // assert(deleteRes.isOk, "delete")
-    // assert.strictEqual(deleteRes.value.data, null, "delete")
+    // delete
+    let res = client
+        .delete_document(DeleteDocument {
+            id,
+            col: col.clone(),
+        })
+        .await;
+    assert!(res.is_ok());
+    // TODO match deleted document
+    // let deleted_doc = res.expect("Couldn't delete document");
+    // assert!(matches!(
+    // deleted_doc,
+    // Document {
+    // id: an_id,
+    // content: None,
+    // ..
+    // } if id == an_id ));
 
-    // // already deleted
-    // const alreadyDeletedRes = await sinkron.deleteDocument({ id, col })
-    // assert(!alreadyDeletedRes.isOk, "already deleted")
-    // assert.strictEqual(
-    // alreadyDeletedRes.error.code,
-    // ErrorCode.UnprocessableContent,
-    // "already deleted"
-    // )
+    // delete already deleted
+    let res = client
+        .delete_document(DeleteDocument {
+            id,
+            col: col.clone(),
+        })
+        .await;
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(
+            SinkronError::DocumentAlreadyDeleted { .. }
+        ))
+    ));
 
-    // // update deleted
-    // const updateDeletedRes = await sinkron.updateDocument({
-    // id,
-    // col,
-    // data: update
-    // })
-    // assert(!updateDeletedRes.isOk, "update deleted")
-    // assert.strictEqual(
-    // updateDeletedRes.error.code,
-    // ErrorCode.UnprocessableContent,
-    // "update deleted"
-    // )
+    // update deleted
+    let res = client
+        .update_document(UpdateDocument {
+            id,
+            col,
+            content_update: Some("TODO".to_string()), // TODO actual update
+            files_update: None,
+        })
+        .await;
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(
+            SinkronError::DocumentAlreadyDeleted { .. }
+        ))
+    ));
 }
 
 #[tokio::test]
