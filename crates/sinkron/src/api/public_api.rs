@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Json, Router,
     body::Bytes,
-    extract::ws::{WebSocket, WebSocketUpgrade},
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{Query, Request, State},
     middleware,
     response::Response,
@@ -14,6 +14,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use sinkron_common::error::{SinkronError, internal_error};
+use sinkron_common::protocol::ServerMessage;
 
 use crate::actors::sinkron::{
     ConnectMessage, SinkronActorMessage, SinkronHandle,
@@ -46,17 +47,18 @@ impl SinkronPublicApi {
     }
 
     pub fn router(&self) -> Router {
-        Router::new()
-            // Websocket
-            .route("/sync", any(sync_handler))
-            // Files
+        let header_auth_routes = Router::new()
             .route("/init_file_upload", post(init_file_upload))
             .route("/upload_file_chunk", post(upload_file_chunk))
             .route("/get_file_chunk", get(get_file_chunk))
             .layer(middleware::from_fn_with_state(
                 self.clone(),
-                auth_middleware,
+                header_auth_middleware,
             ))
+            .with_state(self.clone());
+        Router::new()
+            .route("/sync", any(sync_handler))
+            .merge(header_auth_routes)
             .with_state(self.clone())
     }
 
@@ -85,7 +87,7 @@ impl SinkronPublicApi {
         }
     }
 
-    async fn handle_connect(&self, websocket: WebSocket, query: SyncQuery) {
+    async fn handle_connect(&self, mut websocket: WebSocket, query: SyncQuery) {
         let user_id = match self.auth(&query.token).await {
             Ok(user) => {
                 debug!("sinkron: authorized client as {}", user);
@@ -93,14 +95,11 @@ impl SinkronPublicApi {
             }
             Err(err) => {
                 debug!("sinkron: client authorization failed {:?}", err);
-                // TODO send something?
-                // let msg = ServerMessage::SyncError(SyncErrorMessage {
-                // code: err.code,
-                // });
-                // let Ok(str_msg) = serde_json::to_string(&msg) else {
-                // return;
-                // };
-                // _ = websocket.send(Message::Text(str_msg.into())).await;
+                let msg = ServerMessage::ConnectionError(err);
+                let Ok(str_msg) = serde_json::to_string(&msg) else {
+                    return;
+                };
+                _ = websocket.send(Message::Text(str_msg.into())).await;
                 return;
             }
         };
@@ -113,7 +112,7 @@ impl SinkronPublicApi {
     }
 }
 
-async fn auth_middleware(
+async fn header_auth_middleware(
     State(state): State<SinkronPublicApi>,
     req: Request,
     next: middleware::Next,

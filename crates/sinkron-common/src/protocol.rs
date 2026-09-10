@@ -225,28 +225,3 @@ pub fn serialize_with_channel_prefix<T: Serialize>(
         Err(_) => None,
     }
 }
-
-/*
-
-struct FileInitRequest {
-    col: String,
-    size: i64
-}
-
-struct FileInitResponse {
-    id: Uuid
-}
-
-enum FileInitErrorDetails {
-    #[serde(rename = "insufficient_storage")]
-    InsufficientStorage,
-    #[serde(rename = "file_too_large")]
-    FileTooLarge
-}
-
-struct FileInitError {
-    code: ErrorCode,
-    details: FileInitErrorDetails
-}
-
-*/

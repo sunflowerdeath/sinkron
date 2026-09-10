@@ -16,20 +16,31 @@ services:
             timeout: 3s
 
     sinkron:
-        build: .
+        build:
+          context: ../..
+          dockerfile: sinkron.Dockerfile
         environment:
             SINKRON_CONFIG: >
                 {
                     "host": "0.0.0.0",
                     "port": 80,
-                    "apiToken": "SINKRON_API_TOKEN",
-                    "syncAuthUrl": "http://auth/",
                     "db": {
                         "host": "postgres",
                         "port": 5432,
                         "user": "postgres",
                         "password": "password",
                         "database": "sinkron"
+                    },
+                    "storage": {
+                      "type": "fs",
+                      "temp_path": "temp/files/temp",
+                      "permanent_path": "temp/files/permanent"
+                    },
+                    "publicApi": {
+                        "authUrl": "http://auth/"
+                    },
+                    "internalApi": {
+                        "apiToken": "SINKRON_API_TOKEN"
                     }
                 }
             RUST_LOG: sinkron=trace
@@ -38,3 +49,4 @@ services:
                 condition: service_healthy
         ports:
             - 3000:80
+

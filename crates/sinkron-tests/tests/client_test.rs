@@ -1,6 +1,7 @@
 use uuid::Uuid;
 
 use sinkron_client::{ClientError, SinkronClient};
+use sinkron_common::permissions::Permissions;
 use sinkron_common::error::SinkronError;
 use sinkron_common::types::{
     Collection, CreateCollection, CreateDocument, DeleteDocument, GetDocument,
@@ -9,7 +10,7 @@ use sinkron_common::types::{
 const API_URL: &'static str = "http://localhost:3000";
 const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 
-const INVALID_API_URL: &'static str = "http://INVALID";
+const INVALID_API_URL: &'static str = "http://invalid_url";
 const INVALID_API_TOKEN: &'static str = "INVALID_API_TOKEN";
 
 #[tokio::test]
@@ -20,7 +21,7 @@ async fn test_auth() {
         .create_collection(CreateCollection {
             id: Uuid::new_v4().to_string(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: Permissions::empty().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -32,7 +33,7 @@ async fn test_auth() {
         .create_collection(CreateCollection {
             id: Uuid::new_v4().to_string(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: Permissions::empty().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -53,7 +54,7 @@ async fn test_collections() {
         .create_collection(CreateCollection {
             id: col.clone(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: Permissions::empty().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -72,7 +73,7 @@ async fn test_collections() {
         .create_collection(CreateCollection {
             id: col.clone(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: Permissions::empty().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -118,7 +119,7 @@ async fn test_documents() {
         .create_collection(CreateCollection {
             id: col.clone(),
             is_ref: false,
-            permissions: "TODO".to_string(),
+            permissions: Permissions::empty().to_string(),
             storage_limit: 0,
         })
         .await;
@@ -137,6 +138,7 @@ async fn test_documents() {
         })
         .await;
     let doc = res.expect("Couldn't create document");
+    // TODO match doc
 
     // create duplicate document
     let res = client
@@ -148,14 +150,18 @@ async fn test_documents() {
             permissions: None,
         })
         .await;
-    let err = res.unwrap_err();
-    assert_eq!(
-        err,
-        ClientError::Sinkron(SinkronError::DuplicateDocumentId)
-    );
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(SinkronError::DuplicateDocumentId))
+    ));
 
     // get document
-    let res = client.get_document(GetDocument { id, col }).await;
+    let res = client
+        .get_document(GetDocument {
+            id,
+            col: col.clone(),
+        })
+        .await;
     let doc = res.expect("Couldn't get document");
     // TODO check document
 
