@@ -196,10 +196,10 @@ async fn test_documents() {
         } if id == an_id && col == a_col
     ));
 
-    // not found document
+    // not found document id
     let res = client
         .get_document(GetDocument {
-            id: Uuid::new_v4(),
+            id: Uuid::new_v4(), // <- not found id
             col: col.clone(),
         })
         .await;
@@ -208,14 +208,17 @@ async fn test_documents() {
         Err(ClientError::Sinkron(SinkronError::NotFound { .. }))
     ));
 
-    // // col not found
-    // const colNotFoundRes = await sinkron.getDocument({ id, col: uuidv4() })
-    // assert(!colNotFoundRes.isOk, "col not found")
-    // assert.strictEqual(
-    // colNotFoundRes.error.code,
-    // ErrorCode.NotFound,
-    // "col not found"
-    // )
+    // not found col
+    let res = client
+        .get_document(GetDocument {
+            id,
+            col: Uuid::new_v4().to_string(), // <- not found col
+        })
+        .await;
+    assert!(matches!(
+        res,
+        Err(ClientError::Sinkron(SinkronError::NotFound { .. }))
+    ));
 
     // update document
 
