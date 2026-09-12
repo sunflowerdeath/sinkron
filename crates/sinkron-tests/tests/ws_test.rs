@@ -657,7 +657,8 @@ async fn test_files() {
     })
     .to_string();
     let res =
-        send_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload).await;
+        send_api_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload)
+            .await;
     assert!(!res.status().is_success());
     let err = res
         .json::<SinkronErrorResponseBody<SinkronError>>()
@@ -692,9 +693,9 @@ async fn test_files() {
             .await;
     assert!(res.status().is_success());
 
-    // upload chunk with invalid number
+    // upload chunk with invalid chunk number
     let url = format!(
-        "files/upload_file_chunk?col_id={}&file_id={}&chunk={}",
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk_number={}",
         col, file_id, 3
     );
     let res =
@@ -713,18 +714,19 @@ async fn test_files() {
 
     // upload valid chunks
     let url = format!(
-        "files/upload_file_chunk?col_id={}&file_id={}&chunk={}",
-        col, file_id, 0
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk_number={}",
+        col, file_id, 1
     );
     let res = send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data).await;
     assert!(res.status().is_success());
 
     let url = format!(
-        "files/upload_file_chunk?col_id={}&file_id={}&chunk={}",
-        col, file_id, 1
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk_number={}",
+        col, file_id, 2
     );
     let res = send_api_reqwest(&url, USER_AUTH_TOKEN, second_chunk_data).await;
     assert!(res.status().is_success());
 
     // create document with file
+    // TODO
 }

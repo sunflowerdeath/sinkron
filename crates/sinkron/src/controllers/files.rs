@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::PathBuf;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use diesel::prelude::*;
@@ -31,7 +34,10 @@ pub struct S3StorageConfig {
 }
 
 #[derive(Clone, serde::Deserialize)]
-pub struct FsStorageConfig {}
+pub struct FsStorageConfig {
+    pub temp_path: String,
+    pub permanent_path: String,
+}
 
 /*
 To upload a file client first initiates upload using `init_file_upload` method.
@@ -198,7 +204,8 @@ impl FilesController {
             })?;
 
         // check chunk number
-        let chunks_count = (file_upload.size as u64 / CHUNK_SIZE) as u32;
+        let chunks_count =
+            (file_upload.size as u64).div_ceil(CHUNK_SIZE) as u32;
         if chunk_number == 0 || chunk_number > chunks_count {
             return Err(SinkronError::unprocessable("Invalid chunk number"));
         }
@@ -505,11 +512,31 @@ impl StorageAdapter for S3StorageAdapter {
     }
 }
 
-struct FsStorageAdapter {}
+struct FsStorageAdapter {
+    temp_path: PathBuf,
+    permanent_path: PathBuf,
+}
 
 impl FsStorageAdapter {
     fn new(config: FsStorageConfig) -> Self {
-        Self {}
+        let temp_path = PathBuf::from(config.temp_path);
+        let _ = fs::create_dir_all(&temp_path);
+
+        let permanent_path = PathBuf::from(config.permanent_path);
+        let _ = fs::create_dir_all(&permanent_path);
+
+        Self {
+            temp_path,
+            permanent_path,
+        }
+    }
+
+    fn chunk_path(&self, file_id: Uuid, chunk_number: u32) -> PathBuf {
+        let filename = "".to_string()
+            + &file_id.to_string()
+            + "_"
+            + &chunk_number.to_string();
+        self.temp_path.join(filename)
     }
 }
 
@@ -521,7 +548,10 @@ impl StorageAdapter for FsStorageAdapter {
         chunk_number: u32,
         content: &[u8],
     ) -> Result<(), SinkronError> {
-        Err(SinkronError::internal("Not implemented"))
+        let path = self.chunk_path(file_id, chunk_number);
+        tokio::fs::write(&path, content)
+            .await
+            .map_err(|err| SinkronError::internal(&err.to_string()))
     }
 
     async fn create_file_from_chunks(
