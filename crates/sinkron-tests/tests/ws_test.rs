@@ -1,13 +1,16 @@
 use base64::prelude::*;
 use futures_util::{SinkExt, StreamExt};
 use loro::{ExportMode, LoroDoc};
+use reqwest;
+use reqwest::header::{HeaderMap, HeaderValue};
+use serde_json::json;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 use tungstenite::protocol::Message;
 use uuid::Uuid;
 
 use sinkron_client::SinkronClient;
-use sinkron_common::error::SinkronError;
+use sinkron_common::error::{SinkronError, SinkronErrorResponseBody};
 use sinkron_common::permissions::{Permissions, Role};
 use sinkron_common::protocol::*;
 use sinkron_common::types::{CreateCollection, CreateDocument, DeleteDocument};
@@ -18,7 +21,8 @@ const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
 fn ws_url(token: &'static str) -> String {
     format!("ws://localhost:3000/sync?token={token}")
 }
-const WS_AUTH_TOKEN: &'static str = "token-test";
+const USER_AUTH_TOKEN: &'static str = "token-test";
+const PUBLIC_API_URL: &'static str = "http://localhost:3000/";
 
 struct WsTest {
     ws: WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -120,7 +124,7 @@ async fn test_connect() {
 
     // invalid col
     {
-        let url = ws_url(WS_AUTH_TOKEN);
+        let url = ws_url(USER_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         let invalid_col = "INVALID_COL".to_string();
@@ -148,7 +152,7 @@ async fn test_connect() {
 
     // invalid colrev
     {
-        let url = ws_url(WS_AUTH_TOKEN);
+        let url = ws_url(USER_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         conn.send_or_fail(
@@ -175,7 +179,7 @@ async fn test_connect() {
 
     // valid
     {
-        let url = ws_url(WS_AUTH_TOKEN);
+        let url = ws_url(USER_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         conn.send_or_fail(
@@ -252,7 +256,7 @@ async fn test_sync() {
     // sync without colrev:
     //   should recieve doc1
     {
-        let url = ws_url(WS_AUTH_TOKEN);
+        let url = ws_url(USER_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         conn.send_or_fail(
@@ -292,7 +296,7 @@ async fn test_sync() {
     // sync after doc2 was created but before it was deleted:
     //   should receive "delete" message for doc2
     {
-        let url = ws_url(WS_AUTH_TOKEN);
+        let url = ws_url(USER_AUTH_TOKEN);
         let mut conn = WsTest::new_or_fail(url).await;
 
         conn.send_or_fail(
@@ -346,7 +350,7 @@ async fn test_crud() {
         .await;
     assert!(res.is_ok());
 
-    let url = ws_url(WS_AUTH_TOKEN);
+    let url = ws_url(USER_AUTH_TOKEN);
     let mut conn = WsTest::new_or_fail(url).await;
 
     // sync
@@ -487,7 +491,6 @@ async fn test_crud() {
     ));
 }
 
-// permissions
 #[tokio::test]
 async fn test_permissions() {
     let client = SinkronClient::new(API_URL.to_string(), API_TOKEN.to_string());
@@ -600,5 +603,84 @@ async fn test_permissions() {
     ));
 }
 
-// files
-//      TODO
+// enum SendReqwestError {
+// RequestError(String),
+// SinkronError(),
+// }
+
+async fn send_reqwest(
+    url: &str,
+    auth_token: &str,
+    payload: String,
+) -> reqwest::Response {
+    let mut headers = HeaderMap::new();
+    headers
+        .insert("content-type", HeaderValue::from_static("application/json"));
+    headers.insert("accept", HeaderValue::from_static("application/json"));
+    headers.insert(
+        "x-sinkron-auth-token",
+        HeaderValue::from_str(auth_token).unwrap(),
+    );
+
+    let client = reqwest::Client::new();
+    let url = "".to_string() + PUBLIC_API_URL + url;
+    let res = client.post(url).headers(headers).body(payload).send().await;
+    res.expect("Couldn't send reqwest")
+}
+
+#[tokio::test]
+async fn test_files() {
+    let client = SinkronClient::new(API_URL.to_string(), API_TOKEN.to_string());
+
+    // create collection
+    let col = Uuid::new_v4().to_string();
+    let res = client
+        .create_collection(CreateCollection {
+            id: col.clone(),
+            is_ref: false,
+            permissions: any_permissions().to_string(),
+            storage_limit: 1024 * 1024 * 10, // 10 Mb
+        })
+        .await;
+    assert!(res.is_ok());
+
+    // init file over collection storage limit
+    let file_id = Uuid::new_v4();
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": file_id,
+        "size": 1024 * 1024 * 20, // 20 Mb
+        "checksum": "", // TODO checksum
+    })
+    .to_string();
+    let res =
+        send_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload).await;
+    assert!(!res.status().is_success());
+    let err = res
+        .json::<SinkronErrorResponseBody<SinkronError>>()
+        .await
+        .expect("Couldn't parse error");
+    assert!(matches!(
+        err,
+        SinkronErrorResponseBody {
+            error: SinkronError::InsufficientStorage
+        }
+    ));
+
+    // init file
+    let file_id = Uuid::new_v4();
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": file_id,
+        "size": 1024 * 1024 * 4, // 4 Mb
+        "checksum": "", // TODO checksum
+    })
+    .to_string();
+    let res =
+        send_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload).await;
+    assert!(res.status().is_success());
+
+    // upload chunks
+
+    // create document with file
+}

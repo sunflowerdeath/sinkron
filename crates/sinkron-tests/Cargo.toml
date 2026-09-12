@@ -15,3 +15,4 @@ sinkron-client = { path = "../sinkron-client" }
 serde_json.workspace = true
 loro = "1.16.0"
 base64 = "0.23.1"
+reqwest = "0.13.5"

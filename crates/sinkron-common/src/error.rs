@@ -1,7 +1,7 @@
 use std::fmt;
 
 use log::error;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -17,11 +17,11 @@ pub enum SinkronError {
     UnprocessableContent { message: String },
 
     // Collection & document errors
-    InvalidColrev, // { col_id }
-    DuplicateDocumentId, // { col_id, doc_id }
+    InvalidColrev,          // { col_id }
+    DuplicateDocumentId,    // { col_id, doc_id }
     DocumentAlreadyDeleted, // { col_id, doc_id }
-    InsufficientStorage, // { col_id, remaining_storage }
-    ContentTooLarge, // { col_id }
+    InsufficientStorage,    // { col_id, remaining_storage }
+    ContentTooLarge,        // { col_id }
 
     // File errors
     FileNotFound { file_id: Uuid },
@@ -124,4 +124,9 @@ where
 {
     error!("internal error: {:?}", err);
     SinkronError::internal(&err.to_string())
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SinkronErrorResponseBody<E> {
+    pub error: E,
 }

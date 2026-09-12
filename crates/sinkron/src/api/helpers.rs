@@ -7,6 +7,8 @@ use axum::{
 use bytes::Bytes;
 use serde::Serialize;
 
+use sinkron_common::error::SinkronErrorResponseBody;
+
 pub fn get_header_value(req: &Request, header: &str) -> Option<String> {
     let header_value = req.headers().get(header)?;
     if let Ok(str) = header_value.to_str() {
@@ -16,13 +18,8 @@ pub fn get_header_value(req: &Request, header: &str) -> Option<String> {
     }
 }
 
-#[derive(Serialize)]
-struct SinkronErrorBody<E: Serialize> {
-    error: E,
-}
-
 pub fn err_response<E: Serialize>(error: E) -> Response {
-    let body = Json(SinkronErrorBody { error });
+    let body = Json(SinkronErrorResponseBody { error });
     (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
 }
 
