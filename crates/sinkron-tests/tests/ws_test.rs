@@ -1,8 +1,12 @@
 use base64::prelude::*;
 use futures_util::{SinkExt, StreamExt};
 use loro::{ExportMode, LoroDoc};
+use rand::Rng;
 use reqwest;
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::{
+    Body,
+    header::{HeaderMap, HeaderValue},
+};
 use serde_json::json;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -608,10 +612,10 @@ async fn test_permissions() {
 // SinkronError(),
 // }
 
-async fn send_reqwest(
+async fn send_api_reqwest<T: Into<Body>>(
     url: &str,
     auth_token: &str,
-    payload: String,
+    payload: T,
 ) -> reqwest::Response {
     let mut headers = HeaderMap::new();
     headers
@@ -621,7 +625,6 @@ async fn send_reqwest(
         "x-sinkron-auth-token",
         HeaderValue::from_str(auth_token).unwrap(),
     );
-
     let client = reqwest::Client::new();
     let url = "".to_string() + PUBLIC_API_URL + url;
     let res = client.post(url).headers(headers).body(payload).send().await;
@@ -667,20 +670,61 @@ async fn test_files() {
         }
     ));
 
-    // init file
+    // generate file data
+    let file_size = 1024 * 1024 * 3; // 3 Mb
+    let mut file_data = vec![0u8; file_size];
+    rand::rng().fill_bytes(&mut file_data);
+    let chunk_size = 2 * 1024 * 1024; // 2 Mb
+    let first_chunk_data = file_data[0..chunk_size].to_vec();
+    let second_chunk_data = file_data[chunk_size..].to_vec();
+
+    // init file upload
     let file_id = Uuid::new_v4();
     let payload = json!({
         "col_id": col.clone(),
         "file_id": file_id,
-        "size": 1024 * 1024 * 4, // 4 Mb
+        "size": file_size,
         "checksum": "", // TODO checksum
     })
     .to_string();
     let res =
-        send_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload).await;
+        send_api_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload)
+            .await;
     assert!(res.status().is_success());
 
-    // upload chunks
+    // upload chunk with invalid number
+    let url = format!(
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk={}",
+        col, file_id, 3
+    );
+    let res =
+        send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data.clone()).await;
+    assert!(!res.status().is_success());
+    let err = res
+        .json::<SinkronErrorResponseBody<SinkronError>>()
+        .await
+        .expect("Couldn't parse error");
+    assert!(matches!(
+        err,
+        SinkronErrorResponseBody {
+            error: SinkronError::UnprocessableContent { .. }
+        }
+    ));
+
+    // upload valid chunks
+    let url = format!(
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk={}",
+        col, file_id, 0
+    );
+    let res = send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data).await;
+    assert!(res.status().is_success());
+
+    let url = format!(
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk={}",
+        col, file_id, 1
+    );
+    let res = send_api_reqwest(&url, USER_AUTH_TOKEN, second_chunk_data).await;
+    assert!(res.status().is_success());
 
     // create document with file
 }

@@ -3162,6 +3162,7 @@ dependencies = [
  "base64 0.23.1",
  "futures-util",
  "loro",
+ "rand 0.10.2",
  "reqwest 0.13.5",
  "serde_json",
  "sinkron",
