@@ -52,10 +52,11 @@ CREATE TABLE "files" (
     CONSTRAINT files_pk PRIMARY KEY ("id"),
     CONSTRAINT files_fk_col
         FOREIGN KEY ("col_id") REFERENCES "collections"("id") 
-            ON DELETE NO ACTION ON UPDATE NO ACTION,
-    CONSTRAINT files_fk_doc
-        FOREIGN KEY ("doc_id") REFERENCES "documents"("id") 
             ON DELETE NO ACTION ON UPDATE NO ACTION
+    -- Disable contstraint as files must be created before document
+    --  CONSTRAINT files_fk_doc
+        --  FOREIGN KEY ("doc_id") REFERENCES "documents"("id") 
+            --  ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE INDEX ON "files" ("col_id");

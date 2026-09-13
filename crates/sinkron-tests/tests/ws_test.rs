@@ -607,11 +607,6 @@ async fn test_permissions() {
     ));
 }
 
-// enum SendReqwestError {
-// RequestError(String),
-// SinkronError(),
-// }
-
 async fn send_api_reqwest<T: Into<Body>>(
     url: &str,
     auth_token: &str,
@@ -647,7 +642,7 @@ async fn test_files() {
         .await;
     assert!(res.is_ok());
 
-    // init file over collection storage limit
+    // init file upload that exceeds collection storage limit
     let file_id = Uuid::new_v4();
     let payload = json!({
         "col_id": col.clone(),
@@ -727,6 +722,59 @@ async fn test_files() {
     let res = send_api_reqwest(&url, USER_AUTH_TOKEN, second_chunk_data).await;
     assert!(res.status().is_success());
 
-    // create document with file
-    // TODO
+    // connect
+    let url = ws_url(USER_AUTH_TOKEN);
+    let mut conn = WsTest::new_or_fail(url).await;
+
+    // sync
+    conn.send_or_fail(
+        1,
+        ClientMessage::SyncStart(SyncStartMessage {
+            col: col.clone(),
+            colrev: 0,
+        }),
+    )
+    .await;
+
+    let (chan, msg) = conn.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::SyncComplete(SyncCompleteMessage { .. })
+    ));
+
+    // create document with an attachment
+    let id = Uuid::new_v4();
+    conn.send_or_fail(
+        1,
+        ClientMessage::Create(ClientCreateMessage {
+            id,
+            col: col.clone(),
+            content: serialize_doc(&new_test_doc()),
+            files: vec![file_id],
+        }),
+    )
+    .await;
+    let (chan, msg) = conn.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::Doc(DocMessage {
+            id: an_id,
+            col: a_col,
+            files: doc_files,
+            ..
+        }) if an_id == id && a_col == col && doc_files == [file_id]
+    ));
+    // TODO files should have size and checksum ?
+
+    // TODO check collection storage
+    
+    // TODO get file
+
+    // TODO updating files
+
+    // TODO delete document
+
+    // TODO check that file is deleted
 }

@@ -407,12 +407,18 @@ impl CollectionActor {
 
         // TODO check collection is_ref
 
-        // TODO create files
-        // self.controller.files.create_files().await;
-
         let decoded = BASE64_STANDARD.decode(&content).map_err(|_| {
             SinkronError::bad_request("Couldn't decode content from base64")
         })?;
+
+        // TODO check that files is unique set ?
+        // TODO how to handle orphan files?
+        if !files.is_empty() {
+            self.controller
+                .files
+                .create_files(self.id.clone(), id, files.clone())
+                .await?;
+        }
 
         // increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;
@@ -425,7 +431,8 @@ impl CollectionActor {
             col_id: self.id.clone(),
             colrev: next_colrev,
             content: decoded,
-            files: Vec::new(), // TODO files
+            // convert to array of Nullable Uuids for storage in the db
+            files: files.iter().map(|i| Some(*i)).collect(),
             permissions: &permissions,
         };
         let created_at: chrono::DateTime<chrono::Utc> =
@@ -443,7 +450,7 @@ impl CollectionActor {
             col: self.id.clone(),
             colrev: next_colrev,
             content: content.clone(),
-            files: Vec::new(), // TODO files
+            files: files.clone(),
             created_at,
             updated_at: created_at,
         };
@@ -455,7 +462,7 @@ impl CollectionActor {
             created_at,
             updated_at: created_at,
             content: Some(content),
-            files: Vec::new(), // TODO files
+            files,
             col: self.id.clone(),
             colrev: next_colrev,
             permissions,

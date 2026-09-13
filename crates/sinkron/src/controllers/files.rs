@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -7,6 +6,9 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use s3;
 use serde::Deserialize;
+use tokio::fs;
+use tokio::fs::OpenOptions;
+use tokio::io;
 use uuid::Uuid;
 
 use sinkron_common::error::{SinkronError, internal_error};
@@ -17,6 +19,10 @@ use crate::models;
 use crate::schema;
 
 const CHUNK_SIZE: u64 = 2 * 1024 * 1024; // 2 Mb
+
+fn calc_chunks_count(file_size: u64) -> u32 {
+    file_size.div_ceil(CHUNK_SIZE) as u32
+}
 
 #[derive(Clone, serde::Deserialize)]
 #[serde(tag = "type")]
@@ -204,8 +210,7 @@ impl FilesController {
             })?;
 
         // check chunk number
-        let chunks_count =
-            (file_upload.size as u64).div_ceil(CHUNK_SIZE) as u32;
+        let chunks_count = calc_chunks_count(file_upload.size as u64);
         if chunk_number == 0 || chunk_number > chunks_count {
             return Err(SinkronError::unprocessable("Invalid chunk number"));
         }
@@ -269,18 +274,18 @@ impl FilesController {
 
             // TODO verify file size and checksum
 
-            // delete file upload
+            // delete file upload entity
             let _ = diesel::delete(schema::file_uploads::table)
                 .filter(schema::file_uploads::id.eq(&file_upload.id))
                 .execute(&mut conn)
                 .await
                 .map_err(internal_error)?;
 
-            // create permanent file
+            // create permanent file entity
             let new_file = models::NewFile {
                 id: file_id,
                 col_id: col_id.clone(),
-                doc_id,
+                doc_id, // TODO initially create files as orphans
                 size,
                 checksum: checksum,
             };
@@ -435,8 +440,8 @@ impl StorageAdapter for S3StorageAdapter {
         }
         chunk_keys.sort();
 
-        let chunks_count = file_size / CHUNK_SIZE;
-        if chunk_keys.len() as u64 != chunks_count {
+        let chunks_count = calc_chunks_count(file_size);
+        if chunk_keys.len() as u32 != chunks_count {
             return Err(SinkronError::FileMissingChunks { file_id });
         }
 
@@ -520,10 +525,12 @@ struct FsStorageAdapter {
 impl FsStorageAdapter {
     fn new(config: FsStorageConfig) -> Self {
         let temp_path = PathBuf::from(config.temp_path);
-        let _ = fs::create_dir_all(&temp_path);
+        std::fs::create_dir_all(&temp_path)
+            .expect("Couldn't create directory for storing files");
 
         let permanent_path = PathBuf::from(config.permanent_path);
-        let _ = fs::create_dir_all(&permanent_path);
+        std::fs::create_dir_all(&permanent_path)
+            .expect("Couldn't create directory for storing files");
 
         Self {
             temp_path,
@@ -549,7 +556,7 @@ impl StorageAdapter for FsStorageAdapter {
         content: &[u8],
     ) -> Result<(), SinkronError> {
         let path = self.chunk_path(file_id, chunk_number);
-        tokio::fs::write(&path, content)
+        fs::write(&path, content)
             .await
             .map_err(|err| SinkronError::internal(&err.to_string()))
     }
@@ -560,7 +567,37 @@ impl StorageAdapter for FsStorageAdapter {
         file_size: u64,
         checksum: String,
     ) -> Result<(), SinkronError> {
-        Err(SinkronError::internal("Not implemented"))
+        let chunks_count = calc_chunks_count(file_size);
+
+        let dest_path = self.permanent_path.join(file_id.to_string());
+        let Ok(mut dest) = OpenOptions::new()
+            .create_new(true)
+            .append(true)
+            .open(dest_path)
+            .await
+        else {
+            return Err(SinkronError::internal(
+                "Couldn't open destination file",
+            ));
+        };
+
+        for i in 1..=chunks_count {
+            let path = self.chunk_path(file_id, i);
+            let Ok(mut source) = OpenOptions::new().read(true).open(path).await
+            else {
+                return Err(SinkronError::internal("Chunk not found"));
+            };
+            io::copy(&mut source, &mut dest).await.map_err(|err| {
+                SinkronError::internal(&format!(
+                    "Couldn't write to dest file: {}",
+                    err.to_string()
+                ))
+            })?;
+        }
+
+        // TODO check checksum
+
+        Ok(())
     }
 
     async fn get_file_chunk(
