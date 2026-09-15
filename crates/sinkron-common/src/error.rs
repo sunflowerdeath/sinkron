@@ -130,3 +130,9 @@ where
 pub struct SinkronErrorResponseBody<E> {
     pub error: E,
 }
+
+impl From<diesel::result::Error> for SinkronError {
+    fn from(e: diesel::result::Error) -> Self {
+        SinkronError::internal(&e.to_string())
+    }
+}

@@ -626,6 +626,8 @@ async fn send_api_reqwest<T: Into<Body>>(
     res.expect("Couldn't send reqwest")
 }
 
+const CHUNK_SIZE: u64 = 5 * 1024 * 1024; // 5 Mb
+
 #[tokio::test]
 async fn test_files() {
     let client = SinkronClient::new(API_URL.to_string(), API_TOKEN.to_string());
@@ -667,12 +669,11 @@ async fn test_files() {
     ));
 
     // generate file data
-    let file_size = 1024 * 1024 * 3; // 3 Mb
+    let file_size = 1024 * 1024 * 7; // 7 Mb
     let mut file_data = vec![0u8; file_size];
     rand::rng().fill_bytes(&mut file_data);
-    let chunk_size = 2 * 1024 * 1024; // 2 Mb
-    let first_chunk_data = file_data[0..chunk_size].to_vec();
-    let second_chunk_data = file_data[chunk_size..].to_vec();
+    let first_chunk_data = file_data[0..(CHUNK_SIZE as usize)].to_vec();
+    let second_chunk_data = file_data[(CHUNK_SIZE as usize)..].to_vec();
 
     // init file upload
     let file_id = Uuid::new_v4();
@@ -696,6 +697,8 @@ async fn test_files() {
     let res =
         send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data.clone()).await;
     assert!(!res.status().is_success());
+    // println!("TEXT::: {}", res.text().await.unwrap());
+    // return;
     let err = res
         .json::<SinkronErrorResponseBody<SinkronError>>()
         .await
@@ -769,7 +772,7 @@ async fn test_files() {
     // TODO files should have size and checksum ?
 
     // TODO check collection storage
-    
+
     // TODO get file
 
     // TODO updating files

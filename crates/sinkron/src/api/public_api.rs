@@ -4,7 +4,7 @@ use axum::{
     Json, Router,
     body::Bytes,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    extract::{Query, Request, State},
+    extract::{DefaultBodyLimit, Query, Request, State},
     middleware,
     response::Response,
     routing::{any, get, post},
@@ -24,7 +24,7 @@ use crate::api::helpers::{
 };
 use crate::config::PublicApiConfig;
 use crate::controllers::SinkronControllers;
-use crate::controllers::files::{InitFileUpload, UploadFileChunk};
+use crate::controllers::files::{CHUNK_SIZE, InitFileUpload, UploadFileChunk};
 
 #[derive(Clone)]
 pub struct SinkronPublicApi {
@@ -49,7 +49,11 @@ impl SinkronPublicApi {
     pub fn router(&self) -> Router {
         let files_routes = Router::new()
             .route("/init_file_upload", post(init_file_upload))
-            .route("/upload_file_chunk", post(upload_file_chunk))
+            .route(
+                "/upload_file_chunk",
+                post(upload_file_chunk)
+                    .layer(DefaultBodyLimit::max(CHUNK_SIZE as usize)),
+            )
             .route("/get_file_chunk", get(get_file_chunk))
             .layer(middleware::from_fn_with_state(
                 self.clone(),

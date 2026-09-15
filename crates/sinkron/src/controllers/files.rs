@@ -18,7 +18,7 @@ use crate::db::{Db, DbConnection};
 use crate::models;
 use crate::schema;
 
-const CHUNK_SIZE: u64 = 2 * 1024 * 1024; // 2 Mb
+pub const CHUNK_SIZE: u64 = 5 * 1024 * 1024; // 5 Mb
 
 fn calc_chunks_count(file_size: u64) -> u32 {
     file_size.div_ceil(CHUNK_SIZE) as u32
@@ -54,13 +54,13 @@ old entries.
 After all chunks have been uploaded, client can create file by attaching it to
 a document.
 
-If all chunks are located successfully, they are combined into a single file,
-which is then stored in the persistent storage.
+While creating a file, if all chunks are located successfully, they are
+combined into a single file, which is then stored in the persistent storage.
 
-If some chunks are not found while creating a file, client should retry the
-uploading process from the beginning. There can only be one upload process
-per file. Calling `init_file_upload` again for the same file ID replaces
-the existing upload process.
+If some chunks are missing client should retry the uploading process from
+the beginning. There can only be one upload process per file.
+Calling `init_file_upload` again for the same file ID replaces the existing
+upload process.
 */
 
 #[derive(Deserialize)]
@@ -208,6 +208,7 @@ impl FilesController {
                 diesel::NotFound => SinkronError::FileNotFound { file_id },
                 err => SinkronError::internal(&err.to_string()),
             })?;
+        drop(conn);
 
         // check chunk number
         let chunks_count = calc_chunks_count(file_upload.size as u64);
@@ -235,7 +236,8 @@ impl FilesController {
         let remaining_storage = col.storage_limit - col.used_storage;
 
         let mut conn = self.connect().await?;
-        // check that file uploads exist and col has enough storage space
+
+        // get file uploads from db
         let file_uploads = schema::file_uploads::table
             .filter(schema::file_uploads::file_id.eq_any(&files))
             .filter(schema::file_uploads::col_id.eq(&col_id))
@@ -245,6 +247,7 @@ impl FilesController {
                 err => SinkronError::internal(&err.to_string()),
             })?;
 
+        // check that all file uploads are found
         let mut total_file_size = 0;
         for file_id in files {
             let Some(file_upload) =
@@ -253,13 +256,16 @@ impl FilesController {
                 return Err(SinkronError::FileNotFound { file_id });
             };
             total_file_size += file_upload.size;
-            if total_file_size > remaining_storage {
-                return Err(SinkronError::InsufficientStorage);
-            }
         }
 
-        // create files from uploaded chunks
-        for file_upload in file_uploads {
+        // check that collection has enough space
+        if total_file_size > remaining_storage {
+            return Err(SinkronError::InsufficientStorage);
+        }
+
+        // create permanent file via storage adapters
+        let mut uploaded_files = Vec::new();
+        for file_upload in &file_uploads {
             let models::FileUpload {
                 file_id,
                 size,
@@ -267,12 +273,34 @@ impl FilesController {
                 ..
             } = file_upload;
 
-            // create file from uploaded chunks via storage adapter
-            self.storage_adapter
-                .create_file_from_chunks(file_id, size as u64, checksum.clone())
-                .await?;
+            let res = self
+                .storage_adapter
+                .create_file_from_chunks(
+                    *file_id,
+                    *size as u64,
+                    checksum.clone(),
+                )
+                .await;
 
-            // TODO verify file size and checksum
+            if res.is_err() {
+                // rollback created files to prevent orphans
+                for file in uploaded_files {
+                    // ignore errors to return original error
+                    let _ = self.storage_adapter.delete_file(file).await;
+                }
+                return res;
+            } else {
+                uploaded_files.push(*file_id);
+            }
+        }
+
+        for file_upload in file_uploads {
+            let models::FileUpload {
+                file_id,
+                size,
+                checksum,
+                ..
+            } = file_upload;
 
             // delete file upload entity
             let _ = diesel::delete(schema::file_uploads::table)
@@ -285,9 +313,9 @@ impl FilesController {
             let new_file = models::NewFile {
                 id: file_id,
                 col_id: col_id.clone(),
-                doc_id, // TODO initially create files as orphans
+                doc_id,
                 size,
-                checksum: checksum,
+                checksum,
             };
             diesel::insert_into(schema::files::table)
                 .values(&new_file)
@@ -314,9 +342,8 @@ impl FilesController {
     ) -> Result<(), SinkronError> {
         // TODO
         // check files exist
-        // delete files from storage
-        // delete files rows
-        // update col used_storage
+        // delete files from storage (ignore file not found error?)
+        // delete files entities & update col used_storage
         Err(SinkronError::internal("Not implemented"))
     }
 
@@ -326,6 +353,7 @@ impl FilesController {
         file_id: Uuid,
         chunk_number: u32,
     ) -> Result<Bytes, SinkronError> {
+        // TODO
         Err(SinkronError::internal("Not implemented"))
     }
 }
@@ -399,6 +427,7 @@ impl S3StorageAdapter {
             region,
             credentials.clone(),
         )
+        .map(|bucket| bucket.with_path_style())
     }
 }
 

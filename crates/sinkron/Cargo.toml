@@ -19,6 +19,7 @@ loro = "1.16.0"
 lru = "0.16.3"
 reqwest = "0.13.3"
 rust-s3 = { version = "0.37.2", default-features = false, features = ["fail-on-err", "tokio-rustls-tls"] }
+scoped-futures = "0.1.4"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sinkron-common = { path = "../sinkron-common" }

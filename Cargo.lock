@@ -675,9 +675,9 @@ dependencies = [
 
 [[package]]
 name = "diesel"
-version = "2.3.11"
+version = "2.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e54d1f576cd3a3460f212a4615fd12ce1b6303c095b79a44449ffbe627753dc1"
+checksum = "e3b934ddbdcb2abb9f9fc9c30bd47bcc5618b615eea1d334cda5fdf8ff9b072a"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -3118,6 +3118,7 @@ dependencies = [
  "lru",
  "reqwest 0.13.5",
  "rust-s3",
+ "scoped-futures",
  "serde",
  "serde_json",
  "sinkron-common",
@@ -3146,6 +3147,7 @@ dependencies = [
  "bytes",
  "chrono",
  "deadpool 0.13.0",
+ "diesel",
  "diesel-async 0.9.2",
  "diesel_migrations",
  "log",

@@ -35,9 +35,21 @@ services:
                         "database": "sinkron"
                     },
                     "storage": {
-                      "type": "fs",
-                      "temp_path": "temp/files/temp",
-                      "permanent_path": "temp/files/permanent"
+                        "type": "s3",
+                        "temp_bucket": {
+                            "region": "us-east-1",
+                            "endpoint": "http://rustfs:9000",
+                            "access_key_id": "RUSTFS_ACCESS_KEY",
+                            "secret_access_key": "RUSTFS_SECRET_KEY",
+                            "bucket_name": "sinkron-temp-bucket"
+                        },
+                        "permanent_bucket": {
+                            "region": "us-east-1",
+                            "endpoint": "http://rustfs:9000",
+                            "access_key_id": "RUSTFS_ACCESS_KEY",
+                            "secret_access_key": "RUSTFS_SECRET_KEY",
+                            "bucket_name": "sinkron-permanent-bucket"
+                        }
                     },
                     "publicApi": {
                         "authUrl": "http://fake_auth/"
@@ -53,3 +65,30 @@ services:
         ports:
             - 3000:80
 
+    rustfs:
+        image: rustfs/rustfs:1.0.0-rc.6
+        environment:
+            RUSTFS_CONSOLE_ENABLE: true
+            RUSTFS_ACCESS_KEY: RUSTFS_ACCESS_KEY 
+            RUSTFS_SECRET_KEY: RUSTFS_SECRET_KEY 
+        healthcheck:
+            test: curl -f http://localhost:9000/health
+            interval: 3s
+            retries: 3
+            start_period: 3s
+            timeout: 3s
+
+    rustfs-init:
+        image: rustfs/rc:latest
+        depends_on:
+            rustfs:
+                condition: service_healthy
+        entrypoint: >
+            /bin/sh -c "
+            echo 'Configuring rustfs client alias...';
+            rc alias set local http://rustfs:9000 RUSTFS_ACCESS_KEY \
+            RUSTFS_SECRET_KEY;
+            rc bucket create local/sinkron-temp-bucket;
+            rc bucket create local/sinkron-permanent-bucket;
+            echo 'All buckets initialized successfully!';
+            "
