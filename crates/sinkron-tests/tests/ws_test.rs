@@ -697,8 +697,6 @@ async fn test_files() {
     let res =
         send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data.clone()).await;
     assert!(!res.status().is_success());
-    // println!("TEXT::: {}", res.text().await.unwrap());
-    // return;
     let err = res
         .json::<SinkronErrorResponseBody<SinkronError>>()
         .await
@@ -715,14 +713,17 @@ async fn test_files() {
         "files/upload_file_chunk?col_id={}&file_id={}&chunk_number={}",
         col, file_id, 1
     );
-    let res = send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data).await;
+    let res =
+        send_api_reqwest(&url, USER_AUTH_TOKEN, first_chunk_data.clone()).await;
     assert!(res.status().is_success());
 
     let url = format!(
         "files/upload_file_chunk?col_id={}&file_id={}&chunk_number={}",
         col, file_id, 2
     );
-    let res = send_api_reqwest(&url, USER_AUTH_TOKEN, second_chunk_data).await;
+    let res =
+        send_api_reqwest(&url, USER_AUTH_TOKEN, second_chunk_data.clone())
+            .await;
     assert!(res.status().is_success());
 
     // connect
@@ -773,9 +774,34 @@ async fn test_files() {
 
     // TODO check collection storage
 
-    // TODO get file
+    // TODO get file chunk
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": file_id,
+        "chunk_number": 1
+    })
+    .to_string();
+    let res =
+        send_api_reqwest("files/get_file_chunk", USER_AUTH_TOKEN, payload)
+            .await;
+    assert!(res.status().is_success());
+    let bytes = res.bytes().await.expect("Couldn't get body");
+    assert!(bytes == &first_chunk_data, "Chunk data is wrong");
 
-    // TODO updating files
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": file_id,
+        "chunk_number": 2
+    })
+    .to_string();
+    let res =
+        send_api_reqwest("files/get_file_chunk", USER_AUTH_TOKEN, payload)
+            .await;
+    assert!(res.status().is_success());
+    let bytes = res.bytes().await.expect("Couldn't get body");
+    assert!(bytes == &second_chunk_data, "Chunk data is wrong")
+
+    // TODO update document files
 
     // TODO delete document
 

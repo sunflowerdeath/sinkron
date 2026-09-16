@@ -24,7 +24,9 @@ use crate::api::helpers::{
 };
 use crate::config::PublicApiConfig;
 use crate::controllers::SinkronControllers;
-use crate::controllers::files::{CHUNK_SIZE, InitFileUpload, UploadFileChunk};
+use crate::controllers::files::{
+    CHUNK_SIZE, GetFileChunk, InitFileUpload, UploadFileChunk,
+};
 
 #[derive(Clone)]
 pub struct SinkronPublicApi {
@@ -54,7 +56,7 @@ impl SinkronPublicApi {
                 post(upload_file_chunk)
                     .layer(DefaultBodyLimit::max(CHUNK_SIZE as usize)),
             )
-            .route("/get_file_chunk", get(get_file_chunk))
+            .route("/get_file_chunk", post(get_file_chunk))
             .layer(middleware::from_fn_with_state(
                 self.clone(),
                 header_auth_middleware,
@@ -168,25 +170,11 @@ async fn upload_file_chunk(
     json_response(res)
 }
 
-#[derive(Deserialize)]
-struct GetFileChunkQuery {
-    file_id: Uuid,
-    chunk_number: u32,
-}
-
 async fn get_file_chunk(
     State(state): State<SinkronPublicApi>,
-    Query(query): Query<GetFileChunkQuery>,
+    Json(payload): Json<GetFileChunk>,
 ) -> Response {
     // TODO check user permissions in collection
-    let GetFileChunkQuery {
-        file_id,
-        chunk_number,
-    } = query;
-    let res = state
-        .controller
-        .files
-        .get_file_chunk("col".to_string(), file_id, chunk_number)
-        .await;
+    let res = state.controller.files.get_file_chunk(payload).await;
     bin_response(res)
 }

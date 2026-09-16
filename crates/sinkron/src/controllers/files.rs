@@ -72,6 +72,13 @@ pub struct InitFileUpload {
 }
 
 #[derive(Deserialize)]
+pub struct GetFileChunk {
+    col_id: String,
+    file_id: Uuid,
+    chunk_number: u32,
+}
+
+#[derive(Deserialize)]
 pub struct UploadFileChunk {
     file_id: Uuid,
     col_id: String,
@@ -243,9 +250,7 @@ impl FilesController {
             .filter(schema::file_uploads::col_id.eq(&col_id))
             .load::<models::FileUpload>(&mut conn)
             .await
-            .map_err(|err| match err {
-                err => SinkronError::internal(&err.to_string()),
-            })?;
+            .map_err(internal_error)?;
 
         // check that all file uploads are found
         let mut total_file_size = 0;
@@ -349,12 +354,37 @@ impl FilesController {
 
     pub async fn get_file_chunk(
         &self,
-        col: String,
-        file_id: Uuid,
-        chunk_number: u32,
+        props: GetFileChunk,
     ) -> Result<Bytes, SinkronError> {
-        // TODO
-        Err(SinkronError::internal("Not implemented"))
+        let GetFileChunk {
+            col_id,
+            file_id,
+            chunk_number,
+        } = props;
+
+        let mut conn = self.connect().await?;
+
+        // find file entity
+        let file = schema::files::table
+            .find(&file_id)
+            .filter(schema::files::col_id.eq(&col_id))
+            .first::<models::File>(&mut conn)
+            .await
+            .map_err(|err| match err {
+                diesel::NotFound => SinkronError::not_found("File not found"),
+                err => SinkronError::internal(&err.to_string()),
+            })?;
+
+        // check chunk number
+        let chunks_count = calc_chunks_count(file.size as u64);
+        if chunk_number == 0 || chunk_number > chunks_count {
+            return Err(SinkronError::unprocessable("Invalid chunk number"));
+        }
+
+        // get file chunk via storage provider
+        self.storage_adapter
+            .get_file_chunk(file_id, chunk_number)
+            .await
     }
 }
 
@@ -527,7 +557,7 @@ impl StorageAdapter for S3StorageAdapter {
         chunk_number: u32,
     ) -> Result<Bytes, SinkronError> {
         let start = (chunk_number as u64 - 1) * CHUNK_SIZE;
-        let end = start + CHUNK_SIZE; // TODO none if last chunk ?
+        let end = start + CHUNK_SIZE - 1; // TODO none if last chunk ?
         let data = self
             .permanent_bucket
             .get_object_range(file_id.to_string(), start, Some(end))
