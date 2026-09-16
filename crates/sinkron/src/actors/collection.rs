@@ -535,7 +535,14 @@ impl CollectionActor {
             return Err(SinkronError::DocumentAlreadyDeleted);
         }
 
-        // TODO delete files
+        // Delete files
+        let files = filter_null_values(doc.files);
+        if !files.is_empty() {
+            self.controller
+                .files
+                .delete_files(self.id.clone(), files)
+                .await?;
+        }
 
         // Increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;

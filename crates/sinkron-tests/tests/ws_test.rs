@@ -774,7 +774,7 @@ async fn test_files() {
 
     // TODO check collection storage
 
-    // TODO get file chunk
+    // get file chunk
     let payload = json!({
         "col_id": col.clone(),
         "file_id": file_id,
@@ -799,11 +799,45 @@ async fn test_files() {
             .await;
     assert!(res.status().is_success());
     let bytes = res.bytes().await.expect("Couldn't get body");
-    assert!(bytes == &second_chunk_data, "Chunk data is wrong")
+    assert!(bytes == &second_chunk_data, "Chunk data is wrong");
 
     // TODO update document files
 
-    // TODO delete document
+    // delete document
+    conn.send_or_fail(
+        1,
+        ClientMessage::Delete(ClientDeleteMessage {
+            id,
+            col: col.clone(),
+        }),
+    )
+    .await;
+    let (chan, msg) = conn.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::Delete(ServerDeleteMessage { .. })
+    ));
 
-    // TODO check that file is deleted
+    // check that file is deleted
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": file_id,
+        "chunk_number": 1
+    })
+    .to_string();
+    let res =
+        send_api_reqwest("files/get_file_chunk", USER_AUTH_TOKEN, payload)
+            .await;
+    assert!(!res.status().is_success());
+    let err = res
+        .json::<SinkronErrorResponseBody<SinkronError>>()
+        .await
+        .expect("Couldn't parse error");
+    assert!(matches!(
+        err,
+        SinkronErrorResponseBody {
+            error: SinkronError::NotFound { .. }
+        }
+    ));
 }

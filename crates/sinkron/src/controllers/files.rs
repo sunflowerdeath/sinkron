@@ -342,14 +342,52 @@ impl FilesController {
     }
 
     pub async fn delete_files(
-        col: String,
-        files: Vec<Uuid>,
+        &self,
+        col_id: String,
+        file_ids: Vec<Uuid>,
     ) -> Result<(), SinkronError> {
-        // TODO
-        // check files exist
-        // delete files from storage (ignore file not found error?)
-        // delete files entities & update col used_storage
-        Err(SinkronError::internal("Not implemented"))
+        let mut conn = self.connect().await?;
+
+        // get collection
+        let col = self.get_collection(&col_id).await?;
+
+        // get file entities
+        let files = schema::files::table
+            .filter(schema::files::id.eq_any(&file_ids))
+            .filter(schema::files::col_id.eq(&col_id))
+            .load::<models::File>(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        // do not fail if some or even all files are not found
+        if files.is_empty() {
+            return Ok(());
+        }
+
+        let mut total_file_size = 0;
+        for file in files {
+            total_file_size += file.size;
+            let _ = self.storage_adapter.delete_file(file.id).await?;
+        }
+
+        // delete files entities
+        let _ = diesel::delete(schema::files::table)
+            .filter(schema::files::id.eq_any(&file_ids))
+            .filter(schema::files::col_id.eq(&col_id))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        // update col used storage
+        let new_used_storage = col.used_storage - total_file_size;
+        diesel::update(schema::collections::table)
+            .filter(schema::collections::id.eq(col_id))
+            .set(schema::collections::used_storage.eq(new_used_storage))
+            .execute(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        Ok(())
     }
 
     pub async fn get_file_chunk(
@@ -557,7 +595,7 @@ impl StorageAdapter for S3StorageAdapter {
         chunk_number: u32,
     ) -> Result<Bytes, SinkronError> {
         let start = (chunk_number as u64 - 1) * CHUNK_SIZE;
-        let end = start + CHUNK_SIZE - 1; // TODO none if last chunk ?
+        let end = start + CHUNK_SIZE - 1;
         let data = self
             .permanent_bucket
             .get_object_range(file_id.to_string(), start, Some(end))
@@ -567,6 +605,7 @@ impl StorageAdapter for S3StorageAdapter {
     }
 
     async fn delete_file(&self, file_id: Uuid) -> Result<(), SinkronError> {
+        // TODO should not fail if file not found ?
         let _ = self
             .permanent_bucket
             .delete_object(file_id.to_string())
