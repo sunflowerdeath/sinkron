@@ -121,12 +121,12 @@ impl FilesController {
     // TODO call from collecition api
     async fn get_collection(
         &self,
+        conn: &mut DbConnection,
         id: &str,
     ) -> Result<models::Collection, SinkronError> {
-        let mut conn = self.connect().await?;
         schema::collections::table
             .find(id)
-            .first(&mut conn)
+            .first(conn)
             .await
             .map_err(|err| match err {
                 diesel::NotFound => {
@@ -161,9 +161,11 @@ impl FilesController {
             ));
         }
 
+        let col = self.get_collection(&mut conn, &col_id).await?;
+
         // TODO check max file size / collection file size limit
 
-        let col = self.get_collection(&col_id).await?;
+        // check collection storage
         let remaining_storage = col.storage_limit - col.used_storage;
         if remaining_storage < size {
             return Err(SinkronError::InsufficientStorage);
@@ -204,8 +206,10 @@ impl FilesController {
             col_id,
             chunk_number,
         } = props;
-        // check that file upload exists
+
         let mut conn = self.connect().await?;
+
+        // check that file upload exists
         let file_upload: models::FileUpload = schema::file_uploads::table
             .filter(schema::file_uploads::file_id.eq(&file_id))
             .filter(schema::file_uploads::col_id.eq(&col_id))
@@ -238,11 +242,9 @@ impl FilesController {
         doc_id: Uuid,
         files: Vec<Uuid>,
     ) -> Result<(), SinkronError> {
-        // check that col exists and get remaining storage
-        let col = self.get_collection(&col_id).await?;
-        let remaining_storage = col.storage_limit - col.used_storage;
-
         let mut conn = self.connect().await?;
+
+        let col = self.get_collection(&mut conn, &col_id).await?;
 
         // get file uploads from db
         let file_uploads = schema::file_uploads::table
@@ -264,6 +266,7 @@ impl FilesController {
         }
 
         // check that collection has enough space
+        let remaining_storage = col.storage_limit - col.used_storage;
         if total_file_size > remaining_storage {
             return Err(SinkronError::InsufficientStorage);
         }
@@ -271,20 +274,11 @@ impl FilesController {
         // create permanent file via storage adapters
         let mut uploaded_files = Vec::new();
         for file_upload in &file_uploads {
-            let models::FileUpload {
-                file_id,
-                size,
-                checksum,
-                ..
-            } = file_upload;
+            let models::FileUpload { file_id, size, .. } = file_upload;
 
             let res = self
                 .storage_adapter
-                .create_file_from_chunks(
-                    *file_id,
-                    *size as u64,
-                    checksum.clone(),
-                )
+                .create_file_from_chunks(*file_id, *size as u64)
                 .await;
 
             if res.is_err() {
@@ -344,17 +338,18 @@ impl FilesController {
     pub async fn delete_files(
         &self,
         col_id: String,
+        doc_id: Uuid,
         file_ids: Vec<Uuid>,
     ) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
 
-        // get collection
-        let col = self.get_collection(&col_id).await?;
+        let col = self.get_collection(&mut conn, &col_id).await?;
 
         // get file entities
         let files = schema::files::table
             .filter(schema::files::id.eq_any(&file_ids))
             .filter(schema::files::col_id.eq(&col_id))
+            .filter(schema::files::doc_id.eq(&doc_id))
             .load::<models::File>(&mut conn)
             .await
             .map_err(internal_error)?;
@@ -439,7 +434,6 @@ trait StorageAdapter {
         &self,
         file_id: Uuid,
         file_size: u64,
-        checksum: String,
     ) -> Result<(), SinkronError>;
 
     async fn get_file_chunk(
@@ -521,24 +515,33 @@ impl StorageAdapter for S3StorageAdapter {
         &self,
         file_id: Uuid,
         file_size: u64,
-        checksum: String,
     ) -> Result<(), SinkronError> {
+        // list chunks
         let chunks_prefix = file_id.to_string() + "_";
         let list_result = self
             .temp_bucket
             .list(chunks_prefix, None)
             .await
             .map_err(internal_error)?;
-        let mut chunk_keys = Vec::new();
+
+        let mut chunks_keys = Vec::new();
+        let mut chunks_total_size = 0;
         for result in list_result {
             for object in result.contents {
-                chunk_keys.push(object.key);
+                chunks_keys.push(object.key);
+                chunks_total_size += object.size;
             }
         }
-        chunk_keys.sort();
+        chunks_keys.sort();
+
+        if chunks_total_size != file_size {
+            return Err(SinkronError::unprocessable(
+                "Total size of uploaded chunks isn't equal to file size",
+            ));
+        }
 
         let chunks_count = calc_chunks_count(file_size);
-        if chunk_keys.len() as u32 != chunks_count {
+        if chunks_keys.len() as u32 != chunks_count {
             return Err(SinkronError::FileMissingChunks { file_id });
         }
 
@@ -555,7 +558,7 @@ impl StorageAdapter for S3StorageAdapter {
             .map_err(internal_error)?;
 
         let mut uploaded_parts = Vec::new();
-        for key in chunk_keys {
+        for key in chunks_keys {
             let chunk_data = self
                 .temp_bucket
                 .get_object(key)
@@ -576,7 +579,7 @@ impl StorageAdapter for S3StorageAdapter {
             uploaded_parts.push(part);
         }
 
-        let _ = self
+        _ = self
             .permanent_bucket
             .complete_multipart_upload(
                 &file_upload_path,
@@ -605,10 +608,19 @@ impl StorageAdapter for S3StorageAdapter {
     }
 
     async fn delete_file(&self, file_id: Uuid) -> Result<(), SinkronError> {
-        // TODO should not fail if file not found ?
-        let _ = self
+        let key = file_id.to_string();
+        let exists = self
             .permanent_bucket
-            .delete_object(file_id.to_string())
+            .object_exists(&key)
+            .await
+            .map_err(internal_error)?;
+        // Do not fail if file not found, but fail on other errors
+        if !exists {
+            return Ok(());
+        }
+        _ = self
+            .permanent_bucket
+            .delete_object(&key)
             .await
             .map_err(internal_error)?;
         Ok(())
@@ -663,7 +675,6 @@ impl StorageAdapter for FsStorageAdapter {
         &self,
         file_id: Uuid,
         file_size: u64,
-        checksum: String,
     ) -> Result<(), SinkronError> {
         let chunks_count = calc_chunks_count(file_size);
 

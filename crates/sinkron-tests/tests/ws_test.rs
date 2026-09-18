@@ -801,7 +801,78 @@ async fn test_files() {
     let bytes = res.bytes().await.expect("Couldn't get body");
     assert!(bytes == &second_chunk_data, "Chunk data is wrong");
 
-    // TODO update document files
+    // generate new file data
+    let new_file_size = 1024 * 1024 * 3; // 3 Mb
+    let mut new_file_data = vec![0u8; new_file_size];
+    rand::rng().fill_bytes(&mut new_file_data);
+
+    // upload new file
+    let new_file_id = Uuid::new_v4();
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": new_file_id,
+        "size": new_file_size,
+        "checksum": "", // TODO checksum
+    })
+    .to_string();
+    let res =
+        send_api_reqwest("files/init_file_upload", USER_AUTH_TOKEN, payload)
+            .await;
+    assert!(res.status().is_success());
+
+    let url = format!(
+        "files/upload_file_chunk?col_id={}&file_id={}&chunk_number={}",
+        col, new_file_id, 1
+    );
+    let res =
+        send_api_reqwest(&url, USER_AUTH_TOKEN, new_file_data.clone()).await;
+    assert!(res.status().is_success());
+
+    // update document files
+    conn.send_or_fail(
+        1,
+        ClientMessage::Update(ClientUpdateMessage {
+            id,
+            col: col.clone(),
+            content_update: None,
+            files_update: Some(FilesUpdate {
+                add: vec![new_file_id],
+                delete: vec![file_id],
+            }),
+        }),
+    )
+    .await;
+    let (chan, msg) = conn.next_or_fail().await;
+    assert_eq!(chan, 1);
+    assert!(matches!(
+        msg,
+        ServerMessage::Update(ServerUpdateMessage {
+            files,
+            ..
+        }) if files == vec![new_file_id],
+    ));
+
+    // check that first file is deleted
+    let payload = json!({
+        "col_id": col.clone(),
+        "file_id": file_id,
+        "chunk_number": 1
+    })
+    .to_string();
+    let res =
+        send_api_reqwest("files/get_file_chunk", USER_AUTH_TOKEN, payload)
+            .await;
+    assert!(!res.status().is_success());
+    let err = res
+        .json::<SinkronErrorResponseBody<SinkronError>>()
+        .await
+        .expect("Couldn't parse error");
+    assert!(matches!(
+        err,
+        SinkronErrorResponseBody {
+            error: SinkronError::NotFound { .. }
+        }
+    ));
 
     // delete document
     conn.send_or_fail(
@@ -819,10 +890,10 @@ async fn test_files() {
         ServerMessage::Delete(ServerDeleteMessage { .. })
     ));
 
-    // check that file is deleted
+    // check that new file is deleted
     let payload = json!({
         "col_id": col.clone(),
-        "file_id": file_id,
+        "file_id": new_file_id,
         "chunk_number": 1
     })
     .to_string();

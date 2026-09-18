@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use base64::prelude::*;
@@ -19,6 +19,10 @@ use crate::controllers::SinkronControllers;
 use crate::db::{Db, DbConnection};
 use crate::models;
 use crate::schema;
+
+fn vec_to_set<T: Eq + std::hash::Hash>(vec: Vec<T>) -> HashSet<T> {
+    vec.into_iter().collect()
+}
 
 fn filter_null_values<T>(items: Vec<Option<T>>) -> Vec<T> {
     let mut res = Vec::new();
@@ -540,7 +544,7 @@ impl CollectionActor {
         if !files.is_empty() {
             self.controller
                 .files
-                .delete_files(self.id.clone(), files)
+                .delete_files(self.id.clone(), id, files)
                 .await?;
         }
 
@@ -614,7 +618,7 @@ impl CollectionActor {
             return Err(SinkronError::DocumentAlreadyDeleted);
         }
 
-        // content & files are updated using Diesel AsChangeset behaviour
+        // "next_content" uses Diesel AsChangeset behaviour
         let next_content = match &content_update {
             Some(update) => {
                 let doc_content = doc.content.clone().unwrap();
@@ -623,10 +627,37 @@ impl CollectionActor {
             None => None,
         };
 
+        // "next_files" uses Diesel AsChangeset behaviour
         let next_files = match files_update {
             Some(files_update) => {
-                // TODO actually update files
-                Some(Vec::<Uuid>::new())
+                let mut next_files_set: HashSet<Uuid> =
+                    filter_null_values(doc.files.clone()).into_iter().collect();
+
+                if !files_update.delete.is_empty() {
+                    for file in &files_update.delete {
+                        next_files_set.remove(file);
+                    }
+                    // delete ignores not found files without errors
+                    self.controller
+                        .files
+                        .delete_files(self.id.clone(), id, files_update.delete)
+                        .await?;
+                }
+
+                if !files_update.add.is_empty() {
+                    for file in &files_update.add {
+                        next_files_set.insert(*file);
+                    }
+                    self.controller
+                        .files
+                        .create_files(self.id.clone(), id, files_update.add)
+                        .await?;
+                }
+
+                let next_files_vec: Vec<Uuid> =
+                    next_files_set.into_iter().collect();
+
+                Some(next_files_vec)
             }
             None => None,
         };
