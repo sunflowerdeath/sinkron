@@ -12,6 +12,7 @@ use tokio::io;
 use uuid::Uuid;
 
 use sinkron_common::error::{SinkronError, internal_error};
+use sinkron_common::types::File;
 
 use crate::actors::sinkron::SinkronHandle;
 use crate::db::{Db, DbConnection};
@@ -241,7 +242,7 @@ impl FilesController {
         col_id: String,
         doc_id: Uuid,
         files: Vec<Uuid>,
-    ) -> Result<(), SinkronError> {
+    ) -> Result<Vec<File>, SinkronError> {
         let mut conn = self.connect().await?;
 
         let col = self.get_collection(&mut conn, &col_id).await?;
@@ -281,17 +282,22 @@ impl FilesController {
                 .create_file_from_chunks(*file_id, *size as u64)
                 .await;
 
-            if res.is_err() {
-                // rollback created files to prevent orphans
-                for file in uploaded_files {
-                    // ignore errors to return original error
-                    let _ = self.storage_adapter.delete_file(file).await;
+            match res {
+                Err(err) => {
+                    // rollback created files to prevent orphans
+                    for file in uploaded_files {
+                        // ignore errors to return original error
+                        let _ = self.storage_adapter.delete_file(file).await;
+                    }
+                    return Err(err);
                 }
-                return res;
-            } else {
-                uploaded_files.push(*file_id);
-            }
+                Ok(()) => {
+                    uploaded_files.push(*file_id);
+                }
+            };
         }
+
+        let mut files = Vec::new();
 
         for file_upload in file_uploads {
             let models::FileUpload {
@@ -314,13 +320,20 @@ impl FilesController {
                 col_id: col_id.clone(),
                 doc_id,
                 size,
-                checksum,
+                checksum: checksum.clone(),
             };
             diesel::insert_into(schema::files::table)
                 .values(&new_file)
                 .execute(&mut conn)
                 .await
                 .map_err(internal_error)?;
+
+            files.push(File {
+                id: file_id,
+                size,
+                checksum,
+                content_type: "TODO".to_string(), // TODO content-type
+            });
         }
 
         // update col used storage
@@ -332,29 +345,33 @@ impl FilesController {
             .await
             .map_err(internal_error)?;
 
-        Ok(())
+        Ok(files)
     }
 
     pub async fn delete_files(
         &self,
         col_id: String,
         doc_id: Uuid,
-        file_ids: Vec<Uuid>,
+        file_ids: Option<Vec<Uuid>>, // if None - delete all doc files
     ) -> Result<(), SinkronError> {
         let mut conn = self.connect().await?;
 
         let col = self.get_collection(&mut conn, &col_id).await?;
 
         // get file entities
-        let files = schema::files::table
-            .filter(schema::files::id.eq_any(&file_ids))
+        let mut query = schema::files::table
+            .into_boxed()
             .filter(schema::files::col_id.eq(&col_id))
-            .filter(schema::files::doc_id.eq(&doc_id))
+            .filter(schema::files::doc_id.eq(&doc_id));
+        if let Some(file_ids) = &file_ids {
+            query = query.filter(schema::files::id.eq_any(file_ids));
+        };
+        let files = query
             .load::<models::File>(&mut conn)
             .await
             .map_err(internal_error)?;
 
-        // do not fail if some or even all files are not found
+        // do not fail if some files are not found
         if files.is_empty() {
             return Ok(());
         }
@@ -366,9 +383,14 @@ impl FilesController {
         }
 
         // delete files entities
-        let _ = diesel::delete(schema::files::table)
-            .filter(schema::files::id.eq_any(&file_ids))
-            .filter(schema::files::col_id.eq(&col_id))
+        let mut query = diesel::delete(schema::files::table)
+            .into_boxed()
+            .filter(schema::files::doc_id.eq(&doc_id))
+            .filter(schema::files::col_id.eq(&col_id));
+        if let Some(file_ids) = &file_ids {
+            query = query.filter(schema::files::id.eq_any(file_ids));
+        }
+        let _ = query
             .execute(&mut conn)
             .await
             .map_err(internal_error)?;

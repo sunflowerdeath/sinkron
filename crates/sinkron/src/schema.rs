@@ -19,7 +19,6 @@ diesel::table! {
         col_id -> Text,
         colrev -> Int8,
         content -> Nullable<Bytea>,
-        files -> Array<Nullable<Uuid>>,
         is_deleted -> Bool,
         permissions -> Text,
     }
@@ -73,7 +72,6 @@ diesel::table! {
 diesel::joinable!(documents -> collections (col_id));
 diesel::joinable!(file_uploads -> collections (col_id));
 diesel::joinable!(files -> collections (col_id));
-diesel::joinable!(files -> documents (doc_id));
 diesel::joinable!(members -> groups (group));
 diesel::joinable!(refs -> collections (col_id));
 diesel::joinable!(refs -> documents (doc_id));

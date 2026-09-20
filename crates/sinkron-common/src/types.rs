@@ -32,6 +32,15 @@ pub struct CreateCollection {
 
 // Documents
 
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct File {
+    pub id: Uuid,
+    pub size: i64,
+    pub checksum: String,
+    pub content_type: String
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
@@ -39,7 +48,7 @@ pub struct Document {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub content: Option<String>,
-    pub files: Vec<Uuid>,
+    pub files: Vec<File>,
     pub col: String,
     pub colrev: i64,
     pub permissions: String,

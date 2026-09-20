@@ -15,7 +15,6 @@ CREATE TABLE "documents" (
     "col_id" text NOT NULL,
     "colrev" bigint NOT NULL,
     "content" bytea,
-    "files" uuid[] NOT NULL,
     "is_deleted" boolean NOT NULL DEFAULT false,
     "permissions" text NOT NULL,
     CONSTRAINT documents_pk PRIMARY KEY ("id"),

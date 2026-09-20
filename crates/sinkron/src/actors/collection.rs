@@ -11,7 +11,7 @@ use uuid::Uuid;
 use sinkron_common::error::{SinkronError, internal_error};
 use sinkron_common::permissions::{Action, Permissions};
 use sinkron_common::protocol::*;
-use sinkron_common::types::{Collection, Document};
+use sinkron_common::types::{Collection, Document, File};
 
 use crate::actors::client::ClientChannelSender;
 use crate::actors::supervisor::{ExitCallback, Supervisor};
@@ -32,6 +32,34 @@ fn filter_null_values<T>(items: Vec<Option<T>>) -> Vec<T> {
         }
     }
     res
+}
+
+fn file_from_model(file: models::File) -> File {
+    let models::File {
+        id, size, checksum, ..
+    } = file;
+    File {
+        id,
+        size,
+        checksum,
+        content_type: "content_type".to_string(), // TODO content-type
+    }
+}
+
+fn doc_from_model(
+    doc: models::Document,
+    doc_files: Vec<models::File>,
+) -> Document {
+    Document {
+        id: doc.id,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        content: doc.content.map(|content| BASE64_STANDARD.encode(content)),
+        files: doc_files.into_iter().map(file_from_model).collect(),
+        col: doc.col_id,
+        colrev: doc.colrev,
+        permissions: doc.permissions,
+    }
 }
 
 // Collection actor performs document operations over single collection,
@@ -289,19 +317,6 @@ impl CollectionActor {
         }
     }
 
-    fn doc_from_model(doc: models::Document) -> Document {
-        Document {
-            id: doc.id,
-            created_at: doc.created_at,
-            updated_at: doc.updated_at,
-            content: doc.content.map(|content| BASE64_STANDARD.encode(content)),
-            files: filter_null_values(doc.files),
-            col: doc.col_id,
-            colrev: doc.colrev,
-            permissions: doc.permissions,
-        }
-    }
-
     fn add_subscriber(&mut self, handle: ClientChannelSender) -> i32 {
         self.subscriber_id += 1;
         self.subscribers.insert(self.subscriber_id, handle);
@@ -341,14 +356,30 @@ impl CollectionActor {
             // select docs since colrev, including deleted
             req_base.filter(schema::documents::colrev.gt(colrev))
         };
+
         let documents: Vec<models::Document> =
             req.get_results(&mut conn).await.map_err(internal_error)?;
 
+        // fetch all files belonging to documents and group files by doc id
+        let files = models::File::belonging_to(&documents)
+            .load::<models::File>(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
+        // group files by document
+        let documents_with_files: Vec<(models::Document, Vec<models::File>)> =
+            files
+                .grouped_by(&documents)
+                .into_iter()
+                .zip(documents)
+                .map(|(files, doc)| (doc, files))
+                .collect();
+
         let subscriber_id = self.add_subscriber(handle);
         Ok(SyncResult {
-            documents: documents
+            documents: documents_with_files
                 .into_iter()
-                .map(Self::doc_from_model)
+                .map(|(doc, files)| doc_from_model(doc, files))
                 .collect(),
             colrev: self.state.colrev,
             subscriber_id,
@@ -369,6 +400,7 @@ impl CollectionActor {
         source: Source,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
+
         let doc: models::Document = schema::documents::table
             .find(id)
             .filter(schema::documents::col_id.eq(&self.id))
@@ -380,12 +412,19 @@ impl CollectionActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
+
+        let files = schema::files::table
+            .filter(schema::files::doc_id.eq(&id))
+            .load::<models::File>(&mut conn)
+            .await
+            .map_err(internal_error)?;
+
         drop(conn);
 
         self.check_doc_permission(&doc, source, Action::Read)
             .await?;
 
-        Ok(Self::doc_from_model(doc))
+        Ok(doc_from_model(doc, files))
     }
 
     async fn handle_create(
@@ -415,14 +454,16 @@ impl CollectionActor {
             SinkronError::bad_request("Couldn't decode content from base64")
         })?;
 
-        // TODO check that files is unique set ?
-        // TODO how to handle orphan files?
-        if !files.is_empty() {
+        let doc_files = if !files.is_empty() {
+            // TODO how to handle orphan files?
+            // (if files created but document create failed)
             self.controller
                 .files
                 .create_files(self.id.clone(), id, files.clone())
-                .await?;
-        }
+                .await?
+        } else {
+            Vec::new()
+        };
 
         // increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;
@@ -435,8 +476,6 @@ impl CollectionActor {
             col_id: self.id.clone(),
             colrev: next_colrev,
             content: decoded,
-            // convert to array of Nullable Uuids for storage in the db
-            files: files.iter().map(|i| Some(*i)).collect(),
             permissions: &permissions,
         };
         let created_at: chrono::DateTime<chrono::Utc> =
@@ -454,19 +493,18 @@ impl CollectionActor {
             col: self.id.clone(),
             colrev: next_colrev,
             content: content.clone(),
-            files: files.clone(),
+            files: doc_files.clone(),
             created_at,
             updated_at: created_at,
         };
         self.broadcast(ServerMessage::Doc(msg));
 
-        // return document
         let doc = Document {
             id,
             created_at,
             updated_at: created_at,
             content: Some(content),
-            files,
+            files: doc_files,
             col: self.id.clone(),
             colrev: next_colrev,
             permissions,
@@ -540,13 +578,10 @@ impl CollectionActor {
         }
 
         // Delete files
-        let files = filter_null_values(doc.files);
-        if !files.is_empty() {
-            self.controller
-                .files
-                .delete_files(self.id.clone(), id, files)
-                .await?;
-        }
+        self.controller
+            .files
+            .delete_files(self.id.clone(), id, None)
+            .await?;
 
         // Increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;
@@ -558,7 +593,6 @@ impl CollectionActor {
             colrev: next_colrev,
             is_deleted: true,
             content: Some(None),
-            files: Some(&Vec::new()),
         };
         let updated_at: chrono::DateTime<chrono::Utc> =
             diesel::update(schema::documents::table)
@@ -609,7 +643,6 @@ impl CollectionActor {
                 }
                 err => SinkronError::internal(&err.to_string()),
             })?;
-        // drop(conn); TODO Why drop?
 
         self.check_doc_permission(&doc, source, Action::Update)
             .await?;
@@ -617,6 +650,16 @@ impl CollectionActor {
         if doc.is_deleted {
             return Err(SinkronError::DocumentAlreadyDeleted);
         }
+
+        // get doc files
+        let file_entities = schema::files::table
+            .filter(schema::files::col_id.eq(&self.id))
+            .filter(schema::files::doc_id.eq(&id))
+            .load::<models::File>(&mut conn)
+            .await
+            .map_err(internal_error)?;
+        let mut files: Vec<_> =
+            file_entities.into_iter().map(file_from_model).collect();
 
         // "next_content" uses Diesel AsChangeset behaviour
         let next_content = match &content_update {
@@ -627,39 +670,29 @@ impl CollectionActor {
             None => None,
         };
 
-        // "next_files" uses Diesel AsChangeset behaviour
-        let next_files = match files_update {
-            Some(files_update) => {
-                let mut next_files_set: HashSet<Uuid> =
-                    filter_null_values(doc.files.clone()).into_iter().collect();
-
-                if !files_update.delete.is_empty() {
-                    for file in &files_update.delete {
-                        next_files_set.remove(file);
-                    }
-                    // delete ignores not found files without errors
-                    self.controller
-                        .files
-                        .delete_files(self.id.clone(), id, files_update.delete)
-                        .await?;
+        if let Some(files_update) = files_update {
+            if !files_update.delete.is_empty() {
+                for file_id in &files_update.delete {
+                    files.retain(|file| file.id != *file_id);
                 }
-
-                if !files_update.add.is_empty() {
-                    for file in &files_update.add {
-                        next_files_set.insert(*file);
-                    }
-                    self.controller
-                        .files
-                        .create_files(self.id.clone(), id, files_update.add)
-                        .await?;
-                }
-
-                let next_files_vec: Vec<Uuid> =
-                    next_files_set.into_iter().collect();
-
-                Some(next_files_vec)
+                self.controller
+                    .files
+                    .delete_files(
+                        self.id.clone(),
+                        id,
+                        Some(files_update.delete),
+                    )
+                    .await?;
             }
-            None => None,
+
+            if !files_update.add.is_empty() {
+                let created_files = self
+                    .controller
+                    .files
+                    .create_files(self.id.clone(), id, files_update.add)
+                    .await?;
+                files.extend(created_files);
+            }
         };
 
         // Increment colrev
@@ -672,7 +705,6 @@ impl CollectionActor {
             colrev: next_colrev,
             is_deleted: false,
             content: next_content.as_ref().map(|i| i.as_ref()),
-            files: next_files.as_ref(),
         };
         let updated_at: chrono::DateTime<chrono::Utc> =
             diesel::update(schema::documents::table)
@@ -685,18 +717,13 @@ impl CollectionActor {
 
         drop(conn);
 
-        let updated_doc_files = match next_files {
-            Some(files) => files,
-            None => filter_null_values(doc.files),
-        };
-
         // Broadcast message to subscribers
         let msg = ServerUpdateMessage {
             id,
             col: self.id.clone(),
             colrev: next_colrev,
             content_update,
-            files: updated_doc_files.clone(),
+            files: files.clone(),
             created_at: doc.created_at,
             updated_at,
         };
@@ -711,7 +738,7 @@ impl CollectionActor {
             created_at: doc.created_at,
             updated_at,
             content: serialized_new_content,
-            files: updated_doc_files,
+            files,
             col: doc.col_id,
             colrev: next_colrev,
             permissions: doc.permissions,

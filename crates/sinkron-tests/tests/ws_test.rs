@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use base64::prelude::*;
 use futures_util::{SinkExt, StreamExt};
 use loro::{ExportMode, LoroDoc};
@@ -17,7 +19,9 @@ use sinkron_client::SinkronClient;
 use sinkron_common::error::{SinkronError, SinkronErrorResponseBody};
 use sinkron_common::permissions::{Permissions, Role};
 use sinkron_common::protocol::*;
-use sinkron_common::types::{CreateCollection, CreateDocument, DeleteDocument};
+use sinkron_common::types::{
+    CreateCollection, CreateDocument, DeleteDocument, File,
+};
 
 const API_URL: &'static str = "http://localhost:3000/api";
 const API_TOKEN: &'static str = "SINKRON_API_TOKEN";
@@ -116,12 +120,12 @@ async fn test_connect() {
         let mut conn = WsTest::new_or_fail(url).await;
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 0);
-        assert!(matches!(
+        assert_matches!(
             msg,
             ServerMessage::ConnectionError(SinkronError::AuthFailed {
                 message: _
             })
-        ));
+        );
 
         conn.close().await;
     }
@@ -143,13 +147,13 @@ async fn test_connect() {
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
-        assert!(matches!(
+        assert_matches!(
             msg,
             ServerMessage::SyncError(SyncErrorMessage {
                 col,
                 error: SinkronError::NotFound { message: _ }
             }) if col == invalid_col
-        ));
+        );
 
         conn.close().await;
     }
@@ -274,7 +278,7 @@ async fn test_sync() {
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
-        assert!(matches!(
+        assert_matches!(
             msg,
             ServerMessage::Doc(DocMessage {
                 id,
@@ -282,7 +286,7 @@ async fn test_sync() {
                 colrev,
                 ..
             }) if id == doc1.id && a_col == col && colrev == doc1.colrev
-        ));
+        );
 
         let (chan, msg) = conn.next_or_fail().await;
         assert_eq!(chan, 1);
@@ -395,14 +399,14 @@ async fn test_crud() {
 
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Doc(DocMessage {
             id: an_id,
             col: a_col,
             ..
         }) if an_id == id && a_col == col
-    ));
+    );
 
     // get
     conn.send_or_fail(
@@ -416,14 +420,14 @@ async fn test_crud() {
 
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Doc(DocMessage {
             id: an_id,
             col: a_col,
             ..
         }) if an_id == id && a_col == col
-    ));
+    );
 
     // get error
     conn.send_or_fail(
@@ -437,13 +441,13 @@ async fn test_crud() {
 
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::GetError(GetErrorMessage {
             error: SinkronError::NotFound { message: _ },
             ..
         })
-    ));
+    );
 
     // update
     let vv = loro_doc.oplog_vv();
@@ -464,14 +468,14 @@ async fn test_crud() {
 
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Update(ServerUpdateMessage {
             col: a_col,
             id: an_id,
             ..
         }) if a_col == col && an_id == id
-    ));
+    );
 
     // delete
     conn.send_or_fail(
@@ -485,14 +489,14 @@ async fn test_crud() {
 
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Delete(ServerDeleteMessage {
             col: a_col,
             id: an_id,
             ..
         }) if a_col == col && an_id == id
-    ));
+    );
 }
 
 #[tokio::test]
@@ -533,13 +537,13 @@ async fn test_permissions() {
     ws_forbidden.send_or_fail(1, sync_msg.clone()).await;
     let (chan, msg) = ws_forbidden.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::SyncError(SyncErrorMessage {
             col: a_col,
             error: SinkronError::Forbidden { message: _ },
         }) if a_col == col
-    ));
+    );
 
     // readonly: sync should success, change should fail
     let mut ws_readonly = WsTest::new_or_fail(ws_url("token-readonly")).await;
@@ -570,14 +574,14 @@ async fn test_permissions() {
         .await;
     let (chan, msg) = ws_readonly.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::ChangeError(ChangeErrorMessage {
             id: an_id,
             col: a_col,
             error: SinkronError::Forbidden { message: _ }
         }) if an_id == id && a_col == col
-    ));
+    );
 
     // editor: sync should success, change should success
     let mut ws_editor = WsTest::new_or_fail(ws_url("token-editor")).await;
@@ -597,14 +601,14 @@ async fn test_permissions() {
         .await;
     let (chan, msg) = ws_readonly.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Doc(DocMessage {
             id: an_id,
             col: a_col,
             ..
         }) if an_id == id && a_col == col
-    ));
+    );
 }
 
 async fn send_api_reqwest<T: Into<Body>>(
@@ -742,10 +746,10 @@ async fn test_files() {
 
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::SyncComplete(SyncCompleteMessage { .. })
-    ));
+    );
 
     // create document with an attachment
     let id = Uuid::new_v4();
@@ -761,16 +765,28 @@ async fn test_files() {
     .await;
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Doc(DocMessage {
-            id: an_id,
-            col: a_col,
-            files: doc_files,
+            id: msg_id,
+            col: msg_col,
+            files: msg_files,
             ..
-        }) if an_id == id && a_col == col && doc_files == [file_id]
-    ));
-    // TODO files should have size and checksum ?
+        }) if
+            msg_id == id &&
+            msg_col == col &&
+            msg_files.len() == 1 &&
+            matches!(
+                msg_files[0],
+                File {
+                    id: msg_file_id,
+                    size: msg_file_size,
+                    ..
+                } if
+                    msg_file_id == file_id &&
+                    msg_file_size == (file_size as i64)
+            )
+    );
 
     // TODO check collection storage
 
@@ -802,12 +818,12 @@ async fn test_files() {
     assert!(bytes == &second_chunk_data, "Chunk data is wrong");
 
     // generate new file data
+    let new_file_id = Uuid::new_v4();
     let new_file_size = 1024 * 1024 * 3; // 3 Mb
     let mut new_file_data = vec![0u8; new_file_size];
     rand::rng().fill_bytes(&mut new_file_data);
 
     // upload new file
-    let new_file_id = Uuid::new_v4();
     let payload = json!({
         "col_id": col.clone(),
         "file_id": new_file_id,
@@ -844,13 +860,18 @@ async fn test_files() {
     .await;
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
+    assert_matches!(
         msg,
         ServerMessage::Update(ServerUpdateMessage {
-            files,
+            files: msg_files,
             ..
-        }) if files == vec![new_file_id],
-    ));
+        }) if
+            msg_files.len() == 1 &&
+            matches!(
+                msg_files[0],
+                File { id: msg_file_id, .. } if msg_file_id == new_file_id
+            )
+    );
 
     // check that first file is deleted
     let payload = json!({
@@ -885,10 +906,7 @@ async fn test_files() {
     .await;
     let (chan, msg) = conn.next_or_fail().await;
     assert_eq!(chan, 1);
-    assert!(matches!(
-        msg,
-        ServerMessage::Delete(ServerDeleteMessage { .. })
-    ));
+    assert_matches!(msg, ServerMessage::Delete(ServerDeleteMessage { .. }));
 
     // check that new file is deleted
     let payload = json!({

@@ -169,7 +169,7 @@ impl ClientChannel {
                             col: doc.col,
                             colrev: doc.colrev,
                             content,
-                            files: Vec::new(), // TODO
+                            files: doc.files,
                             created_at: doc.created_at,
                             updated_at: doc.updated_at,
                         }),
@@ -241,7 +241,7 @@ impl ClientChannel {
                     col: doc.col,
                     colrev: doc.colrev,
                     content: doc.content.unwrap_or("".to_string()),
-                    files: Vec::new(), // TODO
+                    files: doc.files,
                     created_at: doc.created_at,
                     updated_at: doc.updated_at,
                 };

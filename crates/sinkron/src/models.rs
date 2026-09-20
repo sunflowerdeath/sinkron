@@ -46,7 +46,7 @@ pub struct NewCollection {
     pub storage_limit: i64,
 }
 
-#[derive(Selectable, Queryable)]
+#[derive(Identifiable, Selectable, Queryable)]
 #[diesel(table_name = schema::documents)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Document {
@@ -56,7 +56,6 @@ pub struct Document {
     pub col_id: String,
     pub colrev: i64,
     pub content: Option<Vec<u8>>,
-    pub files: Vec<Option<Uuid>>,
     pub is_deleted: bool,
     pub permissions: String,
 }
@@ -68,7 +67,6 @@ pub struct NewDocument<'a> {
     pub col_id: String,
     pub colrev: i64,
     pub content: Vec<u8>,
-    pub files: Vec<Option<Uuid>>,
     pub permissions: &'a str,
 }
 
@@ -79,7 +77,6 @@ pub struct DocumentUpdate<'a> {
     pub is_deleted: bool,
     // None - update is skipped, Some(None) - inserts NULL
     pub content: Option<Option<&'a Vec<u8>>>,
-    pub files: Option<&'a Vec<Uuid>>,
 }
 
 #[derive(Selectable, Queryable)]
@@ -137,9 +134,10 @@ pub struct NewFileUpload {
     pub checksum: String,
 }
 
-#[derive(Selectable, Queryable)]
+#[derive(Identifiable, Selectable, Queryable, Associations)]
 #[diesel(table_name = schema::files)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(belongs_to(Document, foreign_key = doc_id))]
 pub struct File {
     pub id: Uuid,
     pub col_id: String,

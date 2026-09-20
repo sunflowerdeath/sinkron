@@ -1,7 +1,7 @@
 use std::fmt;
 
 use log::error;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -27,7 +27,7 @@ pub enum SinkronError {
     FileNotFound { file_id: Uuid },
     FileMissingChunks { file_id: Uuid },
     FileTooLarge { file_id: Uuid },
-    FileInvalidChecksum { file_id: Uuid },
+    FileInvalidChecksum { file_id: Uuid }, // TODO not used
 }
 
 impl fmt::Display for SinkronError {
@@ -129,10 +129,4 @@ where
 #[derive(Deserialize, Serialize)]
 pub struct SinkronErrorResponseBody<E> {
     pub error: E,
-}
-
-impl From<diesel::result::Error> for SinkronError {
-    fn from(e: diesel::result::Error) -> Self {
-        SinkronError::internal(&e.to_string())
-    }
 }

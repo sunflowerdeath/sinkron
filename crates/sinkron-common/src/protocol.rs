@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::SinkronError;
+use crate::types::File;
 
 /*
 Client connects to server via webscokets. All messages must be prefixed
@@ -105,7 +106,7 @@ pub struct DocMessage {
     pub col: String,
     pub colrev: i64,
     pub content: String,
-    pub files: Vec<Uuid>,
+    pub files: Vec<File>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -117,7 +118,7 @@ pub struct ServerUpdateMessage {
     pub id: Uuid,
     pub colrev: i64,
     pub content_update: Option<String>,
-    pub files: Vec<Uuid>,
+    pub files: Vec<File>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
