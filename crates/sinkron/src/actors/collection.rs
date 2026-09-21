@@ -459,7 +459,7 @@ impl CollectionActor {
             // (if files created but document create failed)
             self.controller
                 .files
-                .create_files(self.id.clone(), id, files.clone())
+                .create_files(&mut conn, self.id.clone(), id, files.clone())
                 .await?
         } else {
             Vec::new()
@@ -485,8 +485,6 @@ impl CollectionActor {
                 .get_result(&mut conn)
                 .await
                 .map_err(internal_error)?;
-
-        drop(conn);
 
         let msg = DocMessage {
             id,
@@ -558,6 +556,7 @@ impl CollectionActor {
         source: Source,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
+
         let doc: models::Document = schema::documents::table
             .find(id)
             .filter(schema::documents::col_id.eq(&self.id))
@@ -577,18 +576,18 @@ impl CollectionActor {
             return Err(SinkronError::DocumentAlreadyDeleted);
         }
 
-        // Delete files
+        // delete files
         self.controller
             .files
-            .delete_files(self.id.clone(), id, None)
+            .delete_files(&mut conn, self.id.clone(), id, None)
             .await?;
 
-        // Increment colrev
+        // increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;
 
         // TODO increment refs colrev
 
-        // Update document
+        // update document
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
             is_deleted: true,
@@ -603,7 +602,7 @@ impl CollectionActor {
                 .await
                 .map_err(internal_error)?;
 
-        // Broadcast message to subscribers
+        // broadcast message to subscribers
         let msg = ServerDeleteMessage {
             id,
             col: self.id.clone(),
@@ -632,6 +631,7 @@ impl CollectionActor {
         files_update: Option<FilesUpdate>,
     ) -> Result<Document, SinkronError> {
         let mut conn = self.connect().await?;
+
         let doc: models::Document = schema::documents::table
             .find(id)
             .filter(schema::documents::col_id.eq(&self.id))
@@ -661,6 +661,7 @@ impl CollectionActor {
         let mut files: Vec<_> =
             file_entities.into_iter().map(file_from_model).collect();
 
+        // update content
         // "next_content" uses Diesel AsChangeset behaviour
         let next_content = match &content_update {
             Some(update) => {
@@ -670,6 +671,7 @@ impl CollectionActor {
             None => None,
         };
 
+        // create and delete files
         if let Some(files_update) = files_update {
             if !files_update.delete.is_empty() {
                 for file_id in &files_update.delete {
@@ -678,6 +680,7 @@ impl CollectionActor {
                 self.controller
                     .files
                     .delete_files(
+                        &mut conn,
                         self.id.clone(),
                         id,
                         Some(files_update.delete),
@@ -689,18 +692,23 @@ impl CollectionActor {
                 let created_files = self
                     .controller
                     .files
-                    .create_files(self.id.clone(), id, files_update.add)
+                    .create_files(
+                        &mut conn,
+                        self.id.clone(),
+                        id,
+                        files_update.add,
+                    )
                     .await?;
                 files.extend(created_files);
             }
         };
 
-        // Increment colrev
+        // increment colrev
         let next_colrev = self.increment_colrev(&mut conn).await?;
 
         // TODO increment refs colrev
 
-        // Update document
+        // update document
         let doc_update = models::DocumentUpdate {
             colrev: next_colrev,
             is_deleted: false,
@@ -715,9 +723,7 @@ impl CollectionActor {
                 .await
                 .map_err(internal_error)?;
 
-        drop(conn);
-
-        // Broadcast message to subscribers
+        // broadcast message to subscribers
         let msg = ServerUpdateMessage {
             id,
             col: self.id.clone(),

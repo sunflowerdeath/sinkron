@@ -237,21 +237,55 @@ impl FilesController {
         Ok(())
     }
 
+    pub async fn get_file_chunk(
+        &self,
+        props: GetFileChunk,
+    ) -> Result<Bytes, SinkronError> {
+        let GetFileChunk {
+            col_id,
+            file_id,
+            chunk_number,
+        } = props;
+
+        let mut conn = self.connect().await?;
+
+        // find file entity
+        let file = schema::files::table
+            .find(&file_id)
+            .filter(schema::files::col_id.eq(&col_id))
+            .first::<models::File>(&mut conn)
+            .await
+            .map_err(|err| match err {
+                diesel::NotFound => SinkronError::not_found("File not found"),
+                err => SinkronError::internal(&err.to_string()),
+            })?;
+
+        // check chunk number
+        let chunks_count = calc_chunks_count(file.size as u64);
+        if chunk_number == 0 || chunk_number > chunks_count {
+            return Err(SinkronError::unprocessable("Invalid chunk number"));
+        }
+
+        // get file chunk via storage provider
+        self.storage_adapter
+            .get_file_chunk(file_id, chunk_number)
+            .await
+    }
+
     pub async fn create_files(
         &self,
+        conn: &mut DbConnection,
         col_id: String,
         doc_id: Uuid,
         files: Vec<Uuid>,
     ) -> Result<Vec<File>, SinkronError> {
-        let mut conn = self.connect().await?;
-
-        let col = self.get_collection(&mut conn, &col_id).await?;
+        let col = self.get_collection(conn, &col_id).await?;
 
         // get file uploads from db
         let file_uploads = schema::file_uploads::table
             .filter(schema::file_uploads::file_id.eq_any(&files))
             .filter(schema::file_uploads::col_id.eq(&col_id))
-            .load::<models::FileUpload>(&mut conn)
+            .load::<models::FileUpload>(conn)
             .await
             .map_err(internal_error)?;
 
@@ -310,7 +344,7 @@ impl FilesController {
             // delete file upload entity
             let _ = diesel::delete(schema::file_uploads::table)
                 .filter(schema::file_uploads::id.eq(&file_upload.id))
-                .execute(&mut conn)
+                .execute(conn)
                 .await
                 .map_err(internal_error)?;
 
@@ -324,7 +358,7 @@ impl FilesController {
             };
             diesel::insert_into(schema::files::table)
                 .values(&new_file)
-                .execute(&mut conn)
+                .execute(conn)
                 .await
                 .map_err(internal_error)?;
 
@@ -341,7 +375,7 @@ impl FilesController {
         diesel::update(schema::collections::table)
             .filter(schema::collections::id.eq(col_id))
             .set(schema::collections::used_storage.eq(new_used_storage))
-            .execute(&mut conn)
+            .execute(conn)
             .await
             .map_err(internal_error)?;
 
@@ -350,13 +384,12 @@ impl FilesController {
 
     pub async fn delete_files(
         &self,
+        conn: &mut DbConnection,
         col_id: String,
         doc_id: Uuid,
         file_ids: Option<Vec<Uuid>>, // if None - delete all doc files
     ) -> Result<(), SinkronError> {
-        let mut conn = self.connect().await?;
-
-        let col = self.get_collection(&mut conn, &col_id).await?;
+        let col = self.get_collection(conn, &col_id).await?;
 
         // get file entities
         let mut query = schema::files::table
@@ -367,7 +400,7 @@ impl FilesController {
             query = query.filter(schema::files::id.eq_any(file_ids));
         };
         let files = query
-            .load::<models::File>(&mut conn)
+            .load::<models::File>(conn)
             .await
             .map_err(internal_error)?;
 
@@ -390,56 +423,18 @@ impl FilesController {
         if let Some(file_ids) = &file_ids {
             query = query.filter(schema::files::id.eq_any(file_ids));
         }
-        let _ = query
-            .execute(&mut conn)
-            .await
-            .map_err(internal_error)?;
+        let _ = query.execute(conn).await.map_err(internal_error)?;
 
         // update col used storage
         let new_used_storage = col.used_storage - total_file_size;
         diesel::update(schema::collections::table)
             .filter(schema::collections::id.eq(col_id))
             .set(schema::collections::used_storage.eq(new_used_storage))
-            .execute(&mut conn)
+            .execute(conn)
             .await
             .map_err(internal_error)?;
 
         Ok(())
-    }
-
-    pub async fn get_file_chunk(
-        &self,
-        props: GetFileChunk,
-    ) -> Result<Bytes, SinkronError> {
-        let GetFileChunk {
-            col_id,
-            file_id,
-            chunk_number,
-        } = props;
-
-        let mut conn = self.connect().await?;
-
-        // find file entity
-        let file = schema::files::table
-            .find(&file_id)
-            .filter(schema::files::col_id.eq(&col_id))
-            .first::<models::File>(&mut conn)
-            .await
-            .map_err(|err| match err {
-                diesel::NotFound => SinkronError::not_found("File not found"),
-                err => SinkronError::internal(&err.to_string()),
-            })?;
-
-        // check chunk number
-        let chunks_count = calc_chunks_count(file.size as u64);
-        if chunk_number == 0 || chunk_number > chunks_count {
-            return Err(SinkronError::unprocessable("Invalid chunk number"));
-        }
-
-        // get file chunk via storage provider
-        self.storage_adapter
-            .get_file_chunk(file_id, chunk_number)
-            .await
     }
 }
 
@@ -636,7 +631,7 @@ impl StorageAdapter for S3StorageAdapter {
             .object_exists(&key)
             .await
             .map_err(internal_error)?;
-        // Do not fail if file not found, but fail on other errors
+        // do not fail if file not found, but fail on other errors
         if !exists {
             return Ok(());
         }
