@@ -1,5 +1,8 @@
 import { action } from "mobx"
 
+import type { ServerMessage, ClientMessage } from "./protocol"
+import { Transport } from "./transport"
+
 export interface CollectionStore {
     save(id: string, item: Item<any>): Promise<void>
     delete(id: string): Promise<void>
@@ -34,7 +37,7 @@ class SinkronClient {
 
     constructor(props: SinkronClientProps) {}
 
-    collection(props: SinkronCollectionProps): SinkronCollection {
+    collection<T>(props: SinkronCollectionProps): SinkronCollection<T> {
         let channel = this.next_channel_index
         this.next_channel_index += 1
         return new SinkronCollection(this, channel, props)
@@ -123,14 +126,14 @@ class SinkronClient {
     }
 }
 
-class SinkronCollection {
+class SinkronCollection<T> {
     client: SinkronClient
     channel: ChannelId
 
     constructor(
         client: SinkronClient,
         channel: ChannelId,
-        props: SinkronCollectionProps,
+        props: SinkronCollectionProps<T>,
     ) {
         this.client = client
         this.channel = channel

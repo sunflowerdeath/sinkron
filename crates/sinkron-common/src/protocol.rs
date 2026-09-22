@@ -203,6 +203,7 @@ pub fn parse_channel_prefix(input: &str) -> Option<(i32, &str)> {
         } else {
             break;
         }
+        // TODO break if len > 6
     }
     if len == 0 {
         return None;
