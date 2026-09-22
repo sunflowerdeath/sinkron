@@ -1,0 +1,34 @@
+{
+    "name": "sinkron-client",
+    "version": "0.0.1",
+    "description": "",
+    "keywords": [],
+    "license": "Unlicense",
+    "author": "sunflowerdeath",
+    "type": "module",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "devEngines": {
+        "packageManager": {
+            "name": "pnpm",
+            "version": "^11.17.0",
+            "onFail": "download"
+        }
+    },
+    "dependencies": {
+        "date-fns": "^4.4.0",
+        "js-base64": "^3.9.4",
+        "loro-crdt": "^1.16.1",
+        "mobx": "^7.0.3",
+        "nanoevents": "^10.0.0",
+        "pino": "^10.3.1",
+        "uuid": "^14.0.2"
+    },
+    "devDependencies": {
+        "@rspack/cli": "^2.2.6",
+        "@rspack/core": "^2.2.6",
+        "@types/ws": "^8.18.1",
+        "ws": "^8.21.3"
+    }
+}
