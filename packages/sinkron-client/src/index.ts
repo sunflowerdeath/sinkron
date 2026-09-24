@@ -1,7 +1,10 @@
+import { Base64 } from "js-base64"
 import { LoroDoc } from "loro-crdt"
+import { debounce } from "lodash-es"
 import {
     makeObservable,
     observable,
+    observableRef,
     action,
     computed,
     createAtom,
@@ -11,7 +14,20 @@ import pino, { Logger } from "pino"
 
 import { AutoReconnect } from "./autoReconnect"
 import { Heartbeat } from "./heartbeat"
-import type { ServerMessage, ClientMessage } from "./protocol"
+import type {
+    ServerMessage,
+    ClientMessage,
+    SyncCompleteMessage,
+    SyncErrorMessage,
+    DocMessage,
+    ServerUpdateMessage,
+    ServerDeleteMessage,
+    ChangeErrorMessage,
+    GetErrorMessage,
+    ClientCreateMessage,
+    ClientUpdateMessage,
+    ClientDeleteMessage,
+} from "./protocol"
 import { Transport, WebSocketTransport } from "./transport"
 
 const L = LoroDoc.prototype
@@ -64,6 +80,11 @@ class ObservableLoroDoc {
     }
 }
 
+const loroToBase64 = (doc: ObservableLoroDoc) => {
+    const snapshot = doc.export({ mode: "snapshot" })
+    return Base64.fromUint8Array(snapshot)
+}
+
 export enum ItemState {
     Changed = 1,
     ChangesSent = 2,
@@ -114,12 +135,12 @@ export class Item<T> {
         Object.assign(this, initialValues)
         this.extractData = extractData
         makeObservable(this, {
-            remote: observable.ref,
-            local: observable.ref,
+            remote: observableRef,
+            local: observableRef,
             state: observable,
-            createdAt: observable.ref,
-            updatedAt: observable.ref,
-            localUpdatedAt: observable.ref,
+            createdAt: observableRef,
+            updatedAt: observableRef,
+            localUpdatedAt: observableRef,
             data: computed,
         })
     }
@@ -279,47 +300,207 @@ class SinkronClient {
     }
 
     handleMessage(msg: string) {
-        // parse channel & message
-        // if 0 channel
-        // if other channel
         let { channel, message } = parseMessage(msg)
 
         if (channel === 0) {
             // handle heartbeat, connection error
         } else {
             let col = this.collections[channel]
-            col?.handleMessage(message)
+            if (col) {
+                col.handleMessage(message)
+            } else {
+                // Log message in unexpected channel
+                // Send sync_stop
+            }
         }
     }
+
+    send(channel: number, msg: ClientMessage) {
+        this.transport.send(String(channel) + ":" + JSON.stringify(msg))
+    }
+
+    closeChannel(channel: number) {
+        delete this.collections[channel]
+    }
+}
+
+export enum CollectionStatus {
+    NotSynchronized = "not_synchronized",
+    SyncInProgress = "sync_in_progress",
+    SyncCompleted = "sync_completed",
+    SyncError = "sync_error",
+    Disposed = "disposed",
 }
 
 class SinkronCollection<T> {
     client: SinkronClient
     channel: number
 
+    initialSyncCompleted: boolean = false
+    status: CollectionStatus = CollectionStatus.NotSynchronized
+
+    col: string
+    colrev: number = 0
+    items: Map<string, Item<T>> = new Map()
+
+    backupQueue = new Set<string>()
+    backupDebounced: ReturnType<typeof debounce>
+
+    flushQueue = new Set<string>()
+    flushDebounced: ReturnType<typeof debounce>
+
     constructor(
         client: SinkronClient,
         channel: number,
         props: SinkronCollectionProps<T>,
     ) {
+        const { col } = props
+        this.col = col
         this.client = client
         this.channel = channel
     }
 
-    onConnect() {
-        // send sync_start
-    }
-
-    onDisconnect() {}
-
-    handleMessage(msg: ServerMessage) {}
-
-    sendMessage(message: ClientMessage) {
-        this.client.send(this.channel, message)
+    send(msg: ClientMessage) {
+        this.client.send(this.channel, msg)
     }
 
     dispose() {
-        // send sync_stop
+        this.send({ kind: "sync_stop", col: this.col })
+        this.client.closeChannel(this.channel)
+        this.status = CollectionStatus.Disposed
+    }
+
+    onConnect() {
+        this.status = CollectionStatus.SyncInProgress
+        this.send({
+            kind: "sync_start",
+            col: this.col,
+            colrev: this.colrev,
+        })
+    }
+
+    onDisconnect() {
+        this.status = CollectionStatus.NotSynchronized
+    }
+
+    handleMessage(msg: ServerMessage) {
+        if (msg.kind === "sync_complete") {
+            this.handleSyncCompleteMessage(msg)
+        } else if (msg.kind === "sync_error") {
+            this.handleSyncErrorMessage(msg)
+        } else if (msg.kind === "doc") {
+            this.handleDocMessage(msg)
+        } else if (msg.kind === "update") {
+            this.handleUpdateMessage(msg)
+        } else if (msg.kind === "delete") {
+            this.handleDeleteMessage(msg)
+        } else if (msg.kind === "change_error") {
+            this.handleChangeErrorMessage(msg)
+        } else if (msg.kind === "get_error") {
+            this.handleGetErrorMessage(msg)
+        } else {
+            // TODO log unexpected message type
+        }
+    }
+
+    handleSyncCompleteMessage(msg: SyncCompleteMessage) {
+        this.colrev = msg.colrev
+        this.flush()
+        this.status = CollectionStatus.SyncCompleted
+        this.initialSyncCompleted = true
+        this.backup()
+    }
+
+    handleSyncErrorMessage(msg: SyncErrorMessage) {
+        // TODO log sync error
+        this.status = CollectionStatus.SyncError
+        this.client.closeChannel(this.channel)
+    }
+
+    handleDocMessage(msg: DocMessage) {
+        // TODO
+    }
+
+    handleUpdateMessage(msg: ServerUpdateMessage) {
+        // TODO
+    }
+
+    handleDeleteMessage(msg: ServerDeleteMessage) {
+        // TODO
+    }
+
+    handleChangeErrorMessage(msg: ChangeErrorMessage) {
+        // TODO
+    }
+
+    handleGetErrorMessage(msg: GetErrorMessage) {
+        // TODO
+    }
+
+    async backup() {
+        if (this.store === undefined) return
+
+        if (this.backupQueue.size === 0) {
+            return
+        }
+
+        const colrev = this.colrev
+        const clonedQueue = new Set<string>()
+        for (const key of this.backupQueue) clonedQueue.add(key)
+        this.backupQueue.clear()
+        for (const key of clonedQueue) {
+            const item = this.items.get(key)
+            if (item) {
+                await this.store.save(key, item)
+            } else {
+                await this.store.delete(key)
+            }
+        }
+        await this.store.colrev(colrev)
+        this.logger.debug(
+            `Completed backup to local store, stored ${clonedQueue.size} items`
+        )
+    }
+
+    flush() {
+        this.logger.debug(`Flushing changes, ${this.flushQueue.size} items`)
+        this.flushQueue.forEach((id) => {
+            const item = this.items.get(id)
+            if (item === undefined) return
+
+            if (item.local !== null && item.remote === null) {
+                let msg: ClientCreateMessage = {
+                    kind: "create",
+                    col: this.col,
+                    id,
+                    content: loroToBase64(item.local),
+                    files: [], // TODO files
+                }
+                this.send(msg)
+            } else if (item.local === null && item.remote !== null) {
+                let msg: ClientDeleteMessage = {
+                    kind: "delete",
+                    col: this.col,
+                    id,
+                }
+                this.send(msg)
+            } else if (item.local !== null && item.remote !== null) {
+                const update = item.local.export({
+                    mode: "update",
+                    from: item.remote.version(),
+                })
+                let msg: ClientUpdateMessage = {
+                    kind: "update",
+                    col: this.col,
+                    id,
+                    content_update: Base64.fromUint8Array(update),
+                    files_update: null, // TODO files
+                }
+                this.send(msg)
+            }
+            item.state = ItemState.ChangesSent
+        })
+        this.flushQueue.clear()
     }
 }
 

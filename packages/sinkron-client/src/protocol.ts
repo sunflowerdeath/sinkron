@@ -159,7 +159,7 @@ export type ClientDeleteMessage = {
 }
 
 export type DocMessage = {
-    kind: "dec"
+    kind: "doc"
     id: string
     col: string
     colrev: number

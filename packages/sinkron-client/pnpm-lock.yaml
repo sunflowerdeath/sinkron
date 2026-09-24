@@ -213,6 +213,9 @@ importers:
       js-base64:
         specifier: ^3.9.4
         version: 3.9.4
+      lodash-es:
+        specifier: ^4.18.1
+        version: 4.18.1
       loro-crdt:
         specifier: ^1.16.1
         version: 1.16.1
@@ -382,6 +385,9 @@ packages:
 
   js-base64@3.9.4:
     resolution: {integrity: sha512-PtOMXpEGuP0RRiRXsjzHzl44dMHxSu2CPvAhinupR1tBa88me+1DPqsobl7eupn5UukjLkln1ZnAOAOXOrYG0Q==}
+
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
   loro-crdt@1.16.1:
     resolution: {integrity: sha512-olUkbQEjeeE78Kx6BknYrpbaX43wxRAycoiLZUSLVcMFKMSZ8RxPfp244kNVQEM8MQfgkbnwrNOaHU/yUb5Ncg==}
@@ -573,6 +579,8 @@ snapshots:
   date-fns@4.4.0: {}
 
   js-base64@3.9.4: {}
+
+  lodash-es@4.18.1: {}
 
   loro-crdt@1.16.1: {}
 
