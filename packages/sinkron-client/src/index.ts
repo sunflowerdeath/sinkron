@@ -1,7 +1,129 @@
-import { action } from "mobx"
+import { LoroDoc } from "loro-crdt"
+import {
+    makeObservable,
+    observable,
+    action,
+    computed,
+    createAtom,
+    IAtom,
+} from "mobx"
+import pino, { Logger } from "pino"
 
+import { AutoReconnect } from "./autoReconnect"
+import { Heartbeat } from "./heartbeat"
 import type { ServerMessage, ClientMessage } from "./protocol"
-import { Transport } from "./transport"
+import { Transport, WebSocketTransport } from "./transport"
+
+const L = LoroDoc.prototype
+
+class ObservableLoroDoc {
+    #doc: LoroDoc
+    #atom: IAtom
+
+    constructor(doc: LoroDoc | undefined) {
+        this.#doc = doc === undefined ? new LoroDoc() : doc
+        this.#atom = createAtom("ObservableLoroDoc")
+    }
+
+    get doc() {
+        this.#atom.reportObserved()
+        return this.#doc
+    }
+
+    change(cb: (doc: LoroDoc) => void) {
+        cb(this.#doc)
+        this.#atom.reportChanged()
+    }
+
+    export(...args: Parameters<typeof L.export>): ReturnType<typeof L.export> {
+        this.#atom.reportObserved()
+        return this.#doc.export(...args)
+    }
+
+    fork(...args: Parameters<typeof L.fork>): ObservableLoroDoc {
+        this.#atom.reportObserved()
+        return new ObservableLoroDoc(this.#doc.fork(...args))
+    }
+
+    import(...args: Parameters<typeof L.import>): ReturnType<typeof L.import> {
+        const res = this.#doc.import(...args)
+        this.#atom.reportChanged()
+        return res
+    }
+
+    toJSON(...args: Parameters<typeof L.toJSON>): ReturnType<typeof L.toJSON> {
+        this.#atom.reportObserved()
+        return this.#doc.toJSON(...args)
+    }
+
+    version(
+        ...args: Parameters<typeof L.version>
+    ): ReturnType<typeof L.version> {
+        this.#atom.reportObserved()
+        return this.#doc.version(...args)
+    }
+}
+
+export enum ItemState {
+    Changed = 1,
+    ChangesSent = 2,
+    Synchronized = 3,
+    Error = 4,
+}
+
+interface ItemInitialValues {
+    id: string
+    remote: ObservableLoroDoc | null
+    local: ObservableLoroDoc | null
+    state: ItemState
+    localUpdatedAt?: Date
+    createdAt?: Date
+    updatedAt?: Date
+}
+
+export type ExtractData<T> = (doc: LoroDoc) => T
+
+export class Item<T> {
+    id!: string
+    // Remote version of the document. It is `null` until server acknowledges
+    // creation.
+    remote!: ObservableLoroDoc | null
+    // Local version of the document. After deleting it remains in the
+    // collection with `null` value until server acknowledges deletion.
+    local!: ObservableLoroDoc | null
+    state!: ItemState
+    // Used to sort items in when they are not in synchronized state
+    localUpdatedAt?: Date = undefined
+    createdAt?: Date = undefined
+    updatedAt?: Date = undefined
+
+    extractData?: ExtractData<T> | undefined
+
+    get data() {
+        if (this.local === null) {
+            return undefined
+        } else {
+            return this.extractData?.(this.local.doc)
+        }
+    }
+
+    constructor(
+        initialValues: ItemInitialValues,
+        extractData: ExtractData<T> | undefined = undefined,
+    ) {
+        Object.assign(this, initialValues)
+        this.extractData = extractData
+        makeObservable(this, {
+            remote: observable.ref,
+            local: observable.ref,
+            state: observable,
+            createdAt: observable.ref,
+            updatedAt: observable.ref,
+            localUpdatedAt: observable.ref,
+            data: computed,
+        })
+    }
+}
 
 export interface CollectionStore {
     save(id: string, item: Item<any>): Promise<void>
@@ -24,62 +146,58 @@ interface SinkronClientProps {
 interface SinkronCollectionProps<T> {
     col: string
     errorHandler?: (msg: ServerMessage) => void
-    dataExtractor?: DataExtractor<T>
+    dataExtractor?: ExtractData<T>
 }
 
-type ChannelId = number
+export enum ConnectionStatus {
+    Disconnected = "disconnected",
+    Connected = "connected",
+    Ready = "ready",
+    Error = "error",
+}
+
+const defaultLogger = (level = "debug"): Logger<string> => {
+    const logger: Logger<string> = pino({
+        transport: { target: "pino-pretty" },
+    })
+    logger.level = level
+    return logger
+}
 
 class SinkronClient {
+    logger: Logger<string>
+
     next_channel_index = 1
-    channels: Map<ChannelId, SinkronCollection> = new Map()
+    collections: { [key: string]: SinkronCollection<any> } = {}
 
     transport: Transport
+    status: ConnectionStatus = ConnectionStatus.Disconnected
+    heartbeat?: Heartbeat
+    autoReconnect?: AutoReconnect
+    disconnect?: () => void
 
-    constructor(props: SinkronClientProps) {}
-
-    collection<T>(props: SinkronCollectionProps): SinkronCollection<T> {
-        let channel = this.next_channel_index
-        this.next_channel_index += 1
-        return new SinkronCollection(this, channel, props)
+    constructor(props: SinkronClientProps) {
+        const { store, errorHandler, logger } = props
+        // this.store = store
+        // this.errorHandler = errorHandler
+        this.logger = logger === undefined ? defaultLogger() : logger
+        makeObservable(this, {
+            status: observable,
+        })
+        this.init(props)
     }
 
-    init() {
-        this.transport.emitter.on(
-            "open",
-            action(() => {
-                this.logger.info("Connection established")
-                this.status = ConnectionStatus.Connected
-                this.heartbeat = new Heartbeat({
-                    logger: this.logger,
-                    heartbeat: (i: number) => {
-                        this.logger.trace(`Sending heartbeat: ${i}`, i)
-                        const heartbeat = { kind: "h", i }
-                        this.transport.send(JSON.stringify(heartbeat))
-                    },
-                    heartbeatInterval: 30000,
-                    timeout: 5000,
-                    onTimeout: () => {
-                        this.logger.warn(
-                            "No response from server for too long, disconnecting",
-                        )
-                        this.transport.close()
-                    },
-                })
+    init(props: SinkronClientProps) {
+        const { url, authToken, webSocketImpl } = props
 
-                // TODO send to collection that connection is open
-            }),
-        )
-        this.transport.emitter.on(
-            "close",
-            action(() => {
-                this.logger.info("Connection closed")
-                this.status = ConnectionStatus.Disconnected
-                this.heartbeat?.dispose()
-                this.heartbeat = undefined
-                // TODO send disconnect message to collections
-                // this.flushDebounced.cancel()
-            }),
-        )
+        this.transport = new WebSocketTransport({
+            url,
+            webSocketImpl,
+            logger: this.logger,
+        })
+
+        this.transport.emitter.on("open", this.onConnect)
+        this.transport.emitter.on("close", this.onDisconnect)
         this.transport.emitter.on("message", (msg: string) => {
             try {
                 this.handleMessage(msg)
@@ -96,18 +214,67 @@ class SinkronClient {
             this.disconnect = () => this.transport.close()
         } else {
             this.autoReconnect = new AutoReconnect({
-                connect: () => this.transport.open()
+                connect: () => this.transport.open(),
             })
             this.transport.emitter.on("open", () =>
-                this.autoReconnect?.onOpen()
+                this.autoReconnect?.onOpen(),
             )
             this.transport.emitter.on("close", () =>
-                this.autoReconnect?.onClose()
+                this.autoReconnect?.onClose(),
             )
             this.disconnect = () => {
                 this.autoReconnect?.stop()
                 this.transport.close()
             }
+        }
+    }
+
+    collection<T>(props: SinkronCollectionProps<T>): SinkronCollection<T> {
+        let channel = this.next_channel_index
+        this.next_channel_index += 1
+        const collection = new SinkronCollection(this, channel, props)
+        this.collections[channel] = collection
+        if (this.status === ConnectionStatus.Connected) {
+            collection.onConnect()
+        }
+        return collection
+    }
+
+    onConnect() {
+        this.logger.info("Connection established")
+        this.status = ConnectionStatus.Connected
+
+        this.heartbeat = new Heartbeat({
+            logger: this.logger,
+            heartbeat: (i: number) => {
+                this.logger.trace(`Sending heartbeat: ${i}`, i)
+                const heartbeat = { kind: "h", i }
+                this.transport.send(JSON.stringify(heartbeat))
+            },
+            heartbeatInterval: 30000,
+            timeout: 5000,
+            onTimeout: () => {
+                this.logger.warn(
+                    "No response from server for too long, disconnecting",
+                )
+                this.transport.close()
+            },
+        })
+
+        for (const col of Object.values(this.collections)) {
+            col.onConnect()
+        }
+    }
+
+    onDisconnect() {
+        this.logger.info("Connection closed")
+        this.status = ConnectionStatus.Disconnected
+
+        this.heartbeat?.dispose()
+        this.heartbeat = undefined
+
+        for (const col of Object.values(this.collections)) {
+            col.onDisconnect()
         }
     }
 
@@ -120,7 +287,7 @@ class SinkronClient {
         if (channel === 0) {
             // handle heartbeat, connection error
         } else {
-            let col = this.channels.get(channel)
+            let col = this.collections[channel]
             col?.handleMessage(message)
         }
     }
@@ -128,22 +295,31 @@ class SinkronClient {
 
 class SinkronCollection<T> {
     client: SinkronClient
-    channel: ChannelId
+    channel: number
 
     constructor(
         client: SinkronClient,
-        channel: ChannelId,
+        channel: number,
         props: SinkronCollectionProps<T>,
     ) {
         this.client = client
         this.channel = channel
     }
 
-    handleMessage(msg: ServerMessage) {
+    onConnect() {
+        // send sync_start
     }
+
+    onDisconnect() {}
+
+    handleMessage(msg: ServerMessage) {}
 
     sendMessage(message: ClientMessage) {
         this.client.send(this.channel, message)
+    }
+
+    dispose() {
+        // send sync_stop
     }
 }
 
