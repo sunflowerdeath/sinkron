@@ -1,19 +1,25 @@
 import { Base64 } from "js-base64"
-import { LoroDoc } from "loro-crdt"
 import { debounce } from "lodash-es"
+import { LoroDoc } from "loro-crdt"
 import {
     makeObservable,
     observable,
     observableRef,
-    action,
+    observableShallow,
     computed,
-    createAtom,
-    IAtom,
 } from "mobx"
 import pino, { Logger } from "pino"
+import { v4 as uuidv4 } from "uuid"
 
 import { AutoReconnect } from "./autoReconnect"
+import type { CollectionStore, StoredItem } from "./collectionStore"
 import { Heartbeat } from "./heartbeat"
+import {
+    ObservableLoroDoc,
+    loroToBase64,
+    mergeChanges,
+    hasChanges,
+} from "./loroUtils"
 import type {
     ServerMessage,
     ClientMessage,
@@ -27,137 +33,16 @@ import type {
     ClientCreateMessage,
     ClientUpdateMessage,
     ClientDeleteMessage,
+    HeartbeatMessage,
 } from "./protocol"
 import { Transport, WebSocketTransport } from "./transport"
 
-const L = LoroDoc.prototype
-
-class ObservableLoroDoc {
-    #doc: LoroDoc
-    #atom: IAtom
-
-    constructor(doc: LoroDoc | undefined) {
-        this.#doc = doc === undefined ? new LoroDoc() : doc
-        this.#atom = createAtom("ObservableLoroDoc")
-    }
-
-    get doc() {
-        this.#atom.reportObserved()
-        return this.#doc
-    }
-
-    change(cb: (doc: LoroDoc) => void) {
-        cb(this.#doc)
-        this.#atom.reportChanged()
-    }
-
-    export(...args: Parameters<typeof L.export>): ReturnType<typeof L.export> {
-        this.#atom.reportObserved()
-        return this.#doc.export(...args)
-    }
-
-    fork(...args: Parameters<typeof L.fork>): ObservableLoroDoc {
-        this.#atom.reportObserved()
-        return new ObservableLoroDoc(this.#doc.fork(...args))
-    }
-
-    import(...args: Parameters<typeof L.import>): ReturnType<typeof L.import> {
-        const res = this.#doc.import(...args)
-        this.#atom.reportChanged()
-        return res
-    }
-
-    toJSON(...args: Parameters<typeof L.toJSON>): ReturnType<typeof L.toJSON> {
-        this.#atom.reportObserved()
-        return this.#doc.toJSON(...args)
-    }
-
-    version(
-        ...args: Parameters<typeof L.version>
-    ): ReturnType<typeof L.version> {
-        this.#atom.reportObserved()
-        return this.#doc.version(...args)
-    }
-}
-
-const loroToBase64 = (doc: ObservableLoroDoc) => {
-    const snapshot = doc.export({ mode: "snapshot" })
-    return Base64.fromUint8Array(snapshot)
-}
-
-export enum ItemState {
-    Changed = 1,
-    ChangesSent = 2,
-    Synchronized = 3,
-    Error = 4,
-}
-
-interface ItemInitialValues {
-    id: string
-    remote: ObservableLoroDoc | null
-    local: ObservableLoroDoc | null
-    state: ItemState
-    localUpdatedAt?: Date
-    createdAt?: Date
-    updatedAt?: Date
-}
-
 export type ExtractData<T> = (doc: LoroDoc) => T
-
-export class Item<T> {
-    id!: string
-    // Remote version of the document. It is `null` until server acknowledges
-    // creation.
-    remote!: ObservableLoroDoc | null
-    // Local version of the document. After deleting it remains in the
-    // collection with `null` value until server acknowledges deletion.
-    local!: ObservableLoroDoc | null
-    state!: ItemState
-    // Used to sort items in when they are not in synchronized state
-    localUpdatedAt?: Date = undefined
-    createdAt?: Date = undefined
-    updatedAt?: Date = undefined
-
-    extractData?: ExtractData<T> | undefined
-
-    get data() {
-        if (this.local === null) {
-            return undefined
-        } else {
-            return this.extractData?.(this.local.doc)
-        }
-    }
-
-    constructor(
-        initialValues: ItemInitialValues,
-        extractData: ExtractData<T> | undefined = undefined,
-    ) {
-        Object.assign(this, initialValues)
-        this.extractData = extractData
-        makeObservable(this, {
-            remote: observableRef,
-            local: observableRef,
-            state: observable,
-            createdAt: observableRef,
-            updatedAt: observableRef,
-            localUpdatedAt: observableRef,
-            data: computed,
-        })
-    }
-}
-
-export interface CollectionStore {
-    save(id: string, item: Item<any>): Promise<void>
-    delete(id: string): Promise<void>
-    colrev(colrev: string): Promise<void>
-    load(): Promise<{ items: StoredItem[]; colrev: string }>
-    dispose(): void
-}
 
 interface SinkronClientProps {
     url: string
     authToken: string
-    store?: CollectionStore
+    store?: (col: string) => CollectionStore
     noAutoReconnect?: boolean
     errorHandler?: (msg: ServerMessage) => void
     logger?: Logger<string>
@@ -167,7 +52,7 @@ interface SinkronClientProps {
 interface SinkronCollectionProps<T> {
     col: string
     errorHandler?: (msg: ServerMessage) => void
-    dataExtractor?: ExtractData<T>
+    extractData?: ExtractData<T>
 }
 
 export enum ConnectionStatus {
@@ -185,8 +70,27 @@ const defaultLogger = (level = "debug"): Logger<string> => {
     return logger
 }
 
+const parseMessage = <T>(
+    msg: string,
+): { message: T; channel: number } | null => {
+    const match = msg.match(/^(\d{1,6}):(.*)$/)
+    if (!match) {
+        return null
+    }
+    const channel = parseInt(match[1], 10)
+    const rest = match[2]
+    try {
+        let parsed = JSON.parse(rest)
+        return { channel, message: parsed }
+    } catch {
+        return null
+    }
+}
+
 class SinkronClient {
     logger: Logger<string>
+    store?: (col: string) => CollectionStore
+    errorHandler?: (msg: ServerMessage) => void
 
     next_channel_index = 1
     collections: { [key: string]: SinkronCollection<any> } = {}
@@ -199,12 +103,15 @@ class SinkronClient {
 
     constructor(props: SinkronClientProps) {
         const { store, errorHandler, logger } = props
-        // this.store = store
-        // this.errorHandler = errorHandler
+
         this.logger = logger === undefined ? defaultLogger() : logger
+        this.store = store
+        this.errorHandler = errorHandler
+
         makeObservable(this, {
             status: observable,
         })
+
         this.init(props)
     }
 
@@ -212,7 +119,7 @@ class SinkronClient {
         const { url, authToken, webSocketImpl } = props
 
         this.transport = new WebSocketTransport({
-            url,
+            url: `${url}?token=${authToken}`,
             webSocketImpl,
             logger: this.logger,
         })
@@ -224,8 +131,7 @@ class SinkronClient {
                 this.handleMessage(msg)
             } catch (e) {
                 this.logger.error(
-                    "Unhandled exception in message handler, %o",
-                    e,
+                    `Unhandled exception in message handler, ${e}`,
                 )
             }
         })
@@ -253,7 +159,13 @@ class SinkronClient {
     collection<T>(props: SinkronCollectionProps<T>): SinkronCollection<T> {
         let channel = this.next_channel_index
         this.next_channel_index += 1
-        const collection = new SinkronCollection(this, channel, props)
+        const collection = new SinkronCollection({
+            client: this,
+            channel,
+            store: this.store ? this.store(props.col) : undefined,
+            logger: this.logger,
+            ...props,
+        })
         this.collections[channel] = collection
         if (this.status === ConnectionStatus.Connected) {
             collection.onConnect()
@@ -268,9 +180,9 @@ class SinkronClient {
         this.heartbeat = new Heartbeat({
             logger: this.logger,
             heartbeat: (i: number) => {
-                this.logger.trace(`Sending heartbeat: ${i}`, i)
-                const heartbeat = { kind: "h", i }
-                this.transport.send(JSON.stringify(heartbeat))
+                this.logger.trace(`Sending heartbeat: ${i}`)
+                const heartbeat: HeartbeatMessage = { kind: "h", i }
+                this.send(0, heartbeat)
             },
             heartbeatInterval: 30000,
             timeout: 5000,
@@ -300,7 +212,13 @@ class SinkronClient {
     }
 
     handleMessage(msg: string) {
-        let { channel, message } = parseMessage(msg)
+        this.logger.trace(`Received message: ${msg}`)
+        let parsed = parseMessage<ServerMessage>(msg)
+        if (parsed === null) {
+            this.logger.error(`Couldn't parse message: ${msg}`)
+            return
+        }
+        let { channel, message } = parsed
 
         if (channel === 0) {
             // handle heartbeat, connection error
@@ -324,22 +242,94 @@ class SinkronClient {
     }
 }
 
+export enum ItemState {
+    Changed = 1,
+    // TODO UploadingFiles,
+    ChangesSent = 2,
+    Synchronized = 3,
+    Error = 4,
+}
+
+// TODO
+// remote: { content, files } | null
+// local: { content, files } | null
+interface ItemInitialValues {
+    id: string
+    remote: ObservableLoroDoc | null
+    local: ObservableLoroDoc | null
+    state: ItemState
+    localUpdatedAt?: Date
+    createdAt?: Date
+    updatedAt?: Date
+}
+
+class Item<T> {
+    id!: string
+    // Remote version of the document. It is `null` until server acknowledges
+    // creation.
+    remote!: ObservableLoroDoc | null
+    // Local version of the document. After deleting it remains in the
+    // collection with `null` value until server acknowledges deletion.
+    local!: ObservableLoroDoc | null
+    state!: ItemState
+    // Used to sort items in when they are not in synchronized state
+    localUpdatedAt?: Date = undefined
+    createdAt?: Date = undefined
+    updatedAt?: Date = undefined
+    extractData?: ExtractData<T> | undefined
+
+    get data() {
+        if (this.local === null) {
+            return undefined
+        } else {
+            return this.extractData?.(this.local.doc)
+        }
+    }
+
+    constructor(
+        initialValues: ItemInitialValues,
+        extractData: ExtractData<T> | undefined = undefined,
+    ) {
+        Object.assign(this, initialValues)
+        this.extractData = extractData
+        makeObservable(this, {
+            remote: observableRef,
+            local: observableRef,
+            state: observable,
+            createdAt: observableRef,
+            updatedAt: observableRef,
+            localUpdatedAt: observableRef,
+            data: computed,
+        })
+    }
+}
+
 export enum CollectionStatus {
     NotSynchronized = "not_synchronized",
     SyncInProgress = "sync_in_progress",
     SyncCompleted = "sync_completed",
     SyncError = "sync_error",
-    Disposed = "disposed",
+    SyncStopped = "sync_stopped",
+}
+
+type SinkronNewCollectionProps<T> = SinkronCollectionProps<T> & {
+    client: SinkronClient
+    channel: number
+    store?: CollectionStore
+    logger: Logger<string>
 }
 
 class SinkronCollection<T> {
     client: SinkronClient
     channel: number
+    store?: CollectionStore
+    col: string
+    extractData?: ExtractData<T>
 
+    logger: Logger<string>
+    isLoadedFromStore: boolean = false
     initialSyncCompleted: boolean = false
     status: CollectionStatus = CollectionStatus.NotSynchronized
-
-    col: string
     colrev: number = 0
     items: Map<string, Item<T>> = new Map()
 
@@ -349,15 +339,49 @@ class SinkronCollection<T> {
     flushQueue = new Set<string>()
     flushDebounced: ReturnType<typeof debounce>
 
-    constructor(
-        client: SinkronClient,
-        channel: number,
-        props: SinkronCollectionProps<T>,
-    ) {
-        const { col } = props
-        this.col = col
-        this.client = client
-        this.channel = channel
+    constructor(props: SinkronNewCollectionProps<T>) {
+        Object.assign(this, props)
+        makeObservable(this, {
+            items: observableShallow,
+            colrev: observable,
+            isLoadedFromStore: observable,
+            status: observable,
+            initialSyncCompleted: observable,
+        })
+        this.init()
+    }
+
+    async init() {
+        if (this.store) await this.loadFromStore()
+        this.isLoadedFromStore = true
+    }
+
+    createItem(initialValues: ItemInitialValues) {
+        return new Item(initialValues, this.extractData)
+    }
+
+    async loadFromStore() {
+        const { colrev, items } = await this.store!.load()
+        this.colrev = colrev
+        items.forEach((stored: StoredItem) => {
+            const { id, local, remote } = stored
+            const isChanged =
+                local === null || remote === null || hasChanges(local, remote)
+            const item = this.createItem({
+                id,
+                local,
+                remote,
+                state: isChanged ? ItemState.Changed : ItemState.Synchronized,
+                localUpdatedAt: stored.localUpdatedAt,
+                createdAt: stored.createdAt,
+                updatedAt: stored.updatedAt,
+            })
+            this.items.set(id, item)
+            if (isChanged) this.flushQueue.add(id)
+        })
+        this.logger.debug(
+            `Loaded from local store ${items.length} items, colrev: ${colrev}`,
+        )
     }
 
     send(msg: ClientMessage) {
@@ -366,8 +390,8 @@ class SinkronCollection<T> {
 
     dispose() {
         this.send({ kind: "sync_stop", col: this.col })
+        this.status = CollectionStatus.SyncStopped
         this.client.closeChannel(this.channel)
-        this.status = CollectionStatus.Disposed
     }
 
     onConnect() {
@@ -437,6 +461,11 @@ class SinkronCollection<T> {
         // TODO
     }
 
+    enqueueBackup(id: string) {
+        this.backupQueue.add(id)
+        this.backupDebounced()
+    }
+
     async backup() {
         if (this.store === undefined) return
 
@@ -458,7 +487,7 @@ class SinkronCollection<T> {
         }
         await this.store.colrev(colrev)
         this.logger.debug(
-            `Completed backup to local store, stored ${clonedQueue.size} items`
+            `Completed backup to local store, stored ${clonedQueue.size} items`,
         )
     }
 
@@ -502,6 +531,71 @@ class SinkronCollection<T> {
         })
         this.flushQueue.clear()
     }
+
+    onChangeItem(id: string, flushImmediate: boolean) {
+        this.enqueueBackup(id)
+        this.flushQueue.add(id)
+        if (this.status === CollectionStatus.SyncCompleted) {
+            if (flushImmediate) {
+                this.flushDebounced.cancel()
+                this.flush()
+            } else {
+                this.flushDebounced()
+            }
+        }
+    }
+
+    // Public API
+
+    create(doc: LoroDoc) {
+        const id = uuidv4()
+        this.items.set(
+            id,
+            this.createItem({
+                id,
+                remote: null,
+                local: new ObservableLoroDoc(doc),
+                state: ItemState.Changed,
+                localUpdatedAt: new Date(),
+            }),
+        )
+        this.onChangeItem(id, true)
+        return id
+    }
+
+    change(id: string, callback: (d: LoroDoc) => void) {
+        const item = this.items.get(id)
+        if (item === undefined) {
+            throw new Error("No item with id: " + id)
+        }
+        if (item.local === null) {
+            throw new Error("Can't change deleted item: " + id)
+        }
+
+        const version = item.local.version()
+        item.local.change(callback)
+        if (item.local.version().compare(version) === 0) {
+            // nothing changed
+            return
+        }
+        item.localUpdatedAt = new Date()
+        item.state = ItemState.Changed
+        this.onChangeItem(id, false)
+    }
+
+    delete(id: string) {
+        const item = this.items.get(id)
+        if (!item) throw new Error(`No item with such id: "${id}"`)
+        if (item.remote === null) {
+            this.items.delete(id)
+            return
+        }
+        item.local = null
+        item.state = ItemState.Changed
+        this.onChangeItem(id, true)
+    }
+
+    // files ?
 }
 
-export { SinkronClient }
+export { SinkronClient, Item }
