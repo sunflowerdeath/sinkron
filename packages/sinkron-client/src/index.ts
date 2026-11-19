@@ -1,5 +1,7 @@
+import { parseISO } from "date-fns"
 import { Base64 } from "js-base64"
 import { debounce } from "lodash-es"
+import { difference } from "lodash-es"
 import { LoroDoc } from "loro-crdt"
 import {
     makeObservable,
@@ -13,14 +15,17 @@ import { v4 as uuidv4 } from "uuid"
 
 import { AutoReconnect } from "./autoReconnect"
 import type { CollectionStore, StoredItem } from "./collectionStore"
+import type { FileSource } from "./files"
 import { Heartbeat } from "./heartbeat"
 import {
     ObservableLoroDoc,
     loroToBase64,
+    loroFromBase64,
     mergeChanges,
     hasChanges,
 } from "./loroUtils"
 import type {
+    FileProps,
     ServerMessage,
     ClientMessage,
     SyncCompleteMessage,
@@ -74,9 +79,7 @@ const parseMessage = <T>(
     msg: string,
 ): { message: T; channel: number } | null => {
     const match = msg.match(/^(\d{1,6}):(.*)$/)
-    if (!match) {
-        return null
-    }
+    if (!match) return null
     const channel = parseInt(match[1], 10)
     const rest = match[2]
     try {
@@ -91,10 +94,8 @@ class SinkronClient {
     logger: Logger<string>
     store?: (col: string) => CollectionStore
     errorHandler?: (msg: ServerMessage) => void
-
     next_channel_index = 1
     collections: { [key: string]: SinkronCollection<any> } = {}
-
     transport: Transport
     status: ConnectionStatus = ConnectionStatus.Disconnected
     heartbeat?: Heartbeat
@@ -102,7 +103,8 @@ class SinkronClient {
     disconnect?: () => void
 
     constructor(props: SinkronClientProps) {
-        const { store, errorHandler, logger } = props
+        const { store, errorHandler, logger, url, authToken, webSocketImpl } =
+            props
 
         this.logger = logger === undefined ? defaultLogger() : logger
         this.store = store
@@ -112,18 +114,11 @@ class SinkronClient {
             status: observable,
         })
 
-        this.init(props)
-    }
-
-    init(props: SinkronClientProps) {
-        const { url, authToken, webSocketImpl } = props
-
         this.transport = new WebSocketTransport({
             url: `${url}?token=${authToken}`,
             webSocketImpl,
             logger: this.logger,
         })
-
         this.transport.emitter.on("open", this.onConnect)
         this.transport.emitter.on("close", this.onDisconnect)
         this.transport.emitter.on("message", (msg: string) => {
@@ -202,10 +197,8 @@ class SinkronClient {
     onDisconnect() {
         this.logger.info("Connection closed")
         this.status = ConnectionStatus.Disconnected
-
         this.heartbeat?.dispose()
         this.heartbeat = undefined
-
         for (const col of Object.values(this.collections)) {
             col.onDisconnect()
         }
@@ -221,12 +214,13 @@ class SinkronClient {
         let { channel, message } = parsed
 
         if (channel === 0) {
-            // handle heartbeat, connection error
+            // TODO handle heartbeat, connection error
         } else {
             let col = this.collections[channel]
             if (col) {
                 col.handleMessage(message)
             } else {
+                // TODO
                 // Log message in unexpected channel
                 // Send sync_stop
             }
@@ -242,21 +236,52 @@ class SinkronClient {
     }
 }
 
-export enum ItemState {
-    Changed = 1,
-    // TODO UploadingFiles,
-    ChangesSent = 2,
-    Synchronized = 3,
-    Error = 4,
+type FileInitialValues = {
+    props: FileProps
+    source: FileSource | null
+    isCreated: boolean
 }
 
-// TODO
-// remote: { content, files } | null
-// local: { content, files } | null
+class ItemFile {
+    props: FileProps
+    source: FileSource | null
+    isCreated: boolean
+
+    constructor(initial: FileInitialValues) {
+        const { props, source, isCreated } = initial
+        this.props = props
+        this.source = source
+        this.isCreated = isCreated
+    }
+}
+
+const isItemChanged = (local: ItemData | null, remote: ItemData | null) => {
+    return (
+        local === null ||
+        remote === null ||
+        hasChanges(local.content, remote.content) ||
+        difference(Object.keys(local.files), Object.keys(remote.files)).length >
+            0
+    )
+}
+
+export enum ItemState {
+    Changed = 1,
+    UploadingFiles = 2,
+    ChangesSent = 3,
+    Synchronized = 4,
+    Error = 5,
+}
+
+type ItemData = {
+    content: ObservableLoroDoc
+    files: Map<string, ItemFile>
+}
+
 interface ItemInitialValues {
     id: string
-    remote: ObservableLoroDoc | null
-    local: ObservableLoroDoc | null
+    remote: ItemData | null
+    local: ItemData | null
     state: ItemState
     localUpdatedAt?: Date
     createdAt?: Date
@@ -264,25 +289,30 @@ interface ItemInitialValues {
 }
 
 class Item<T> {
-    id!: string
-    // Remote version of the document. It is `null` until server acknowledges
-    // creation.
-    remote!: ObservableLoroDoc | null
+    id: string
+
     // Local version of the document. After deleting it remains in the
     // collection with `null` value until server acknowledges deletion.
-    local!: ObservableLoroDoc | null
-    state!: ItemState
+    local: ItemData | null
+
+    // Remote version of the document. It is `null` until server acknowledges
+    // creation.
+    remote: ItemData | null
+
+    state: ItemState
+
     // Used to sort items in when they are not in synchronized state
     localUpdatedAt?: Date = undefined
     createdAt?: Date = undefined
     updatedAt?: Date = undefined
+
     extractData?: ExtractData<T> | undefined
 
     get data() {
         if (this.local === null) {
             return undefined
         } else {
-            return this.extractData?.(this.local.doc)
+            return this.extractData?.(this.local.content.doc)
         }
     }
 
@@ -290,7 +320,24 @@ class Item<T> {
         initialValues: ItemInitialValues,
         extractData: ExtractData<T> | undefined = undefined,
     ) {
-        Object.assign(this, initialValues)
+        const {
+            id,
+            remote,
+            local,
+            state,
+            localUpdatedAt,
+            createdAt,
+            updatedAt,
+        } = initialValues
+
+        this.id = id
+        this.state = state
+        this.localUpdatedAt = localUpdatedAt
+        this.createdAt = createdAt
+        this.updatedAt = updatedAt
+        this.local = local
+        this.remote = remote
+
         this.extractData = extractData
         makeObservable(this, {
             remote: observableRef,
@@ -348,12 +395,7 @@ class SinkronCollection<T> {
             status: observable,
             initialSyncCompleted: observable,
         })
-        this.init()
-    }
-
-    async init() {
-        if (this.store) await this.loadFromStore()
-        this.isLoadedFromStore = true
+        this.loadFromStore()
     }
 
     createItem(initialValues: ItemInitialValues) {
@@ -361,27 +403,75 @@ class SinkronCollection<T> {
     }
 
     async loadFromStore() {
-        const { colrev, items } = await this.store!.load()
+        if (!this.store) return
+
+        const { colrev, items } = await this.store.load()
         this.colrev = colrev
         items.forEach((stored: StoredItem) => {
             const { id, local, remote } = stored
-            const isChanged =
-                local === null || remote === null || hasChanges(local, remote)
+
+            let localData: ItemData | null
+            if (local === null) {
+                localData = null
+            } else {
+                let localFiles = new Map()
+                local?.files.forEach((f) => {
+                    localFiles.set(
+                        f.props.id,
+                        new ItemFile({
+                            props: f.props,
+                            isCreated: f.isCreated,
+                            source: null, // TODO restore source
+                        }),
+                    )
+                })
+                localData = { content: local.content, files: localFiles }
+            }
+
+            let remoteData: ItemData | null
+            if (remote === null) {
+                remoteData = null
+            } else {
+                let remoteFiles = new Map()
+                remote?.files.forEach((f) => {
+                    // Need to ensure that file with same ID in local and remote
+                    // will be the same ItemFile instance, to correctly update
+                    // status and work with sources
+                    let localFile = localData?.files.get(f.props.id)
+                    if (localFile) {
+                        remoteFiles.set(f.props.id, localFile)
+                    } else {
+                        remoteFiles.set(
+                            f.props.id,
+                            new ItemFile({
+                                props: f.props,
+                                isCreated: f.isCreated,
+                                source: null, // TODO restore source
+                            }),
+                        )
+                    }
+                })
+                remoteData = { content: remote.content, files: remoteFiles }
+            }
+
+            const isChanged = isItemChanged(localData, remoteData)
             const item = this.createItem({
                 id,
-                local,
-                remote,
+                local: localData,
+                remote: remoteData,
                 state: isChanged ? ItemState.Changed : ItemState.Synchronized,
                 localUpdatedAt: stored.localUpdatedAt,
                 createdAt: stored.createdAt,
                 updatedAt: stored.updatedAt,
             })
             this.items.set(id, item)
+
             if (isChanged) this.flushQueue.add(id)
         })
         this.logger.debug(
             `Loaded from local store ${items.length} items, colrev: ${colrev}`,
         )
+        this.isLoadedFromStore = true
     }
 
     send(msg: ClientMessage) {
@@ -442,11 +532,110 @@ class SinkronCollection<T> {
     }
 
     handleDocMessage(msg: DocMessage) {
-        // TODO
+        const { id, content, files, created_at, updated_at } = msg
+
+        if (content === null) {
+            this.items.delete(id)
+            this.enqueueBackup(id)
+            return
+        }
+
+        const doc = loroFromBase64(content)
+        const item = this.items.get(id)
+        if (item === undefined || item.state === ItemState.Error) {
+            // Receive new document and create new item
+            const filesMap = new Map(
+                files.map((props) => [
+                    props.id,
+                    new ItemFile({ props, source: null, isCreated: true }),
+                ]),
+            )
+            const item = this.createItem({
+                id,
+                remote: { content: doc, files: filesMap },
+                local: { content: doc.fork(), files: new Map(filesMap) },
+                state: ItemState.Synchronized,
+                updatedAt: parseISO(updated_at),
+                createdAt: parseISO(created_at),
+            })
+            this.items.set(id, item)
+            this.logger.debug("Received new doc: %s", id)
+        } else {
+            // Receive an update for the existing document or
+            // acknowledge remote creation of the local document
+
+            if (item.remote === null) {
+                // Acknowledge remote creation of the document
+                item.remote = { content: doc, files: new Map() }
+            } else {
+                // Update existing document
+                item.remote.content = doc
+            }
+            // Already ensured that item.remote is not null
+            let remote = item.remote!
+
+            // Merge changes to the local document
+            if (item.local !== null) {
+                mergeChanges(item.local.content, remote.content)
+            }
+
+            // Create remote added files
+            const remoteAddedFiles = msg.files.filter(
+                (f) => !remote.files.has(f.id),
+            )
+            remoteAddedFiles.forEach((props) => {
+                const localFile = item.local?.files.get(props.id)
+                if (localFile) {
+                    // Acknowledged creation of the local file
+                    localFile.isCreated = true
+                    remote.files.set(localFile.props.id, localFile)
+                } else {
+                    // Received new file
+                    const file = new ItemFile({
+                        props,
+                        isCreated: true,
+                        source: null,
+                    })
+                    remote.files.set(props.id, file)
+                    item.local?.files.set(props.id, file)
+                }
+            })
+
+            // Delete remote deleted files
+            const remoteDeletedFiles = difference(
+                Object.keys(item.remote.files),
+                msg.files.map((f) => f.id),
+            )
+            remoteDeletedFiles.map((id) => {
+                item.local?.files.delete(id)
+                remote.files.delete(id)
+                // TODO also remove files from queue to cancel uploading
+            })
+
+            item.updatedAt = parseISO(updated_at)
+            item.createdAt = parseISO(created_at)
+
+            // update changed state
+            const isChanged = isItemChanged(item.local, item.remote)
+            item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
+            if (isChanged) {
+                this.logger.debug("Merged remote doc into local: %s", id)
+                this.flushQueue.add(id)
+            } else {
+                this.logger.debug(
+                    "Received remote doc identical to local: %s",
+                    id,
+                )
+                this.flushQueue.delete(id)
+            }
+        }
+        this.enqueueBackup(id)
     }
 
     handleUpdateMessage(msg: ServerUpdateMessage) {
         // TODO
+        //
+        // re-use update files from document update
     }
 
     handleDeleteMessage(msg: ServerDeleteMessage) {
@@ -467,11 +656,11 @@ class SinkronCollection<T> {
     }
 
     async backup() {
-        if (this.store === undefined) return
+        if (!this.store) return
 
-        if (this.backupQueue.size === 0) {
-            return
-        }
+        // TODO backup localFilesManager
+
+        if (this.backupQueue.size === 0) return
 
         const colrev = this.colrev
         const clonedQueue = new Set<string>()
@@ -502,7 +691,7 @@ class SinkronCollection<T> {
                     kind: "create",
                     col: this.col,
                     id,
-                    content: loroToBase64(item.local),
+                    content: loroToBase64(item.local.content),
                     files: [], // TODO files
                 }
                 this.send(msg)
@@ -514,10 +703,28 @@ class SinkronCollection<T> {
                 }
                 this.send(msg)
             } else if (item.local !== null && item.remote !== null) {
-                const update = item.local.export({
+                // Files that are in the local list, but not in the remote
+                const locallyCreatedFiles = difference(
+                    item.local.files,
+                    item.remote.files,
+                )
+
+                // TODO
+                // check upload status
+                // if not uploaded - enqueue
+                // and set status to Uploading and skip file
+
+                // Files that are in the remote list, but not in the local
+                const locallyDeletedFiles = difference(
+                    item.remote.files,
+                    item.local.files,
+                )
+
+                const update = item.local.content.export({
                     mode: "update",
-                    from: item.remote.version(),
+                    from: item.remote.content.version(),
                 })
+
                 let msg: ClientUpdateMessage = {
                     kind: "update",
                     col: this.col,
@@ -554,7 +761,10 @@ class SinkronCollection<T> {
             this.createItem({
                 id,
                 remote: null,
-                local: new ObservableLoroDoc(doc),
+                local: {
+                    content: new ObservableLoroDoc(doc),
+                    files: new Map(),
+                },
                 state: ItemState.Changed,
                 localUpdatedAt: new Date(),
             }),
@@ -572,9 +782,10 @@ class SinkronCollection<T> {
             throw new Error("Can't change deleted item: " + id)
         }
 
-        const version = item.local.version()
-        item.local.change(callback)
-        if (item.local.version().compare(version) === 0) {
+        const doc = item.local.content
+        const version = doc.version()
+        doc.change(callback)
+        if (doc.version().compare(version) === 0) {
             // nothing changed
             return
         }
@@ -595,7 +806,13 @@ class SinkronCollection<T> {
         this.onChangeItem(id, true)
     }
 
-    // files ?
+    // files api
+    // add/create file
+    // delete file
+    //
+    // create / change document with adding/removing files - is it needed?
+    // could use flush in microtask (immediate / 0 timeout)
+    // to batch several immediate changes
 }
 
-export { SinkronClient, Item }
+export { SinkronClient, Item, ItemFile }

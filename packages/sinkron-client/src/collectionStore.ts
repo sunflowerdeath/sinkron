@@ -1,5 +1,9 @@
-import { Item } from "./index"
+import { omit } from "lodash-es"
+
+import { Item, ItemFile } from "./index"
 import { ObservableLoroDoc, loroFromBase64, loroToBase64 } from "./loroUtils"
+import { FileProps } from "./protocol"
+import { Deferred } from "./utils/deferred"
 
 export interface CollectionStore {
     save(id: string, item: Item<any>): Promise<void>
@@ -9,29 +13,33 @@ export interface CollectionStore {
     dispose(): void
 }
 
+export type StoredFile = {
+    props: FileProps
+    isCreated: boolean
+    localPath: string | null
+}
+
+let fileToStored = (file: ItemFile): StoredFile => {
+    return {
+        props: file.props,
+        isCreated: file.isCreated,
+        localPath: null, // TODO use source
+    }
+}
+
 export type StoredItem = {
     id: string
-    remote: ObservableLoroDoc | null
-    local: ObservableLoroDoc | null
+    remote: { content: ObservableLoroDoc; files: StoredFile[] } | null
+    local: { content: ObservableLoroDoc; files: StoredFile[] } | null
     createdAt?: Date
     updatedAt?: Date
     localUpdatedAt?: Date
 }
 
-class Deferred<T> {
-    promise: Promise<T>
-    resolve!: (res: T | PromiseLike<T>) => void
-    constructor() {
-        this.promise = new Promise((resolve) => {
-            this.resolve = resolve
-        })
-    }
-}
-
 interface SerializedItem {
     id: string
-    local: string | null
-    remote: string | null
+    local: { content: string; files: StoredFile[] } | null
+    remote: { content: string; files: StoredFile[] } | null
     createdAt?: Date
     updatedAt?: Date
     localUpdatedAt?: Date
@@ -81,8 +89,20 @@ class IndexedDbCollectionStore implements CollectionStore {
         )
         const serialized: SerializedItem = {
             id,
-            local: local === null ? null : loroToBase64(local),
-            remote: remote === null ? null : loroToBase64(remote),
+            local:
+                local === null
+                    ? null
+                    : {
+                          content: loroToBase64(local.content),
+                          files: Object.values(local.files).map(fileToStored),
+                      },
+            remote:
+                remote === null
+                    ? null
+                    : {
+                          content: loroToBase64(remote.content),
+                          files: Object.values(remote.files).map(fileToStored),
+                      },
             localUpdatedAt,
             createdAt,
             updatedAt,
@@ -111,8 +131,20 @@ class IndexedDbCollectionStore implements CollectionStore {
         const { id, local, remote, localUpdatedAt, createdAt, updatedAt } = item
         return {
             id,
-            local: local === null ? null : loroFromBase64(local),
-            remote: remote === null ? null : loroFromBase64(remote),
+            local:
+                local === null
+                    ? null
+                    : {
+                          content: loroFromBase64(local.content),
+                          files: local.files,
+                      },
+            remote:
+                remote === null
+                    ? null
+                    : {
+                          content: loroFromBase64(remote.content),
+                          files: remote.files,
+                      },
             localUpdatedAt,
             createdAt,
             updatedAt,

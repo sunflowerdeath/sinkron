@@ -21,7 +21,7 @@ class Heartbeat {
         this.props = props
         this.heartbeatTimer = setTimeout(
             () => this.#sendHeartbeat(1),
-            initialHeartbeatDelay
+            initialHeartbeatDelay,
         )
     }
 
@@ -32,7 +32,7 @@ class Heartbeat {
 
     #sendHeartbeat(i: number) {
         const { logger, heartbeat, timeout, onTimeout } = this.props
-        logger?.debug(`Sending heartbeat: ${i}`, i)
+        logger?.debug(`Sending heartbeat: ${i}`)
         heartbeat(i)
         clearTimeout(this.timeoutTimer)
         this.timeoutTimer = setTimeout(() => {
@@ -48,7 +48,7 @@ class Heartbeat {
         // schedule next hearbeat
         this.heartbeatTimer = setTimeout(
             () => this.#sendHeartbeat(i + 1),
-            this.props.heartbeatInterval
+            this.props.heartbeatInterval,
         )
     }
 }

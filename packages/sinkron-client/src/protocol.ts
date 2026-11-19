@@ -158,13 +158,19 @@ export type ClientDeleteMessage = {
     id: string
 }
 
+export type FileProps = {
+    id: string
+    size: number
+    contentType: string
+}
+
 export type DocMessage = {
     kind: "doc"
     id: string
     col: string
     colrev: number
     content: string
-    files: File[]
+    files: FileProps[]
     created_at: string // iso8601
     updated_at: string // iso8601
 }
