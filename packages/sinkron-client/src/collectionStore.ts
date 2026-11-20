@@ -1,5 +1,3 @@
-import { omit } from "lodash-es"
-
 import { Item, ItemFile } from "./index"
 import { ObservableLoroDoc, loroFromBase64, loroToBase64 } from "./loroUtils"
 import { FileProps } from "./protocol"

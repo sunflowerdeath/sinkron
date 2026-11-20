@@ -58,17 +58,17 @@ export type ContentTooLargeError = {
 // File errors
 export type FileNotFoundError = {
     code: "file_not_found"
-    file_id: string
+    fileId: string
 }
 
 export type FileMissingChunksError = {
     code: "file_missing_chunks"
-    file_id: string
+    fileId: string
 }
 
 export type FileTooLargeError = {
     code: "file_too_large"
-    file_id: string
+    fileId: string
 }
 
 export type SinkronError =
@@ -87,9 +87,8 @@ export type SinkronError =
     | FileMissingChunksError
     | FileTooLargeError
 
-export type ConnectionErrorMessage = {
+export type ConnectionErrorMessage = SinkronError & {
     kind: "connection_error"
-    i: number
 }
 
 export type HeartbeatMessage = {
@@ -148,8 +147,8 @@ export type ClientUpdateMessage = {
     kind: "update"
     col: string
     id: string
-    content_update: string | null
-    files_update: FilesUpdate | null
+    contentUpdate: string | null
+    filesUpdate: FilesUpdate | null
 }
 
 export type ClientDeleteMessage = {
@@ -171,8 +170,8 @@ export type DocMessage = {
     colrev: number
     content: string
     files: FileProps[]
-    created_at: string // iso8601
-    updated_at: string // iso8601
+    createdAt: string // iso8601
+    updatedAt: string // iso8601
 }
 
 export type ServerUpdateMessage = {
@@ -180,10 +179,10 @@ export type ServerUpdateMessage = {
     col: string
     id: string
     colrev: number
-    content_update: string | null
-    files: File[]
-    created_at: string // iso8601
-    updated_at: string // iso8601
+    contentUpdate: string | null
+    files: FileProps[]
+    createdAt: string // iso8601
+    updatedAt: string // iso8601
 }
 
 export type ServerDeleteMessage = {
