@@ -349,11 +349,8 @@ class Item<T> {
         Object.assign(this, initialValues)
         this.extractData = extractData
         makeObservable(this, {
-            // TODO how we should be able to observe files?
-            // - show list of files & created status
-            // - show upload progress & errors in UI
-            remote: observableRef,
-            local: observableRef,
+            remote: observableShallow,
+            local: observableShallow,
             state: observable,
             createdAt: observableRef,
             updatedAt: observableRef,

@@ -91,6 +91,8 @@ const sendApiRequest = async (
     }
 }
 
+const AUTH_HEADER = "x-sinkron-auth-token"
+
 class FileApi {
     url: string
     authToken: string
@@ -103,12 +105,12 @@ class FileApi {
     async initFileUpload(
         props: InitFileUpload,
     ): Promise<ResultType<undefined, ApiError>> {
-        const url = `${this.url}/files/init_file_upload"`
+        const url = `${this.url}/files/init_file_upload`
         const request = fetch(url, {
             method: "POST",
             headers: {
                 "content-type": "application/json",
-                "x-sinkron-api-token": this.authToken,
+                [AUTH_HEADER]: this.authToken,
             },
             body: JSON.stringify(props),
         })
@@ -120,12 +122,17 @@ class FileApi {
     async uploadFileChunk(
         props: UploadFileChunk,
     ): Promise<ResultType<undefined, ApiError>> {
-        const url = `${this.url}/files/upload_file_chunk"` //TODO query
+        const query = new URLSearchParams({
+            colId: props.colId,
+            fileId: props.fileId,
+            chunkNumber: String(props.chunkNumber),
+        }).toString()
+        const url = `${this.url}/files/upload_file_chunk?${query}`
         const request = fetch(url, {
             method: "POST",
             headers: {
                 "content-type": "application/octet-stream",
-                "x-sinkron-api-token": this.authToken,
+                [AUTH_HEADER]: this.authToken,
             },
             body: props.data,
         })
