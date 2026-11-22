@@ -14,7 +14,7 @@ import pino, { Logger } from "pino"
 import { v4 as uuidv4 } from "uuid"
 
 import type { CollectionStore, StoredItem } from "./collectionStore"
-import type { FileSource } from "./files"
+import type { FileSource, UploadQueue } from "./uploadQueue"
 import { Heartbeat } from "./heartbeat"
 import {
     ObservableLoroDoc,
@@ -284,7 +284,7 @@ const isItemChanged = (local: ItemData | null, remote: ItemData | null) => {
     return (
         local === null ||
         remote === null ||
-        // Content is changes
+        // Content is changed
         hasChanges(local.content, remote.content) ||
         // Files are changed
         difference([...local.files.keys()], [...remote.files.keys()]).length > 0
@@ -385,6 +385,7 @@ class SinkronCollection<T> {
     col: string
     extractData?: ExtractData<T>
 
+    uploadQueue: UploadQueue
     logger: Logger<string>
     isLoadedFromStore: boolean = false
     initialSyncCompleted: boolean = false
@@ -847,17 +848,50 @@ class SinkronCollection<T> {
                     remoteFileIds,
                 )
 
-                // TODO
-                // check upload status
-                // if not uploaded - enqueue
-                // and set status to Uploading and skip file
+                let uploadNotCompleted = false
+                locallyCreatedFiles.map((fileId) => {
+                    const file = item.local!.files.get(fileId)!
+                    const status = this.uploadQueue.getUploadStatus(fileId)
+                    if (status === null) {
+                        // Not enqueued for some reason
+                        this.uploadQueue.add(file.props, () =>
+                            this.flushQueue.add(item.id),
+                        )
+                        uploadNotCompleted = true
+                        return
+                    }
+
+                    if (status.kind === "completed") {
+                        // Completed successfully
+                        return
+                    }
+
+                    if (status.kind === "error") {
+                        // Couldn't complete upload
+                        if (status.error.code === "file_too_big") {
+                            // TODO delete file
+                        }
+                        if (
+                            status.error.code === "insufficient_storage"
+                        ) {
+                            // TODO set itemstate to error & skip
+                            uploadNotCompleted = true
+                        }
+                        return
+                    }
+
+                    // Upload in progress
+                    uploadNotCompleted = true
+                })
+
+                // Skip flushing item if file uploading is not completed
+                if (uploadNotCompleted) return
 
                 // Files that are in the remote list, but not in the local
                 const locallyDeletedFiles = difference(
                     remoteFileIds,
                     localFileIds,
                 )
-
                 const contentUpdate = item.local.content.export({
                     mode: "update",
                     from: item.remote.content.version(),
