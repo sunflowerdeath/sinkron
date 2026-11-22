@@ -65,6 +65,7 @@ upload process.
 */
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InitFileUpload {
     file_id: Uuid,
     col_id: String,
@@ -73,6 +74,7 @@ pub struct InitFileUpload {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetFileChunk {
     col_id: String,
     file_id: Uuid,
@@ -80,6 +82,7 @@ pub struct GetFileChunk {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UploadFileChunk {
     file_id: Uuid,
     col_id: String,

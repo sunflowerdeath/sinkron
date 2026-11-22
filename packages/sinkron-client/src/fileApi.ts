@@ -1,13 +1,5 @@
 import { SinkronError } from "./protocol"
-
-export type ResultType<T, E = Error> =
-    | { isOk: true; value: T }
-    | { isOk: false; error: E }
-
-const Result = {
-    ok: <T, E>(value: T): ResultType<T, E> => ({ isOk: true, value }),
-    err: <T, E>(error: E): ResultType<T, E> => ({ isOk: false, error }),
-}
+import { type ResultType, Result } from "./utils/result"
 
 type InitFileUpload = {
     colId: string
@@ -29,7 +21,7 @@ type FileApiProps = {
     authToken: string
 }
 
-type ApiError =
+export type ApiError =
     | { kind: "request_error"; message: string }
     | { kind: "parse_error"; message: string }
     | { kind: "application_error"; error: SinkronError }
@@ -74,13 +66,24 @@ const sendApiRequest = async (
     if (response.ok) {
         return Result.ok(response)
     } else {
-        const res = await parseResponseAsJson(response)
-        if (!res.isOk) return res
-        if (isSinkronErrorResponse(res.value)) {
-            return Result.err({
-                kind: "application_error",
-                error: res.value.error,
-            })
+        const contentType = response.headers.get("content-type")
+        const isJson =
+            contentType && contentType.indexOf("application/json") !== -1
+        if (isJson) {
+            const res = await parseResponseAsJson(response)
+            if (!res.isOk) return res
+            if (isSinkronErrorResponse(res.value)) {
+                return Result.err({
+                    kind: "application_error",
+                    error: res.value.error,
+                })
+            } else {
+                return Result.err({
+                    kind: "parse_error",
+                    message: "Couldn't parse server response",
+                    details: { response },
+                })
+            }
         } else {
             return Result.err({
                 kind: "parse_error",
@@ -112,7 +115,10 @@ class FileApi {
                 "content-type": "application/json",
                 [AUTH_HEADER]: this.authToken,
             },
-            body: JSON.stringify(props),
+            body: JSON.stringify({
+                ...props,
+                checksum: "TODO",
+            }),
         })
         let result = await sendApiRequest(request)
         if (!result.isOk) return result

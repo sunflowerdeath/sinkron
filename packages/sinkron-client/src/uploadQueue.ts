@@ -1,5 +1,5 @@
-import type { FileProps } from "./protocol"
-import { FileApi } from "./fileApi"
+import { type ApiError, FileApi } from "./fileApi"
+import { ExponentialBackoff } from "./utils/exponentialBackoff"
 
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5Mb
 
@@ -9,6 +9,10 @@ export interface FileSource {
 
 class BlobFileSource implements FileSource {
     file: File
+
+    constructor(file: File) {
+        this.file = file
+    }
 
     async getChunk(chunk: number) {
         let chunks = Math.ceil(this.file.size / CHUNK_SIZE)
@@ -35,22 +39,12 @@ class LocalFileSource implements FileSource {
 }
 
 type UploadError =
-    | { code: "missing_source" }
-    | { code: "read_chunk_error" }
-    | { code: "other" }
-/*
-    internal => retry (but max N attempts?)
-    file api fetch / network error => retry
-    SourceError
-    | { code: "source_missing" } // status: error? => remove file?
-    | { code: "chunk_read_error" } // status: error => MANUAL
-    SinkronError
-    | { code: "forbidden" } // delete file? what in case of local sync?
-    | { code: "insufficient_storage" } // status: error, auto retry - how?
-    | { code: "file_too_large" } // status: error => MANUAL
-    | { code: "file_not_found" } // status: error => re-queue upload
-    other => unknown/unexpected error => MANUAL
-    */
+    | { code: "chunk_read_error" }
+    | { code: "forbidden" }
+    | { code: "insufficient_storage" }
+    | { code: "file_too_large" }
+    | { code: "file_not_found" }
+    | { code: "unexpected_server_error"; error: any }
 
 type UploadInProgress = {
     kind: "in_progress"
@@ -79,22 +73,29 @@ enum IterationResult {
     Skip,
 }
 
-type UploadQueueItem = {
-    file: FileProps
+export type AddFileProps = {
+    id: string
+    colId: string
+    size: number
+    source: FileSource
+    onComplete: () => void
+}
+
+type UploadQueueItem = AddFileProps & {
     status: UploadStatus
-    callback: () => void
 }
 
 class UploadQueue {
     // All items including pending, successfully completed and failed
-    items: Map<string, UploadQueueItem>
+    items: Map<string, UploadQueueItem> = new Map()
     // Pending and in-progress uploads
-    pendingItems: UploadQueueItem[]
+    pendingItems: UploadQueueItem[] = []
     isStarted = false
     fileApi: FileApi
     exponentialBackoff: ExponentialBackoff
 
-    constructor() {
+    constructor(fileApi: FileApi) {
+        this.fileApi = fileApi
         this.exponentialBackoff = new ExponentialBackoff({
             initialTimeout: 333,
             maxTimeout: 10000,
@@ -105,20 +106,19 @@ class UploadQueue {
         return this.items.get(id)?.status
     }
 
-    add(file: FileProps, callback: () => void) {
+    add(props: AddFileProps) {
         // Already added
-        if (this.items.has(file.id)) return
+        if (this.items.has(props.id)) return
 
         const item: UploadQueueItem = {
-            file,
+            ...props,
             status: {
                 kind: "in_progress",
                 isInitialized: false,
                 chunksUploaded: 0,
             },
-            callback,
         }
-        this.items.set(file.id, item)
+        this.items.set(props.id, item)
         this.pendingItems.push(item)
 
         if (!this.isStarted) this.start()
@@ -126,9 +126,7 @@ class UploadQueue {
 
     remove(fileId: string) {
         this.items.delete(fileId)
-        const index = this.pendingItems.findIndex(
-            (item) => item.file.id === fileId,
-        )
+        const index = this.pendingItems.findIndex((item) => item.id === fileId)
         if (index !== -1) this.pendingItems.splice(index, 1)
     }
 
@@ -162,7 +160,7 @@ class UploadQueue {
             }
             case IterationResult.Finished: {
                 this.pendingItems.shift()
-                item.callback()
+                item.onComplete()
                 this.exponentialBackoff.reset()
                 this.performIteration()
             }
@@ -178,10 +176,50 @@ class UploadQueue {
         }
     }
 
+    handleItemUploadError(
+        item: UploadQueueItem,
+        error: ApiError,
+    ): IterationResult {
+        switch (error.kind) {
+            case "request_error":
+                return IterationResult.NeedRetry
+            case "parse_error":
+                item.status = {
+                    kind: "failed",
+                    error: {
+                        code: "unexpected_server_error",
+                        error,
+                    },
+                }
+                return IterationResult.Finished
+            case "application_error":
+                const code = error.error.code
+                let uploadError: UploadError
+                // Narrow down irrelevant error codes
+                if (
+                    [
+                        "forbidden",
+                        "insufficient_storage",
+                        "file_too_large",
+                        "file_not_found",
+                    ].includes(code)
+                ) {
+                    uploadError = { code } as UploadError
+                } else {
+                    uploadError = {
+                        code: "unexpected_server_error",
+                        error,
+                    }
+                }
+                item.status = { kind: "failed", error: uploadError }
+                return IterationResult.Finished
+        }
+    }
+
     async performItemIteration(
         item: UploadQueueItem,
     ): Promise<IterationResult> {
-        const { file, status } = item
+        const { id, colId, size, status } = item
 
         // Unexpected status, should skip
         if (status.kind !== "in_progress") return IterationResult.Skip
@@ -189,16 +227,13 @@ class UploadQueue {
         // Initialize upload
         if (!status.isInitialized) {
             let res = await this.fileApi.initFileUpload({
-                colId: file.col,
-                fileId: file.id,
-                size: file.size,
+                colId,
+                fileId: id,
+                size,
                 // contentType: file.contentType,
             })
             if (!res.isOk) {
-                // Initialization failed
-                // TODO handle error types: retry / global handler / error status
-                item.status = { kind: "failed", error: res.error }
-                return IterationResult.Finished
+                return this.handleItemUploadError(item, res.error)
             }
 
             // Initialized successfully
@@ -208,18 +243,23 @@ class UploadQueue {
 
         // Upload the next file chunk
         const chunkNumber = status.chunksUploaded + 1
-        const chunk = await item.file.source.getChunk(chunkNumber)
-        // TODO handle source error
+        const data = await item.source.getChunk(chunkNumber)
+        if (data === null) {
+            item.status = {
+                kind: "failed",
+                error: { code: "chunk_read_error" },
+            }
+            return IterationResult.Finished
+        }
 
         const res = await this.fileApi.uploadFileChunk({
-            fileId: file.id,
+            colId,
+            fileId: id,
             chunkNumber,
-            chunk,
+            data: new Blob([data]),
         })
         if (!res.isOk) {
-            // TODO handle error types: retry / global handler / error status
-            item.status = { kind: "failed", error: res.error }
-            return IterationResult.Finished
+            return this.handleItemUploadError(item, res.error)
         }
 
         // Chunk uploaded succesfully
@@ -231,36 +271,6 @@ class UploadQueue {
             item.status = { kind: "completed" }
             return IterationResult.Finished
         }
-    }
-}
-
-type ExponentialBackoffProps = {
-    initialTimeout: number
-    maxTimeout: number
-}
-
-class ExponentialBackoff {
-    props: ExponentialBackoffProps
-    currentTimeout: number
-    timer?: ReturnType<typeof setTimeout>
-
-    constructor(props: ExponentialBackoffProps) {
-        this.props = props
-        this.currentTimeout = this.props.initialTimeout
-    }
-
-    schedule(cb: () => void) {
-        clearTimeout(this.timer)
-        this.timer = setTimeout(() => cb(), this.currentTimeout)
-        this.currentTimeout = Math.min(
-            this.props.maxTimeout,
-            this.currentTimeout * 2,
-        )
-    }
-
-    reset() {
-        this.currentTimeout = this.props.initialTimeout
-        clearTimeout(this.timer)
     }
 }
 

@@ -24,9 +24,11 @@ const apiToken = "SINKRON_API_TOKEN"
 const authToken = "token-test"
 
 const createRandomBinaryBlob = (size: number) => {
-    const randomBytes = new Uint8Array(size)
-    crypto.getRandomValues(randomBytes)
-    return new Blob([randomBytes], { type: "application/octet-stream" })
+    const array = new Uint8Array(size)
+    for (let i = 0; i < array.length; i++) {
+        array[i] = Math.floor(Math.random() * 256)
+    }
+    return new Blob([array])
 }
 
 describe("FileApi", () => {
@@ -65,6 +67,7 @@ describe("FileApi", () => {
             method: "POST",
             headers: {
                 "x-sinkron-api-token": apiToken,
+                "content-type": "application/json",
             },
             body: JSON.stringify({
                 id: colId,
