@@ -1,23 +1,11 @@
 import assert from "node:assert"
 
-// import { LoroDoc } from "loro-crdt"
-// import { autorun } from "mobx"
 import { v4 as uuidv4 } from "uuid"
-// import { WebSocket } from "ws"
-// import { SinkronClient, Permissions } from "../index"
-// import { SinkronCollection, ConnectionStatus, ItemState } from "../collection"
 
 import { FileApi } from "../fileApi"
-
-// const awaitValue = async (fn: () => boolean): Promise<void> =>
-// new Promise((resolve) => {
-// const dispose = autorun(() => {
-// if (fn()) {
-// dispose()
-// resolve()
-// }
-// })
-// })
+import { type FileSource, CHUNK_SIZE, BlobFileSource } from "../fileSource"
+import { UploadQueue } from "../uploadQueue"
+import { Deferred } from "../utils/deferred"
 
 const apiUrl = "http://localhost:3000"
 const apiToken = "SINKRON_API_TOKEN"
@@ -29,6 +17,29 @@ const createRandomBinaryBlob = (size: number) => {
         array[i] = Math.floor(Math.random() * 256)
     }
     return new Blob([array])
+}
+
+const createTestCollection = async (col: string): Promise<object> => {
+    const res = await fetch(`${apiUrl}/api/create_collection`, {
+        method: "POST",
+        headers: {
+            "x-sinkron-api-token": apiToken,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            id: col,
+            isRef: false,
+            permissions: JSON.stringify({
+                read: ["any"],
+                create: ["any"],
+                update: ["any"],
+                delete: ["any"],
+            }),
+            storageLimit: 100 * 1024 * 1025, // 100Mb
+        }),
+    })
+    assert(res.ok)
+    return await res.json()
 }
 
 describe("FileApi", () => {
@@ -63,25 +74,7 @@ describe("FileApi", () => {
     it("valid", async () => {
         // Create collection using API
         const colId = uuidv4()
-        const createColRes = await fetch(`${apiUrl}/api/create_collection`, {
-            method: "POST",
-            headers: {
-                "x-sinkron-api-token": apiToken,
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                id: colId,
-                isRef: false,
-                permissions: JSON.stringify({
-                    read: ["any"],
-                    create: ["any"],
-                    update: ["any"],
-                    delete: ["any"],
-                }),
-                storageLimit: 100 * 1024 * 1025, // 100Mb
-            }),
-        })
-        assert(createColRes.ok)
+        await createTestCollection(colId)
 
         const api = new FileApi({ url: apiUrl, authToken })
 
@@ -106,6 +99,54 @@ describe("FileApi", () => {
         })
         assert(uploadChunkRes.isOk)
     })
+})
+
+describe("UploadQueue", () => {
+    it("successful upload", async () => {
+        // Create test collection
+        const colId = uuidv4()
+        await createTestCollection(colId)
+
+        // Create FileApi and UploadQueue
+        const fileApi = new FileApi({ url: apiUrl, authToken })
+        const queue = new UploadQueue(fileApi)
+        assert(!queue.isRunning)
+
+        // Create file that has 2 chunks
+        const size = 6 * 1024 * 1024
+        const data = createRandomBinaryBlob(size)
+        const file = new File([data], "file.png", { type: "image/png" })
+        const source = new BlobFileSource(file)
+
+        const isCompleted = new Deferred()
+        const fileId = uuidv4()
+        queue.add({
+            id: fileId,
+            colId,
+            size,
+            source,
+            onComplete: () => isCompleted.resolve(undefined),
+        })
+
+        assert.strictEqual(queue.items.get(fileId)?.status.kind, "in_progress")
+        assert(queue.isRunning)
+
+        await isCompleted.promise
+
+        assert.strictEqual(queue.items.get(fileId)?.status.kind, "completed")
+
+        // TODO check uploaded file
+    })
+
+    // TODO test errors
+    //
+    // upload file 100Mb
+    // await onComplete
+    // item should have status error : insufficient_storage
+    //
+    // upload file with broken source
+    // await onComplete
+    // item should have error: chunk read error
 })
 
 /*

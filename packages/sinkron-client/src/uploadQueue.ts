@@ -1,44 +1,10 @@
 import { type ApiError, FileApi } from "./fileApi"
+import { type FileSource, CHUNK_SIZE } from "./fileSource"
 import { ExponentialBackoff } from "./utils/exponentialBackoff"
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5Mb
+// TODO handle auth failed
 
-export interface FileSource {
-    getChunk(chunk: number): Promise<ArrayBuffer | null>
-}
-
-class BlobFileSource implements FileSource {
-    file: File
-
-    constructor(file: File) {
-        this.file = file
-    }
-
-    async getChunk(chunk: number) {
-        let chunks = Math.ceil(this.file.size / CHUNK_SIZE)
-        if (chunk > chunks) return null
-
-        let start = chunk * CHUNK_SIZE
-        let end = Math.max(start + CHUNK_SIZE, this.file.size)
-        let slice = this.file.slice(start, end)
-        return await slice.arrayBuffer()
-    }
-}
-
-class LocalFileSource implements FileSource {
-    path: string
-
-    constructor(path: string) {
-        this.path = path
-    }
-
-    async getChunk(chunk: number) {
-        // TODO not implemented
-        return null
-    }
-}
-
-type UploadError =
+export type UploadError =
     | { code: "chunk_read_error" }
     | { code: "forbidden" }
     | { code: "insufficient_storage" }
@@ -46,20 +12,20 @@ type UploadError =
     | { code: "file_not_found" }
     | { code: "unexpected_server_error"; error: any }
 
-type UploadInProgress = {
+export type UploadInProgress = {
     kind: "in_progress"
     isInitialized: boolean
     chunksUploaded: number
 }
 
-type UploadFailed = {
+export type UploadFailed = {
     kind: "failed"
     error: UploadError
 }
 
-type UploadCompleted = { kind: "completed" }
+export type UploadCompleted = { kind: "completed" }
 
-type UploadStatus = UploadInProgress | UploadFailed | UploadCompleted
+export type UploadStatus = UploadInProgress | UploadFailed | UploadCompleted
 
 enum IterationResult {
     // Upload is not yet finished
@@ -90,7 +56,7 @@ class UploadQueue {
     items: Map<string, UploadQueueItem> = new Map()
     // Pending and in-progress uploads
     pendingItems: UploadQueueItem[] = []
-    isStarted = false
+    isRunning = false
     fileApi: FileApi
     exponentialBackoff: ExponentialBackoff
 
@@ -121,7 +87,7 @@ class UploadQueue {
         this.items.set(props.id, item)
         this.pendingItems.push(item)
 
-        if (!this.isStarted) this.start()
+        if (!this.isRunning) this.start()
     }
 
     remove(fileId: string) {
@@ -131,48 +97,48 @@ class UploadQueue {
     }
 
     start() {
-        if (this.isStarted) return
-        this.isStarted = true
+        if (this.isRunning) return
+        this.isRunning = true
         this.performIteration()
     }
 
     stop() {
-        this.isStarted = false
+        this.isRunning = false
         this.exponentialBackoff.reset()
     }
 
     async performIteration() {
-        if (!this.isStarted) return
+        if (!this.isRunning) return
 
         const item = this.pendingItems[0]
         if (item === undefined) {
             // Queue is empty
-            this.isStarted = false
+            this.isRunning = false
             return
         }
 
         const result = await this.performItemIteration(item)
 
         switch (result) {
-            case IterationResult.InProgress: {
+            case IterationResult.InProgress:
                 this.exponentialBackoff.reset()
                 this.performIteration()
-            }
-            case IterationResult.Finished: {
+                break
+            case IterationResult.Finished:
                 this.pendingItems.shift()
                 item.onComplete()
                 this.exponentialBackoff.reset()
                 this.performIteration()
-            }
-            case IterationResult.NeedRetry: {
+                break
+            case IterationResult.NeedRetry:
                 this.exponentialBackoff.schedule(() => {
                     this.performIteration()
                 })
-            }
-            case IterationResult.Skip: {
+                break
+            case IterationResult.Skip:
                 this.pendingItems.shift()
                 this.performIteration()
-            }
+                break
         }
     }
 
@@ -230,7 +196,7 @@ class UploadQueue {
                 colId,
                 fileId: id,
                 size,
-                // contentType: file.contentType,
+                // TODO contentType
             })
             if (!res.isOk) {
                 return this.handleItemUploadError(item, res.error)
@@ -259,17 +225,18 @@ class UploadQueue {
             data: new Blob([data]),
         })
         if (!res.isOk) {
+            console.log("ERROR", chunkNumber, res.error)
             return this.handleItemUploadError(item, res.error)
         }
 
         // Chunk uploaded succesfully
-        const totalChunks = 5 // TODO
-        if (status.chunksUploaded < totalChunks) {
-            status.chunksUploaded += 1
-            return IterationResult.InProgress
-        } else {
+        status.chunksUploaded += 1
+        const totalChunks = Math.ceil(item.size / CHUNK_SIZE)
+        if (status.chunksUploaded === totalChunks) {
             item.status = { kind: "completed" }
             return IterationResult.Finished
+        } else {
+            return IterationResult.InProgress
         }
     }
 }
