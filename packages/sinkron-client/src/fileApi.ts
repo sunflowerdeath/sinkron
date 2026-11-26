@@ -23,8 +23,8 @@ type FileApiProps = {
 
 export type ApiError =
     | { kind: "request_error"; message: string }
-    | { kind: "parse_error"; message: string }
-    | { kind: "application_error"; error: SinkronError }
+    | { kind: "response_parse_error"; message: string }
+    | { kind: "server_error"; error: SinkronError }
 
 type SinkronErrorResponse = {
     error: SinkronError
@@ -42,7 +42,7 @@ const parseResponseAsJson = async (
         return Result.ok(await response.json())
     } catch (e) {
         return Result.err({
-            kind: "parse_error",
+            kind: "response_parse_error",
             message: "Couldn't parse server response",
             details: { originalError: e, response },
         })
@@ -74,19 +74,19 @@ const sendApiRequest = async (
             if (!res.isOk) return res
             if (isSinkronErrorResponse(res.value)) {
                 return Result.err({
-                    kind: "application_error",
+                    kind: "server_error",
                     error: res.value.error,
                 })
             } else {
                 return Result.err({
-                    kind: "parse_error",
+                    kind: "response_parse_error",
                     message: "Couldn't parse server response",
                     details: { response },
                 })
             }
         } else {
             return Result.err({
-                kind: "parse_error",
+                kind: "response_parse_error",
                 message: "Couldn't parse server response",
                 details: { response },
             })

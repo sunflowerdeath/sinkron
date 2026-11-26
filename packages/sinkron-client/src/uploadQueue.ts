@@ -1,22 +1,18 @@
 import { type ApiError, FileApi } from "./fileApi"
 import { type FileSource, CHUNK_SIZE } from "./fileSource"
+import { type SinkronError } from "./protocol"
 import { ExponentialBackoff } from "./utils/exponentialBackoff"
-
-// TODO handle auth failed
-
-export type UploadError =
-    | { code: "chunk_read_error" }
-    | { code: "forbidden" }
-    | { code: "insufficient_storage" }
-    | { code: "file_too_large" }
-    | { code: "file_not_found" }
-    | { code: "unexpected_server_error"; error: any }
 
 export type UploadInProgress = {
     kind: "in_progress"
     isInitialized: boolean
     chunksUploaded: number
 }
+
+export type UploadError = 
+    | { code: "chunk_read_error" }
+    | SinkronError
+    | { code: "unexpected_server_error"; error: any }
 
 export type UploadFailed = {
     kind: "failed"
@@ -149,7 +145,7 @@ class UploadQueue {
         switch (error.kind) {
             case "request_error":
                 return IterationResult.NeedRetry
-            case "parse_error":
+            case "response_parse_error":
                 item.status = {
                     kind: "failed",
                     error: {
@@ -158,26 +154,8 @@ class UploadQueue {
                     },
                 }
                 return IterationResult.Finished
-            case "application_error":
-                const code = error.error.code
-                let uploadError: UploadError
-                // Narrow down irrelevant error codes
-                if (
-                    [
-                        "forbidden",
-                        "insufficient_storage",
-                        "file_too_large",
-                        "file_not_found",
-                    ].includes(code)
-                ) {
-                    uploadError = { code } as UploadError
-                } else {
-                    uploadError = {
-                        code: "unexpected_server_error",
-                        error,
-                    }
-                }
-                item.status = { kind: "failed", error: uploadError }
+            case "server_error":
+                item.status = { kind: "failed", error: error.error }
                 return IterationResult.Finished
         }
     }
@@ -225,7 +203,6 @@ class UploadQueue {
             data: new Blob([data]),
         })
         if (!res.isOk) {
-            console.log("ERROR", chunkNumber, res.error)
             return this.handleItemUploadError(item, res.error)
         }
 

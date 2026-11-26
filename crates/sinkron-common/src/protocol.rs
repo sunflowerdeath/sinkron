@@ -140,57 +140,31 @@ pub struct ChangeErrorMessage {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[serde(rename_all = "snake_case")]
 pub enum ClientMessage {
     #[serde(rename = "h")]
     Heartbeat(HeartbeatMessage),
-
-    #[serde(rename = "sync_start")]
     SyncStart(SyncStartMessage),
-
-    #[serde(rename = "sync_stop")]
     SyncStop(SyncStopMessage),
-
-    #[serde(rename = "get")]
     Get(GetMessage),
-
-    #[serde(rename = "create")]
     Create(ClientCreateMessage),
-
-    #[serde(rename = "update")]
     Update(ClientUpdateMessage),
-
-    #[serde(rename = "delete")]
     Delete(ClientDeleteMessage),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[serde(rename_all = "snake_case")]
 pub enum ServerMessage {
-    #[serde(rename = "connection_error")]
-    ConnectionError(SinkronError),
-
     #[serde(rename = "h")]
     Heartbeat(HeartbeatMessage),
-
-    #[serde(rename = "sync_complete")]
+    ConnectionError(SinkronError),
     SyncComplete(SyncCompleteMessage),
-
-    #[serde(rename = "sync_error")]
     SyncError(SyncErrorMessage),
-
-    #[serde(rename = "get_error")]
     GetError(GetErrorMessage),
-
-    #[serde(rename = "doc")]
     Doc(DocMessage),
-
-    #[serde(rename = "update")]
     Update(ServerUpdateMessage),
-
-    #[serde(rename = "delete")]
     Delete(ServerDeleteMessage),
-
-    #[serde(rename = "change_error")]
     ChangeError(ChangeErrorMessage),
 }
 

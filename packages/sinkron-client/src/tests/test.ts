@@ -11,12 +11,24 @@ const apiUrl = "http://localhost:3000"
 const apiToken = "SINKRON_API_TOKEN"
 const authToken = "token-test"
 
+class BrokenSource implements FileSource {
+    async getChunk(chunk: number): Promise<Blob | null> {
+        return null
+    }
+}
+
 const createRandomBinaryBlob = (size: number) => {
     const array = new Uint8Array(size)
     for (let i = 0; i < array.length; i++) {
         array[i] = Math.floor(Math.random() * 256)
     }
     return new Blob([array])
+}
+
+const createRandomFileSource = (size: number) => {
+    const data = createRandomBinaryBlob(size)
+    const file = new File([data], "file.png", { type: "image/png" })
+    return new BlobFileSource(file)
 }
 
 const createTestCollection = async (col: string): Promise<object> => {
@@ -35,7 +47,7 @@ const createTestCollection = async (col: string): Promise<object> => {
                 update: ["any"],
                 delete: ["any"],
             }),
-            storageLimit: 100 * 1024 * 1025, // 100Mb
+            storageLimit: 100 * 1024 * 1024, // 100Mb
         }),
     })
     assert(res.ok)
@@ -57,7 +69,7 @@ describe("FileApi", () => {
         assert.strictEqual(res.error.kind, "request_error")
     })
 
-    it("invalid auth", async () => {
+    it("auth_failed error", async () => {
         const api = new FileApi({
             url: apiUrl,
             authToken: "INVALID",
@@ -68,7 +80,8 @@ describe("FileApi", () => {
             size: 1024,
         })
         assert(!res.isOk)
-        assert.strictEqual(res.error.kind, "application_error")
+        assert.strictEqual(res.error.kind, "server_error")
+        assert.strictEqual(res.error.error.code, "auth_failed")
     })
 
     it("valid", async () => {
@@ -114,9 +127,7 @@ describe("UploadQueue", () => {
 
         // Create file that has 2 chunks
         const size = 6 * 1024 * 1024
-        const data = createRandomBinaryBlob(size)
-        const file = new File([data], "file.png", { type: "image/png" })
-        const source = new BlobFileSource(file)
+        const source = createRandomFileSource(size)
 
         const isCompleted = new Deferred()
         const fileId = uuidv4()
@@ -134,19 +145,66 @@ describe("UploadQueue", () => {
         await isCompleted.promise
 
         assert.strictEqual(queue.items.get(fileId)?.status.kind, "completed")
-
         // TODO check uploaded file
     })
 
-    // TODO test errors
-    //
-    // upload file 100Mb
-    // await onComplete
-    // item should have status error : insufficient_storage
-    //
-    // upload file with broken source
-    // await onComplete
-    // item should have error: chunk read error
+    it("chunk_read_error", async () => {
+        // Create test collection
+        const colId = uuidv4()
+        await createTestCollection(colId)
+
+        // Create FileApi and UploadQueue
+        const fileApi = new FileApi({ url: apiUrl, authToken })
+        const queue = new UploadQueue(fileApi)
+
+        // Create broken file source
+        const source = new BrokenSource()
+
+        const isCompleted = new Deferred()
+        const fileId = uuidv4()
+        queue.add({
+            id: fileId,
+            colId,
+            size: 1 * 1024 * 1024, // 1 Mb
+            source,
+            onComplete: () => isCompleted.resolve(undefined),
+        })
+
+        await isCompleted.promise
+
+        const status = queue.items.get(fileId)?.status
+        assert.strictEqual(status?.kind, "failed")
+        assert.strictEqual(status?.error.code, "chunk_read_error")
+    })
+
+    it("insufficient_storage error", async () => {
+        // Create test collection
+        const colId = uuidv4()
+        await createTestCollection(colId)
+
+        // Create FileApi and UploadQueue
+        const fileApi = new FileApi({ url: apiUrl, authToken })
+        const queue = new UploadQueue(fileApi)
+
+        // Create file
+        const source = createRandomFileSource(1024)
+
+        const isCompleted = new Deferred()
+        const fileId = uuidv4()
+        queue.add({
+            id: fileId,
+            colId,
+            size: 101 * 1024 * 1024, // 101 Mb
+            source,
+            onComplete: () => isCompleted.resolve(undefined),
+        })
+
+        await isCompleted.promise
+
+        const status = queue.items.get(fileId)?.status
+        assert.strictEqual(status?.kind, "failed")
+        assert.strictEqual(status?.error.code, "insufficient_storage")
+    })
 })
 
 /*
