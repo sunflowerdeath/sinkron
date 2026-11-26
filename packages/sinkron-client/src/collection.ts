@@ -315,9 +315,8 @@ class SinkronCollection<T> {
             if (isChanged) this.flushQueue.add(id)
         })
         this.logger.debug(
-            `Loaded from local store %s items, colrev: %s`,
-            items.length,
-            colrev,
+            { items: items.length, colrev },
+            "Loaded items from the local store",
         )
         this.isLoadedFromStore = true
     }
@@ -364,8 +363,8 @@ class SinkronCollection<T> {
             this.#handleGetErrorMessage(msg)
         } else {
             this.logger.warn(
-                "Received unexpected message type in the collection channel: %o",
-                msg,
+                { msg },
+                "Received unexpected message type in the collection channel",
             )
         }
     }
@@ -380,7 +379,7 @@ class SinkronCollection<T> {
     }
 
     #handleSyncErrorMessage(msg: SyncErrorMessage) {
-        this.logger.warn("Sync error: %o", msg)
+        this.logger.warn({ msg }, "Sync error")
         this.status = CollectionStatus.SyncError
         this.client.closeChannel(this.channel)
     }
@@ -455,7 +454,7 @@ class SinkronCollection<T> {
                 createdAt: parseISO(createdAt),
             })
             this.items.set(id, item)
-            this.logger.debug("Received new doc: %s", id)
+            this.logger.debug({ id }, "Received new doc")
         } else {
             // Receive an update for the existing document or
             // acknowledge remote creation of the local document
@@ -484,12 +483,12 @@ class SinkronCollection<T> {
             const isChanged = isItemChanged(item.local, item.remote)
             item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
             if (isChanged) {
-                this.logger.debug("Merged remote doc into local: %s", id)
+                this.logger.debug({ id }, "Merged remote doc into local")
                 this.flushQueue.add(id)
             } else {
                 this.logger.debug(
-                    "Received remote doc identical to local: %s",
-                    id,
+                    { id },
+                    "Received remote doc identical to local",
                 )
                 this.flushQueue.delete(id)
             }
@@ -504,13 +503,13 @@ class SinkronCollection<T> {
         const item = this.items.get(id)
 
         if (!item) {
-            this.logger.warn("Can't apply changes, unknown doc: %s", id)
+            this.logger.warn({ id }, "Can't apply changes, unknown doc")
             this.#send({ kind: "get", col: this.col, id })
             return
         }
 
         if (item.remote === null) {
-            this.logger.warn("Can't apply changes, doc is not created: %s", id)
+            this.logger.warn({ id }, "Can't apply changes, doc is not created")
             this.#send({ kind: "get", col: this.col, id })
             return
         }
@@ -523,8 +522,11 @@ class SinkronCollection<T> {
                 if (item.local !== null) {
                     item.local.content.import(parsedUpdate)
                 }
-            } catch {
-                this.logger.warn("Can't import changes, loro error: %s", id)
+            } catch (error) {
+                this.logger.warn(
+                    { id, error },
+                    "Can't import changes, loro error",
+                )
                 this.#send({ kind: "get", col: this.col, id })
                 return
             }
@@ -575,29 +577,25 @@ class SinkronCollection<T> {
         const item = this.items.get(id)
         if (item === undefined) return
 
-        this.logger.warn(
-            'Rejected change for item "%s" with code "%s"',
-            id,
-            code,
-        )
+        this.logger.warn({ id, code }, "Rejected change for item")
 
         // Client is referencing document that does not exist on server
         // To not lose data client should re-create document
         if (code === "not_found") {
-            this.logger.warn("Document not found: %s", id)
+            this.logger.warn({ id }, "Document not found")
             item.remote = null
             this.flushQueue.add(id)
             return
         }
 
         if (code === "forbidden") {
-            this.logger.warn(`Forbidden: %s`, id)
+            this.logger.warn({ id }, "Forbidden")
             this.#restoreItemRemoteState(item)
             return
         }
 
         if (code === "content_too_large") {
-            this.logger.warn(`Content is too large: %s`, id)
+            this.logger.warn({ id }, "Content is too large")
             this.#restoreItemRemoteState(item)
             return
         }
@@ -627,9 +625,9 @@ class SinkronCollection<T> {
 
     #handleGetErrorMessage(msg: GetErrorMessage) {
         const { id, code } = msg
-        this.logger.warn("Get error: %o", msg)
+        this.logger.warn({ msg }, "Get error")
         if (code === "not_found") {
-            this.logger.warn("Document doesn't exist: %s", id)
+            this.logger.warn({ id }, "Document doesn't exist")
             this.items.delete(id)
         }
     }
@@ -658,8 +656,8 @@ class SinkronCollection<T> {
         }
         await this.store.colrev(colrev)
         this.logger.debug(
-            "Completed backup to local store, stored %s items",
-            clonedQueue.size,
+            { items: clonedQueue.size },
+            "Completed backup to the local store",
         )
     }
 
@@ -674,7 +672,7 @@ class SinkronCollection<T> {
     }
 
     #flush() {
-        this.logger.debug("Flushing changes, %s items", this.flushQueue.size)
+        this.logger.debug({ items: this.flushQueue.size }, "Flushing changes")
         this.flushQueue.forEach((id) => {
             const item = this.items.get(id)
             if (item === undefined) return

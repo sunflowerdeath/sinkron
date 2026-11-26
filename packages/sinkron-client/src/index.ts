@@ -61,6 +61,7 @@ class SinkronClient {
     fileApi: FileApi
     uploadQueue: UploadQueue
     logger: Logger<string>
+    clientLogger: Logger<string>
     store?: (col: string) => CollectionStore
     errorHandler?: (msg: ServerMessage) => void
     next_channel_index = 1
@@ -84,6 +85,7 @@ class SinkronClient {
         } = props
 
         this.logger = logger === undefined ? defaultLogger() : logger
+        this.clientLogger = this.logger.child({}, { msgPrefix: "[Client] " })
 
         this.fileApi = new FileApi({ url: apiUrl, authToken })
         this.uploadQueue = new UploadQueue(this.fileApi)
@@ -101,7 +103,10 @@ class SinkronClient {
         this.transport = new WebSocketTransport({
             url: `${wsUrl}?token=${authToken}`,
             webSocketImpl,
-            logger: this.logger,
+            logger: this.logger.child(
+                {},
+                { msgPrefix: "[WebSocketTransport] " },
+            ),
         })
         this.transport.emitter.on("open", () => this.onConnect())
         this.transport.emitter.on("close", () => this.onDisconnect())
@@ -109,9 +114,9 @@ class SinkronClient {
             try {
                 this.handleMessage(msg)
             } catch (e) {
-                this.logger.error(
-                    `Unhandled exception in message handler, %o`,
-                    e,
+                this.clientLogger.error(
+                    { error: e },
+                    "Unhandled exception in message handler",
                 )
             }
         })
@@ -154,29 +159,31 @@ class SinkronClient {
             client: this,
             channel,
             store: this.store ? this.store(props.col) : undefined,
-            logger: this.logger,
+            logger: this.logger.child(
+                { col: props.col },
+                { msgPrefix: "[Collection] " },
+            ),
             ...props,
         })
         this.collections[channel] = collection
         if (this.status === ConnectionStatus.Connected) {
             collection.onConnect()
         }
-        this.logger.info(
-            `Opened channel "%s" for collection %s`,
-            channel,
-            props.col,
+        this.clientLogger.info(
+            { channel, collection: props.col },
+            "Opened new collection channel",
         )
         return collection
     }
 
     onConnect() {
-        this.logger.info("Connection established")
+        this.clientLogger.info("Connection established")
         this.status = ConnectionStatus.Connected
 
         this.heartbeat = new Heartbeat({
-            logger: this.logger,
+            logger: this.clientLogger,
             heartbeat: (i: number) => {
-                this.logger.trace(`Sending heartbeat: %s`, i)
+                this.logger.trace({ heartbeat: i }, "Sending heartbeat")
                 const heartbeat: HeartbeatMessage = { kind: "h", i }
                 this.send(0, heartbeat)
             },
@@ -196,7 +203,7 @@ class SinkronClient {
     }
 
     onDisconnect() {
-        this.logger.info("Connection closed")
+        this.clientLogger.info("Connection closed")
         this.status = ConnectionStatus.Disconnected
         this.heartbeat?.dispose()
         this.heartbeat = undefined
@@ -206,10 +213,10 @@ class SinkronClient {
     }
 
     handleMessage(msg: string) {
-        this.logger.trace("Received message: %s", msg)
+        this.clientLogger.trace({ msg }, "Received message")
         const parsed = parseMessage<ServerMessage>(msg)
         if (parsed === null) {
-            this.logger.error("Couldn't parse message: %s", msg)
+            this.clientLogger.error({ msg }, "Couldn't parse message")
             return
         }
         const { channel, message } = parsed
@@ -221,9 +228,9 @@ class SinkronClient {
             if (col) {
                 col.handleMessage(message)
             } else {
-                this.logger.warn(
-                    "Received message in closed channel: %s",
-                    channel,
+                this.clientLogger.warn(
+                    { channel },
+                    "Received message in the closed channel",
                 )
                 if ("col" in message) {
                     this.send(channel, { kind: "sync_stop", col: message.col })
@@ -234,12 +241,12 @@ class SinkronClient {
 
     handleSystemMessage(msg: ServerMessage) {
         if (msg.kind === "h") {
-            this.logger.trace("Recieved hearbeat response")
+            this.clientLogger.trace("Recieved hearbeat response")
             this.heartbeat?.handleHeartbeatResponse(msg.i)
         } else if (msg.kind === "connection_error") {
-            this.logger.warn(
-                "Connection error, code: %s, disconnecting",
-                msg.code,
+            this.clientLogger.warn(
+                { code: msg.code },
+                "Received connection error, disconnecting",
             )
             this.disconnect?.()
             this.errorHandler?.(msg)
@@ -251,7 +258,7 @@ class SinkronClient {
     }
 
     closeChannel(channel: number) {
-        this.logger.info(`Closing channel: %s`, channel)
+        this.clientLogger.info({ channel }, "Closing channel")
         delete this.collections[channel]
     }
 }

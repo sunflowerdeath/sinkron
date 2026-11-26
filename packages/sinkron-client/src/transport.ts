@@ -1,5 +1,5 @@
-import { Logger } from "pino"
 import { createNanoEvents } from "nanoevents"
+import { Logger } from "pino"
 
 export interface Transport {
     open(): void
@@ -30,7 +30,7 @@ class WebSocketTransport implements Transport {
 
     open() {
         const url = typeof this.url === "function" ? this.url() : this.url
-        this.logger?.debug("Connecting to websocket: %s", url)
+        this.logger?.debug({ url }, "Connecting to websocket")
         this.ws = new this.webSocketImpl(url)
         this.ws.addEventListener("open", () => {
             this.logger?.debug("Websocket connection open")
@@ -45,7 +45,7 @@ class WebSocketTransport implements Transport {
             this.ws = undefined
         })
         this.ws.addEventListener("error", (err) => {
-            this.logger?.debug("Websocket connection error: %o", err)
+            this.logger?.debug({ err }, "Websocket connection error")
             this.ws?.close()
         })
     }
