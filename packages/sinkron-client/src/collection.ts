@@ -1,7 +1,6 @@
 import { parseISO } from "date-fns"
 import { Base64 } from "js-base64"
-import { debounce } from "lodash-es"
-import { difference } from "lodash-es"
+import { debounce, difference } from "lodash-es"
 import { LoroDoc } from "loro-crdt"
 import {
     makeObservable,
@@ -9,6 +8,7 @@ import {
     observableRef,
     observableShallow,
     computed,
+    action,
 } from "mobx"
 import { Logger } from "pino"
 import { v4 as uuidv4 } from "uuid"
@@ -39,6 +39,12 @@ import type {
     ClientDeleteMessage,
 } from "./protocol"
 import { type UploadStatus, UploadQueue } from "./uploadQueue"
+
+const FLUSH_DELAY = 1000
+const FLUSH_MAX_WAIT = 2000
+
+const BACKUP_DELAY = 10000
+const BACKUP_MAX_WAIT = 20000
 
 export type ExtractData<T> = (doc: LoroDoc) => T
 
@@ -139,6 +145,10 @@ class Item<T> {
         }
     }
 
+    setState(state: ItemState) {
+        this.state = state
+    }
+
     constructor(
         initialValues: ItemInitialValues,
         extractData: ExtractData<T> | undefined = undefined,
@@ -159,6 +169,7 @@ class Item<T> {
             remote: observableShallow,
             local: observableShallow,
             state: observable,
+            setState: action,
             createdAt: observableRef,
             updatedAt: observableRef,
             localUpdatedAt: observableRef,
@@ -190,12 +201,6 @@ type SinkronNewCollectionProps<T> = {
     store?: CollectionStore
     logger: Logger<string>
 }
-
-const FLUSH_DELAY = 1000
-const FLUSH_MAX_WAIT = 2000
-
-const BACKUP_DELAY = 10000
-const BACKUP_MAX_WAIT = 20000
 
 class SinkronCollection<T> {
     client: SinkronClient
@@ -481,7 +486,9 @@ class SinkronCollection<T> {
 
             // Update changed state
             const isChanged = isItemChanged(item.local, item.remote)
-            item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
+            item.setState(
+                isChanged ? ItemState.Changed : ItemState.Synchronized,
+            )
             if (isChanged) {
                 this.logger.debug({ id }, "Merged remote doc into local")
                 this.flushQueue.add(id)
@@ -536,9 +543,14 @@ class SinkronCollection<T> {
 
         item.updatedAt = parseISO(updatedAt)
 
+        this.logger.debug(
+            { id },
+            "Recieved and applied update to the existing doc",
+        )
+
         // Update changed state
         const isChanged = isItemChanged(item.local, item.remote)
-        item.state = isChanged ? ItemState.Changed : ItemState.Synchronized
+        item.setState(isChanged ? ItemState.Changed : ItemState.Synchronized)
         if (isChanged) {
             this.flushQueue.add(id)
         } else {
@@ -551,8 +563,10 @@ class SinkronCollection<T> {
     #handleDeleteMessage(msg: ServerDeleteMessage) {
         const { colrev, id } = msg
         this.colrev = colrev
-        this.items.delete(id)
+        const deleted = this.items.delete(id)
+        if (!deleted) return
         // TODO remove items from queue
+        this.logger.debug({ id }, "Deleted doc")
         this.#enqueueBackup(id)
     }
 
@@ -567,7 +581,7 @@ class SinkronCollection<T> {
                 content: new ObservableLoroDoc(item.remote.content.doc.fork()),
                 files: new Map(item.remote.files),
             }
-            item.state = ItemState.Synchronized
+            item.setState(ItemState.Synchronized)
         }
     }
 
@@ -678,6 +692,8 @@ class SinkronCollection<T> {
             if (item === undefined) return
 
             if (item.local !== null && item.remote === null) {
+                // TODO Also need to handle locally created files
+
                 const msg: ClientCreateMessage = {
                     kind: "create",
                     col: this.col,
@@ -685,6 +701,7 @@ class SinkronCollection<T> {
                     content: loroToBase64(item.local.content),
                     files: [], // TODO files
                 }
+
                 this.#send(msg)
             } else if (item.local === null && item.remote !== null) {
                 const msg: ClientDeleteMessage = {
@@ -773,7 +790,7 @@ class SinkronCollection<T> {
                 }
                 this.#send(msg)
             }
-            item.state = ItemState.ChangesSent
+            item.setState(ItemState.ChangesSent)
         })
         this.flushQueue.clear()
     }
@@ -783,12 +800,16 @@ class SinkronCollection<T> {
         this.flushQueue.add(id)
         if (this.status === CollectionStatus.SyncCompleted) {
             if (flushImmediate) {
-                this.flushDebounced.cancel()
-                this.#flush()
+                this.flushImmediate()
             } else {
                 this.flushDebounced()
             }
         }
+    }
+
+    flushImmediate() {
+        this.flushDebounced.cancel()
+        this.#flush()
     }
 
     // Public API
@@ -829,7 +850,7 @@ class SinkronCollection<T> {
             return
         }
         item.localUpdatedAt = new Date()
-        item.state = ItemState.Changed
+        item.setState(ItemState.Changed)
         this.#onChangeItem(id, false)
     }
 
@@ -842,7 +863,7 @@ class SinkronCollection<T> {
         }
         // TODO remove files from queue
         item.local = null
-        item.state = ItemState.Changed
+        item.setState(ItemState.Changed)
         this.#onChangeItem(id, true)
     }
 
@@ -866,7 +887,7 @@ class SinkronCollection<T> {
             queue: this.client.uploadQueue,
         })
         item.local.files.set(fileId, file)
-        item.state = ItemState.Changed
+        item.setState(ItemState.Changed)
         this.#onChangeItem(id, true)
 
         return fileId
@@ -884,7 +905,10 @@ class SinkronCollection<T> {
         if (deleted) {
             // TODO remove from the queue
         }
+
+        item.setState(ItemState.Changed)
+        this.#onChangeItem(id, true)
     }
 }
 
-export { SinkronCollection }
+export { SinkronCollection, Item, ItemFile }

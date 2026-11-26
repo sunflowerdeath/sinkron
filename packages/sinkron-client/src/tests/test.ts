@@ -1,9 +1,10 @@
 import assert from "node:assert"
 
+import { LoroDoc } from "loro-crdt"
 import { autorun } from "mobx"
 import { v4 as uuidv4 } from "uuid"
 
-import { CollectionStatus } from "../collection"
+import { CollectionStatus, ItemState } from "../collection"
 import { FileApi } from "../fileApi"
 import { type FileSource, BlobFileSource } from "../fileSource"
 import { SinkronClient } from "../index"
@@ -60,6 +61,10 @@ const createTestCollection = async (col: string): Promise<object> => {
 
 const awaitValue = async (fn: () => boolean): Promise<void> =>
     new Promise((resolve) => {
+        if (fn()) {
+            resolve()
+            return
+        }
         const dispose = autorun(() => {
             if (fn()) {
                 dispose()
@@ -98,7 +103,7 @@ describe("FileApi", () => {
         assert.strictEqual(res.error.error.code, "auth_failed")
     })
 
-    it("valid", async () => {
+    it("successful upload", async () => {
         // Create collection using API
         const colId = uuidv4()
         await createTestCollection(colId)
@@ -222,7 +227,7 @@ describe("UploadQueue", () => {
 })
 
 describe("SinkronCollection", () => {
-    it("create", async () => {
+    it("create, update and delete", async () => {
         // Create test collection
         const colId = uuidv4()
         await createTestCollection(colId)
@@ -231,22 +236,58 @@ describe("SinkronCollection", () => {
             wsUrl,
             apiUrl,
             authToken,
+            noAutoReconnect: true,
         })
-        const collection = client.collection({
-            col: colId,
-        })
+        const collection = client.collection({ col: colId })
 
         await awaitValue(
             () => collection.status === CollectionStatus.SyncCompleted,
         )
 
-        // create document
+        // Create document
+        const doc = new LoroDoc()
+        doc.getText("text").insert(0, "Hello")
+        const id = collection.create(doc)
 
-        // await creation
+        // Should flush immediately
+        assert.strictEqual(
+            collection.items.get(id)?.state,
+            ItemState.ChangesSent,
+        )
 
-        // update document
+        // Await creation
+        await awaitValue(
+            () => collection.items.get(id)?.state === ItemState.Synchronized,
+        )
 
-        // await updated
+        // Update document
+        collection.change(id, (doc) => {
+            doc.getText("text").insert(5, ", world!")
+        })
+        collection.flushImmediate()
+
+        // Changes should be sent
+        assert.strictEqual(
+            collection.items.get(id)?.state,
+            ItemState.ChangesSent,
+        )
+
+        // Await updated
+        await awaitValue(
+            () => collection.items.get(id)?.state === ItemState.Synchronized,
+        )
+
+        // Delete document
+        collection.delete(id)
+
+        // Changes should be sent
+        const item = collection.items.get(id)
+        assert.strictEqual(item?.local, null)
+        assert(item?.remote !== null)
+        assert.strictEqual(item?.state, ItemState.ChangesSent)
+
+        // Await deleted
+        await awaitValue(() => collection.items.get(id) === undefined)
 
         client.destroy()
     })
@@ -259,33 +300,3 @@ describe("SinkronCollection", () => {
 // 8. delete file
 //
 // 9. await deleted
-//
-// const col = uuidv4()
-// const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
-// const permissions = Permissions.any()
-// const createRes = await sinkron.createCollection({ id: col, permissions })
-// assert(createRes.isOk, "create col")
-// const collection = new SinkronCollection({
-// url: "ws://localhost:3000/sync",
-// // @ts-ignore
-// webSocketImpl: WebSocket,
-// col,
-// token: "token-test",
-// noAutoReconnect: true
-// })
-// await awaitValue(() => collection.status === ConnectionStatus.Ready)
-// const doc = new LoroDoc()
-// doc.getText("text").insert(0, "Hello")
-// const id = collection.create(doc)
-// assert.strictEqual(
-// collection.items.get(id)!.state,
-// ItemState.ChangesSent,
-// "changes sent"
-// )
-// await awaitValue(
-// () => collection.items.get(id)!.state === ItemState.Synchronized
-// )
-// collection.destroy()
-// })
-// })
-// */

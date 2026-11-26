@@ -1,4 +1,4 @@
-import { Item, ItemFile } from "./index"
+import { Item, ItemFile } from "./collection"
 import { ObservableLoroDoc, loroFromBase64, loroToBase64 } from "./loroUtils"
 import { FileProps } from "./protocol"
 import { Deferred } from "./utils/deferred"

@@ -170,7 +170,7 @@ class SinkronClient {
             collection.onConnect()
         }
         this.clientLogger.info(
-            { channel, collection: props.col },
+            { channel, col: props.col },
             "Opened new collection channel",
         )
         return collection
