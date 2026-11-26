@@ -1,18 +1,22 @@
 import assert from "node:assert"
 
+import { autorun } from "mobx"
 import { v4 as uuidv4 } from "uuid"
 
+import { CollectionStatus } from "../collection"
 import { FileApi } from "../fileApi"
-import { type FileSource, CHUNK_SIZE, BlobFileSource } from "../fileSource"
+import { type FileSource, BlobFileSource } from "../fileSource"
+import { SinkronClient } from "../index"
 import { UploadQueue } from "../uploadQueue"
 import { Deferred } from "../utils/deferred"
 
+const wsUrl = "ws://localhost:3000/sync"
 const apiUrl = "http://localhost:3000"
 const apiToken = "SINKRON_API_TOKEN"
 const authToken = "token-test"
 
 class BrokenSource implements FileSource {
-    async getChunk(chunk: number): Promise<Blob | null> {
+    async getChunk(_chunk: number): Promise<Blob | null> {
         return null
     }
 }
@@ -42,10 +46,10 @@ const createTestCollection = async (col: string): Promise<object> => {
             id: col,
             isRef: false,
             permissions: JSON.stringify({
-                read: ["any"],
-                create: ["any"],
-                update: ["any"],
-                delete: ["any"],
+                read: [{ kind: "any" }],
+                create: [{ kind: "any" }],
+                update: [{ kind: "any" }],
+                delete: [{ kind: "any" }],
             }),
             storageLimit: 100 * 1024 * 1024, // 100Mb
         }),
@@ -53,6 +57,16 @@ const createTestCollection = async (col: string): Promise<object> => {
     assert(res.ok)
     return await res.json()
 }
+
+const awaitValue = async (fn: () => boolean): Promise<void> =>
+    new Promise((resolve) => {
+        const dispose = autorun(() => {
+            if (fn()) {
+                dispose()
+                resolve()
+            }
+        })
+    })
 
 describe("FileApi", () => {
     it("request error", async () => {
@@ -139,12 +153,12 @@ describe("UploadQueue", () => {
             onComplete: () => isCompleted.resolve(undefined),
         })
 
-        assert.strictEqual(queue.items.get(fileId)?.status.kind, "in_progress")
+        assert.strictEqual(queue.getStatus(fileId)?.kind, "in_progress")
         assert(queue.isRunning)
 
         await isCompleted.promise
 
-        assert.strictEqual(queue.items.get(fileId)?.status.kind, "completed")
+        assert.strictEqual(queue.getStatus(fileId)?.kind, "completed")
         // TODO check uploaded file
     })
 
@@ -207,57 +221,71 @@ describe("UploadQueue", () => {
     })
 })
 
-/*
 describe("SinkronCollection", () => {
     it("create", async () => {
-        // 1. create collection
-        //
-        // 1. test errors - collection not found / auth error
-        //
-        // 1. connect to server, await synchronized
-        //
-        // 2. create document
-        //
-        // 3. await creation
-        //
-        // 4. update document
-        //
-        // 5. await updated
-        //
-        // 6. create file
-        //
-        // 7. await created
-        //
-        // 8. delete file
-        //
-        // 9. await deleted
-        //
-        // const col = uuidv4()
-        // const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
-        // const permissions = Permissions.any()
-        // const createRes = await sinkron.createCollection({ id: col, permissions })
-        // assert(createRes.isOk, "create col")
-        // const collection = new SinkronCollection({
-        // url: "ws://localhost:3000/sync",
-        // // @ts-ignore
-        // webSocketImpl: WebSocket,
-        // col,
-        // token: "token-test",
-        // noAutoReconnect: true
-        // })
-        // await awaitValue(() => collection.status === ConnectionStatus.Ready)
-        // const doc = new LoroDoc()
-        // doc.getText("text").insert(0, "Hello")
-        // const id = collection.create(doc)
-        // assert.strictEqual(
-        // collection.items.get(id)!.state,
-        // ItemState.ChangesSent,
-        // "changes sent"
-        // )
-        // await awaitValue(
-        // () => collection.items.get(id)!.state === ItemState.Synchronized
-        // )
-        // collection.destroy()
+        // Create test collection
+        const colId = uuidv4()
+        await createTestCollection(colId)
+
+        const client = new SinkronClient({
+            wsUrl,
+            apiUrl,
+            authToken,
+        })
+        const collection = client.collection({
+            col: colId,
+        })
+
+        await awaitValue(
+            () => collection.status === CollectionStatus.SyncCompleted,
+        )
+
+        // create document
+
+        // await creation
+
+        // update document
+
+        // await updated
+
+        client.destroy()
     })
 })
-*/
+
+// 6. create file
+//
+// 7. await created
+//
+// 8. delete file
+//
+// 9. await deleted
+//
+// const col = uuidv4()
+// const sinkron = new SinkronClient({ url: apiUrl, token: apiToken })
+// const permissions = Permissions.any()
+// const createRes = await sinkron.createCollection({ id: col, permissions })
+// assert(createRes.isOk, "create col")
+// const collection = new SinkronCollection({
+// url: "ws://localhost:3000/sync",
+// // @ts-ignore
+// webSocketImpl: WebSocket,
+// col,
+// token: "token-test",
+// noAutoReconnect: true
+// })
+// await awaitValue(() => collection.status === ConnectionStatus.Ready)
+// const doc = new LoroDoc()
+// doc.getText("text").insert(0, "Hello")
+// const id = collection.create(doc)
+// assert.strictEqual(
+// collection.items.get(id)!.state,
+// ItemState.ChangesSent,
+// "changes sent"
+// )
+// await awaitValue(
+// () => collection.items.get(id)!.state === ItemState.Synchronized
+// )
+// collection.destroy()
+// })
+// })
+// */

@@ -1,5 +1,5 @@
 const path = require("path")
-// const nodeExternals = require("webpack-node-externals")
+const nodeExternals = require("webpack-node-externals")
 
 const isProduction = process.env.NODE_ENV === "production"
 const src = path.resolve(__dirname, "src")
@@ -29,12 +29,13 @@ module.exports = {
     },
     mode: isProduction ? "production" : "development",
     target: "node",
-    // externals: [
-        // nodeExternals({
-            // additionalModuleDirs: ["../node_modules"],
-            // allowlist: ["nanoevents", /^lodash-es/, "query-string"],
-        // }),
-    // ],
+    externals: [
+        nodeExternals({
+            additionalModuleDirs: ["../node_modules"],
+            allowlist: ["nanoevents", /^lodash-es/],
+            importType: "module"
+        }),
+    ],
     resolve: {
         extensions: [".js", ".ts"],
     },

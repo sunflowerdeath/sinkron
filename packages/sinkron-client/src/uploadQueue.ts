@@ -1,3 +1,5 @@
+import { makeObservable, observable, observableShallow } from "mobx"
+
 import { type ApiError, FileApi } from "./fileApi"
 import { type FileSource, CHUNK_SIZE } from "./fileSource"
 import { type SinkronError } from "./protocol"
@@ -9,7 +11,7 @@ export type UploadInProgress = {
     chunksUploaded: number
 }
 
-export type UploadError = 
+export type UploadError =
     | { code: "chunk_read_error" }
     | SinkronError
     | { code: "unexpected_server_error"; error: any }
@@ -62,9 +64,14 @@ class UploadQueue {
             initialTimeout: 333,
             maxTimeout: 10000,
         })
+
+        makeObservable(this, {
+            items: observableShallow,
+            isRunning: observable,
+        })
     }
 
-    getUploadStatus(id: string): UploadStatus | undefined {
+    getStatus(id: string): UploadStatus | undefined {
         return this.items.get(id)?.status
     }
 
