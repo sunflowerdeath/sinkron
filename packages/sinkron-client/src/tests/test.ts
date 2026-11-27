@@ -293,7 +293,7 @@ describe("SinkronCollection", () => {
         assert(client.isDestroyed)
     })
 
-    it.only("files", async () => {
+    it("files", async () => {
         // Create test collection
         const colId = uuidv4()
         await createTestCollection(colId)
@@ -321,26 +321,25 @@ describe("SinkronCollection", () => {
         }
         const id = collection.create(doc, { files: [file] })
 
-        // Should not flush immediately, until files are uploaded
-        assert.strictEqual(collection.items.get(id)?.state, ItemState.Changed)
-
-        // Await sending after files uploaded
-        await awaitValue(
-            () => collection.items.get(id)?.state === ItemState.ChangesSent,
-        )
-
-        // Await creation
-        await awaitValue(
-            () => collection.items.get(id)?.state === ItemState.Synchronized,
-        )
-
+        // Check item
         const item = collection.items.get(id)
         assert(item !== undefined)
+        // Should not flush immediately, until files are uploaded
+        assert.strictEqual(item.state, ItemState.Changed)
+
+        // Check local file
         const itemFile = item.local?.files.values().next().value
         assert(itemFile !== undefined)
+        assert(!itemFile.isCreated)
+
+        await awaitValue(() => item.state === ItemState.ChangesSent)
+        await awaitValue(() => item.state === ItemState.Synchronized)
+
         assert(itemFile.isCreated)
 
+        // Delete file
         collection.deleteFile(id, itemFile.props.id)
+        assert.strictEqual(item.local?.files.size, 0)
 
         await awaitValue(() => item.state === ItemState.ChangesSent)
         await awaitValue(() => item.state === ItemState.Synchronized)
@@ -350,11 +349,3 @@ describe("SinkronCollection", () => {
         client.destroy()
     })
 })
-
-// 6. create file
-//
-// 7. await created
-//
-// 8. delete file
-//
-// 9. await deleted
