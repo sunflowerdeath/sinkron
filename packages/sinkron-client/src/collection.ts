@@ -96,7 +96,7 @@ const isItemChanged = (local: ItemData | null, remote: ItemData | null) => {
 
 export enum ItemState {
     Changed = 1,
-    UploadingFiles = 2,
+    // UploadingFiles = 2,
     ChangesSent = 3,
     Synchronized = 4,
     Error = 5,
@@ -178,10 +178,14 @@ class Item<T> {
     }
 }
 
-type AddFileProps = {
+type CreateFileProps = {
     contentType: string
     size: number
     source: FileSource
+}
+
+type CreateDocProps = {
+    files?: CreateFileProps[]
 }
 
 export enum CollectionStatus {
@@ -249,6 +253,21 @@ class SinkronCollection<T> {
 
     #createItem(initialValues: ItemInitialValues) {
         return new Item(initialValues, this.extractData)
+    }
+
+    #createItemFile(props: CreateFileProps): [string, ItemFile] {
+        const fileId = uuidv4()
+        const itemFile = new ItemFile({
+            props: {
+                id: fileId,
+                size: props.size,
+                contentType: props.contentType,
+            },
+            source: props.source,
+            isCreated: false,
+            queue: this.client.uploadQueue,
+        })
+        return [fileId, itemFile]
     }
 
     async #loadFromStore() {
@@ -397,11 +416,17 @@ class SinkronCollection<T> {
         remoteAddedFiles.forEach((props) => {
             const localFile = item.local?.files.get(props.id)
             if (localFile) {
-                // Acknowledged creation of the local file
+                this.logger.debug(
+                    { id: item.id, fileId: props.id },
+                    "Acknowledged creation of the local file",
+                )
                 localFile.isCreated = true
                 remote.files.set(localFile.props.id, localFile)
             } else {
-                // Received new file
+                this.logger.debug(
+                    { id: item.id, fileId: props.id },
+                    "Received new file",
+                )
                 const file = new ItemFile({
                     props,
                     isCreated: true,
@@ -415,13 +440,16 @@ class SinkronCollection<T> {
 
         // Delete remote deleted files
         const remoteDeletedFiles = difference(
-            Object.keys(remote.files),
+            [...remote.files.keys()],
             files.map((f) => f.id),
         )
         remoteDeletedFiles.map((id) => {
+            this.logger.debug(
+                { id: item.id, fileId: id },
+                "Removed file from item",
+            )
             item.local?.files.delete(id)
             remote.files.delete(id)
-            // TODO remove files from queue
         })
     }
 
@@ -681,7 +709,14 @@ class SinkronCollection<T> {
             colId: this.col,
             size: file.props.size,
             source: file.source!, // TODO handle missing source
-            onComplete: () => this.flushQueue.add(itemId),
+            onComplete: (status: UploadStatus) => {
+                this.logger.info(
+                    { fileId: file.props.id, status },
+                    "File upload finished",
+                )
+                this.flushQueue.add(itemId)
+                this.flushImmediate() // TODO better debounced?
+            },
         })
     }
 
@@ -692,16 +727,30 @@ class SinkronCollection<T> {
             if (item === undefined) return
 
             if (item.local !== null && item.remote === null) {
-                // TODO Also need to handle locally created files
+                // Check files upload status & enqueue uploads
+                let isUploadIncomplete = false
+                item.local.files.forEach((file) => {
+                    const status = this.client.uploadQueue.getStatus(
+                        file.props.id,
+                    )
+                    if (status === undefined) {
+                        this.#enqueueFileUpload(item.id, file)
+                        isUploadIncomplete = true
+                        return
+                    }
+                    if (status.kind !== "completed") {
+                        isUploadIncomplete = true
+                    }
+                })
+                if (isUploadIncomplete) return // skip
 
                 const msg: ClientCreateMessage = {
                     kind: "create",
                     col: this.col,
                     id,
                     content: loroToBase64(item.local.content),
-                    files: [], // TODO files
+                    files: [...item.local.files.keys()],
                 }
-
                 this.#send(msg)
             } else if (item.local === null && item.remote !== null) {
                 const msg: ClientDeleteMessage = {
@@ -719,55 +768,20 @@ class SinkronCollection<T> {
                     remoteFileIds,
                 )
 
-                let uploadNotCompleted = false
+                let isUploadIncomplete = false
                 locallyCreatedFiles.map((fileId) => {
                     const file = item.local!.files.get(fileId)!
                     const status = this.client.uploadQueue.getStatus(fileId)
-
-                    // Not enqueued
                     if (status === undefined) {
                         this.#enqueueFileUpload(item.id, file)
-                        uploadNotCompleted = true
+                        isUploadIncomplete = true
                         return
                     }
-
-                    // Completed successfully
-                    if (status.kind === "completed") return
-
-                    // Couldn't complete upload
-                    if (status.kind === "failed") {
-                        // | AuthFailedError => global handler
-                        //
-                        // unexpected errors - just error status?:
-                        // | BadRequestError
-                        // | NotFoundError
-                        // | UnprocessableContentError
-                        // | InvalidColrevError
-                        // | DuplicateDocumentIdError
-                        // | DocumentAlreadyDeletedError
-                        // | FileMissingChunksError
-                        // | ContentTooLargeError
-                        //
-                        // | InternalServerError => retry / error status
-                        // | FileNotFoundError => retry / error status
-                        //
-                        // | ForbiddenError => delete file / error status
-                        //
-                        // | InsufficientStorageError => error status
-                        // | FileTooLargeError => error status
-
-                        // TODO Set ITEM to error status
-
-                        uploadNotCompleted = true
-                        return
+                    if (status.kind !== "completed") {
+                        isUploadIncomplete = true
                     }
-
-                    // Upload in progress
-                    uploadNotCompleted = true
                 })
-
-                // Skip flushing item if file uploading is not completed
-                if (uploadNotCompleted) return
+                if (isUploadIncomplete) return // skip
 
                 // Files that are in the remote list, but not in the local
                 const locallyDeletedFiles = difference(
@@ -814,7 +828,8 @@ class SinkronCollection<T> {
 
     // Public API
 
-    create(doc: LoroDoc) {
+    create(doc: LoroDoc, props?: CreateDocProps) {
+        const { files = [] } = props ?? {}
         const id = uuidv4()
         this.items.set(
             id,
@@ -823,7 +838,7 @@ class SinkronCollection<T> {
                 remote: null,
                 local: {
                     content: new ObservableLoroDoc(doc),
-                    files: new Map(),
+                    files: new Map(files.map((f) => this.#createItemFile(f))),
                 },
                 state: ItemState.Changed,
                 localUpdatedAt: new Date(),
@@ -867,7 +882,7 @@ class SinkronCollection<T> {
         this.#onChangeItem(id, true)
     }
 
-    addFile(id: string, props: AddFileProps) {
+    addFile(id: string, props: CreateFileProps) {
         const item = this.items.get(id)
         if (!item) throw new Error(`No item with such id: "${id}"`)
 
@@ -875,17 +890,7 @@ class SinkronCollection<T> {
             throw new Error("Can't update deleted item: " + id)
         }
 
-        const fileId = uuidv4()
-        const file = new ItemFile({
-            props: {
-                id: fileId,
-                size: props.size,
-                contentType: props.contentType,
-            },
-            source: props.source,
-            isCreated: false,
-            queue: this.client.uploadQueue,
-        })
+        const [fileId, file] = this.#createItemFile(props)
         item.local.files.set(fileId, file)
         item.setState(ItemState.Changed)
         this.#onChangeItem(id, true)

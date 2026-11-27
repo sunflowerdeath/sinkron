@@ -290,6 +290,64 @@ describe("SinkronCollection", () => {
         await awaitValue(() => collection.items.get(id) === undefined)
 
         client.destroy()
+        assert(client.isDestroyed)
+    })
+
+    it.only("files", async () => {
+        // Create test collection
+        const colId = uuidv4()
+        await createTestCollection(colId)
+
+        // Create client & sync collection
+        const client = new SinkronClient({
+            wsUrl,
+            apiUrl,
+            authToken,
+            noAutoReconnect: true,
+        })
+        const collection = client.collection({ col: colId })
+        await awaitValue(
+            () => collection.status === CollectionStatus.SyncCompleted,
+        )
+
+        // Create document with a file
+        const doc = new LoroDoc()
+        doc.getText("text").insert(0, "Hello")
+        const size = 6 * 1024 * 1024
+        const file = {
+            size,
+            contentType: "image/png",
+            source: createRandomFileSource(size),
+        }
+        const id = collection.create(doc, { files: [file] })
+
+        // Should not flush immediately, until files are uploaded
+        assert.strictEqual(collection.items.get(id)?.state, ItemState.Changed)
+
+        // Await sending after files uploaded
+        await awaitValue(
+            () => collection.items.get(id)?.state === ItemState.ChangesSent,
+        )
+
+        // Await creation
+        await awaitValue(
+            () => collection.items.get(id)?.state === ItemState.Synchronized,
+        )
+
+        const item = collection.items.get(id)
+        assert(item !== undefined)
+        const itemFile = item.local?.files.values().next().value
+        assert(itemFile !== undefined)
+        assert(itemFile.isCreated)
+
+        collection.deleteFile(id, itemFile.props.id)
+
+        await awaitValue(() => item.state === ItemState.ChangesSent)
+        await awaitValue(() => item.state === ItemState.Synchronized)
+
+        assert.strictEqual(item.remote?.files.size, 0)
+
+        client.destroy()
     })
 })
 

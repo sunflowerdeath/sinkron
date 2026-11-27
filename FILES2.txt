@@ -1,0 +1,93 @@
+
+    UploadQueue
+        file: Map<id, {
+            file: FileInstance,
+            status: UploadStatus
+        }
+
+        enqueue({ file, itemId, col })
+            queue.push(file)
+            if (!started) start()
+
+        start()
+            let file = queue[0]
+            init_upload
+            for let chunk in file
+                upload chunk
+            collection => notify that file is uploaded
+
+    enum UploadStatus = 
+        UploadQueued,
+        UploadInProgress({ uploadId, progress }),
+        UploadError({ uploadId, error }),
+        UploadCompleted({ uploadId }),
+
+    enum FileStatus = {
+        NotUploaded,
+        Uploading, // in the upload queue
+        Created
+    }
+
+    class File {
+        id,
+        size,
+        contentType,
+        status: FileStatus, // observable - for ui only?
+        source: DataSource // BlobSource
+        // localPath: string | null => FileSystemSource + path
+    }
+
+    ItemStatus
+        Changed
+        UploadingFiles
+        ChangesSent
+        Synchronized
+        Error
+
+    Item
+        local: data,
+        remote: data
+        files: File[] // list of all files
+
+    Collection
+        flush
+            for item in self.flushQueue
+                if has unuploaded files (local files that not present in remote)
+                    uploadQueue.add(files)
+                    item.status = UploadingFiles
+                else
+                    send changes
+                    set status changes sent
+
+        delete
+            if item deleted:
+                - stop all files uploading
+
+
+    doc message / update message
+        files - always receives a list
+
+        files:
+            status: NotUploaded, Uploading, Created
+
+        1. add new files to list (new ids)
+        2. remove deleted files from list
+            "created" files that are not present in list
+
+        for file in item.files {
+            if file.status == Created && msg.files[id] == undefined {
+                // file is deleted
+            }
+        }
+        for file in msg.files {
+            if !item.files.has(file.id)) {
+                // new file added
+                item.files = new File()
+            }
+        }
+
+    backup / serialization
+        filesystem source can be serialized as "localPath"
+        not uploaded files - manually restart upload after restore
+        blob sources - manually clean ?
+

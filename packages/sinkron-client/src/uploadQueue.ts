@@ -42,7 +42,7 @@ export type AddFileProps = {
     colId: string
     size: number
     source: FileSource
-    onComplete: () => void
+    onComplete: (status: UploadStatus) => void
 }
 
 type UploadQueueItem = AddFileProps & {
@@ -129,7 +129,7 @@ class UploadQueue {
                 break
             case IterationResult.Finished:
                 this.pendingItems.shift()
-                item.onComplete()
+                item.onComplete(item.status)
                 this.exponentialBackoff.reset()
                 this.performIteration()
                 break

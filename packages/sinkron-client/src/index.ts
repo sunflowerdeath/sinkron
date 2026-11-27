@@ -151,7 +151,11 @@ class SinkronClient {
     }
 
     collection<T>(props: SinkronCollectionProps<T>): SinkronCollection<T> {
-        // TODO handle isDestroyed
+        if (this.isDestroyed) {
+            throw new Error(
+                "Couldn't create collection. Client is already destroyed",
+            )
+        }
 
         const channel = this.next_channel_index
         this.next_channel_index += 1
