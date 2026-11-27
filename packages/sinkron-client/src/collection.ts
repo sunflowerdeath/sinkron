@@ -96,10 +96,9 @@ const isItemChanged = (local: ItemData | null, remote: ItemData | null) => {
 
 export enum ItemState {
     Changed = 1,
-    // UploadingFiles = 2,
-    ChangesSent = 3,
-    Synchronized = 4,
-    Error = 5,
+    ChangesSent = 2,
+    Synchronized = 3,
+    Error = 4,
 }
 
 type ItemData = {
@@ -408,7 +407,7 @@ class SinkronCollection<T> {
         this.client.closeChannel(this.channel)
     }
 
-    #updateItemFiles<T>(item: Item<T>, files: FileProps[]) {
+    #updateItemFiles(item: Item<any>, files: FileProps[]) {
         const remote = item.remote!
 
         // Create remote added files
@@ -478,7 +477,7 @@ class SinkronCollection<T> {
                     }),
                 ]),
             )
-            const item = this.#createItem({
+            const newItem = this.#createItem({
                 id,
                 remote: { content: doc, files: filesMap },
                 local: { content: doc.fork(), files: new Map(filesMap) },
@@ -486,7 +485,7 @@ class SinkronCollection<T> {
                 updatedAt: parseISO(updatedAt),
                 createdAt: parseISO(createdAt),
             })
-            this.items.set(id, item)
+            this.items.set(id, newItem)
             this.logger.debug({ id }, "Received new doc")
         } else {
             // Receive an update for the existing document or
@@ -710,12 +709,12 @@ class SinkronCollection<T> {
             size: file.props.size,
             source: file.source!, // TODO handle missing source
             onComplete: (status: UploadStatus) => {
-                this.logger.info(
+                this.logger.debug(
                     { fileId: file.props.id, status },
                     "File upload finished",
                 )
                 this.flushQueue.add(itemId)
-                this.flushImmediate() // TODO better debounced?
+                this.flushImmediate()
             },
         })
     }
@@ -742,7 +741,7 @@ class SinkronCollection<T> {
                         isUploadIncomplete = true
                     }
                 })
-                if (isUploadIncomplete) return // skip
+                if (isUploadIncomplete) return // skip item
 
                 const msg: ClientCreateMessage = {
                     kind: "create",
@@ -781,7 +780,7 @@ class SinkronCollection<T> {
                         isUploadIncomplete = true
                     }
                 })
-                if (isUploadIncomplete) return // skip
+                if (isUploadIncomplete) return // skip item
 
                 // Files that are in the remote list, but not in the local
                 const locallyDeletedFiles = difference(

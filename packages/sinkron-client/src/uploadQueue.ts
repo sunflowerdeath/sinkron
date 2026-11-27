@@ -25,6 +25,12 @@ export type UploadCompleted = { kind: "completed" }
 
 export type UploadStatus = UploadInProgress | UploadFailed | UploadCompleted
 
+const INITIAL_STATUS: UploadStatus = {
+    kind: "in_progress",
+    isInitialized: false,
+    chunksUploaded: 0,
+}
+
 enum IterationResult {
     // Upload is not yet finished
     InProgress,
@@ -52,8 +58,10 @@ type UploadQueueItem = AddFileProps & {
 class UploadQueue {
     // All items including pending, successfully completed and failed
     items: Map<string, UploadQueueItem> = new Map()
-    // Pending and in-progress uploads
+
     pendingItems: UploadQueueItem[] = []
+    currentItem?: UploadQueueItem
+
     isRunning = false
     fileApi: FileApi
     exponentialBackoff: ExponentialBackoff
@@ -81,11 +89,7 @@ class UploadQueue {
 
         const item: UploadQueueItem = {
             ...props,
-            status: {
-                kind: "in_progress",
-                isInitialized: false,
-                chunksUploaded: 0,
-            },
+            status: INITIAL_STATUS,
         }
         this.items.set(props.id, item)
         this.pendingItems.push(item)
@@ -95,8 +99,24 @@ class UploadQueue {
 
     remove(fileId: string) {
         this.items.delete(fileId)
+
         const index = this.pendingItems.findIndex((item) => item.id === fileId)
         if (index !== -1) this.pendingItems.splice(index, 1)
+
+        if (this.currentItem?.id === fileId) {
+            this.currentItem = undefined
+            this.exponentialBackoff.reset()
+        }
+    }
+
+    requeue(fileId: string): boolean {
+        const item = this.items.get(fileId)
+        if (!item) return false
+
+        const newItem = { ...item, status: INITIAL_STATUS }
+        this.remove(fileId)
+        this.add(newItem)
+        return true
     }
 
     start() {
@@ -113,14 +133,19 @@ class UploadQueue {
     async performIteration() {
         if (!this.isRunning) return
 
-        const item = this.pendingItems[0]
-        if (item === undefined) {
-            // Queue is empty
-            this.isRunning = false
-            return
+        let currentItem = this.currentItem
+        if (currentItem === undefined) {
+            const nextItem = this.pendingItems.shift()
+            if (nextItem !== undefined) {
+                currentItem = this.currentItem = nextItem
+            } else {
+                // Queue is empty
+                this.isRunning = false
+                return
+            }
         }
 
-        const result = await this.performItemIteration(item)
+        const result = await this.performItemIteration(currentItem)
 
         switch (result) {
             case IterationResult.InProgress:
@@ -128,8 +153,11 @@ class UploadQueue {
                 this.performIteration()
                 break
             case IterationResult.Finished:
-                this.pendingItems.shift()
-                item.onComplete(item.status)
+                // Checks that current item have not beed cancelled
+                if (currentItem === this.currentItem) {
+                    currentItem.onComplete(currentItem.status)
+                }
+                this.currentItem = undefined
                 this.exponentialBackoff.reset()
                 this.performIteration()
                 break
@@ -139,7 +167,7 @@ class UploadQueue {
                 })
                 break
             case IterationResult.Skip:
-                this.pendingItems.shift()
+                this.currentItem = undefined
                 this.performIteration()
                 break
         }

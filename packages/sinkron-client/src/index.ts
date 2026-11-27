@@ -183,7 +183,7 @@ class SinkronClient {
     onConnect() {
         this.clientLogger.info("Connection established")
         this.status = ConnectionStatus.Connected
-
+        this.uploadQueue.start()
         this.heartbeat = new Heartbeat({
             logger: this.clientLogger,
             heartbeat: (i: number) => {
@@ -200,7 +200,6 @@ class SinkronClient {
                 this.transport.close()
             },
         })
-
         for (const col of Object.values(this.collections)) {
             col.onConnect()
         }
@@ -209,6 +208,7 @@ class SinkronClient {
     onDisconnect() {
         this.clientLogger.info("Connection closed")
         this.status = ConnectionStatus.Disconnected
+        this.uploadQueue.stop()
         this.heartbeat?.dispose()
         this.heartbeat = undefined
         for (const col of Object.values(this.collections)) {

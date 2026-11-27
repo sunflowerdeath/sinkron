@@ -12,7 +12,11 @@ class BlobFileSource implements FileSource {
     }
 
     async getChunk(chunk: number) {
-        if (chunk < 1) return null // Starts from 1
+        if (chunk < 1) {
+            throw new Error(
+                `Invalid chunk number: ${chunk}, numeration starts from 1`,
+            )
+        }
 
         let chunks = Math.ceil(this.file.size / CHUNK_SIZE)
         if (chunk > chunks) return null
@@ -24,6 +28,7 @@ class BlobFileSource implements FileSource {
     }
 }
 
+/*
 class LocalFileSource implements FileSource {
     path: string
 
@@ -36,5 +41,6 @@ class LocalFileSource implements FileSource {
         return null
     }
 }
+*/
 
 export { CHUNK_SIZE, BlobFileSource }
